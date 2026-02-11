@@ -1,0 +1,5 @@
+node_modules/
+.gitmem/
+coverage/
+build/
+*.bun-build
