@@ -163,6 +163,10 @@ export interface IndexProgress {
   total: number
   /** Hash of the commit currently being processed. */
   currentHash?: string
+  /** Batch job ID when using batch mode. */
+  batchId?: string
+  /** Batch processing status when using batch mode. */
+  batchStatus?: string
 }
 
 /** Interface for interacting with a git repository. */
