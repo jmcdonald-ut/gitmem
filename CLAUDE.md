@@ -30,13 +30,16 @@ bun run build         # Compile to standalone binary at build/gitmem
 
 ```
 src/
-  cli.tsx              # Entry point, command definitions (index, status, query)
+  cli.tsx              # Entry point — registers commands via addCommand()
   types.ts             # All shared types, interfaces, and constants
-  commands/            # Ink React components for CLI commands
-    index-command.tsx
-    batch-index-command.tsx
-    query-command.tsx
-    status-command.tsx
+  commands/            # One directory per CLI command
+    <name>/
+      command.tsx      # Commander definition, options, help text, action handler
+      <Name>.tsx       # Ink React component for terminal UI
+      <Name>.test.tsx  # Component tests (co-located)
+    utils/
+      command-context.ts   # Shared runCommand() setup (git, db, format, API key)
+      test-utils.ts        # Test helpers (waitForFrame)
   db/                  # SQLite repositories and schema
     database.ts        # Schema creation, WAL + FK setup
     commits.ts         # Commit CRUD (CommitRepository)
