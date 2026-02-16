@@ -296,4 +296,76 @@ describe("AggregateRepository", () => {
   test("getCoupledFiles returns empty for unknown file", () => {
     expect(aggregates.getCoupledFiles("nonexistent.ts")).toHaveLength(0)
   })
+
+  test("getDirectoryStats aggregates across files in prefix", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const stats = aggregates.getDirectoryStats("src/")
+    expect(stats).not.toBeNull()
+    // src/main.ts: 3, src/utils.ts: 2, src/new.ts: 1 = 6 total
+    expect(stats!.total_changes).toBe(6)
+    expect(stats!.bug_fix_count).toBe(2) // bbb touches main.ts and utils.ts
+    expect(stats!.feature_count).toBe(4) // aaa: main+utils, ccc: main+new
+    expect(stats!.first_seen).toBe("2024-01-01T00:00:00Z")
+    expect(stats!.last_changed).toBe("2024-03-01T00:00:00Z")
+    expect(stats!.file_path).toBe("src/")
+  })
+
+  test("getDirectoryStats returns null for no matches", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const stats = aggregates.getDirectoryStats("nonexistent/")
+    expect(stats).toBeNull()
+  })
+
+  test("getDirectoryStats works with narrow prefix", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const stats = aggregates.getDirectoryStats("src/new")
+    expect(stats).not.toBeNull()
+    expect(stats!.total_changes).toBe(1)
+  })
+
+  test("getDirectoryContributors aggregates across files", () => {
+    seedData()
+    aggregates.rebuildFileContributors()
+
+    const contributors = aggregates.getDirectoryContributors("src/")
+    expect(contributors.length).toBeGreaterThanOrEqual(2)
+    // Alice has commits aaa (main+utils) + ccc (main+new) = 4 file touches
+    // Bob has commit bbb (main+utils) = 2 file touches
+    expect(contributors[0].author_name).toBe("Alice")
+    expect(contributors[0].commit_count).toBe(4)
+    expect(contributors[1].author_name).toBe("Bob")
+    expect(contributors[1].commit_count).toBe(2)
+    expect(contributors[0].file_path).toBe("src/")
+  })
+
+  test("getDirectoryContributors respects limit", () => {
+    seedData()
+    aggregates.rebuildFileContributors()
+
+    const contributors = aggregates.getDirectoryContributors("src/", 1)
+    expect(contributors).toHaveLength(1)
+  })
+
+  test("getDirectoryContributors returns empty for no matches", () => {
+    seedData()
+    aggregates.rebuildFileContributors()
+
+    const contributors = aggregates.getDirectoryContributors("nonexistent/")
+    expect(contributors).toHaveLength(0)
+  })
+
+  test("getDirectoryFileCount returns correct count", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    expect(aggregates.getDirectoryFileCount("src/")).toBe(3)
+    expect(aggregates.getDirectoryFileCount("src/main")).toBe(1)
+    expect(aggregates.getDirectoryFileCount("nonexistent/")).toBe(0)
+  })
 })

@@ -180,4 +180,74 @@ export class AggregateRepository {
       )
       .all(filePath, filePath, limit)
   }
+
+  /**
+   * Returns aggregated stats across all files under a directory prefix.
+   * @param prefix - Directory prefix (e.g. "src/services/").
+   * @returns Combined stats, or null if no files match.
+   */
+  getDirectoryStats(prefix: string): FileStatsRow | null {
+    const row = this.db
+      .query<FileStatsRow, [string]>(
+        `SELECT
+           ? as file_path,
+           COALESCE(SUM(total_changes), 0) as total_changes,
+           COALESCE(SUM(bug_fix_count), 0) as bug_fix_count,
+           COALESCE(SUM(feature_count), 0) as feature_count,
+           COALESCE(SUM(refactor_count), 0) as refactor_count,
+           COALESCE(SUM(docs_count), 0) as docs_count,
+           COALESCE(SUM(chore_count), 0) as chore_count,
+           COALESCE(SUM(perf_count), 0) as perf_count,
+           COALESCE(SUM(test_count), 0) as test_count,
+           COALESCE(SUM(style_count), 0) as style_count,
+           MIN(first_seen) as first_seen,
+           MAX(last_changed) as last_changed,
+           COALESCE(SUM(total_additions), 0) as total_additions,
+           COALESCE(SUM(total_deletions), 0) as total_deletions
+         FROM file_stats
+         WHERE file_path LIKE ? || '%'`,
+      )
+      .get(prefix, prefix)
+    if (!row || row.first_seen === null) return null
+    return row
+  }
+
+  /**
+   * Returns aggregated contributors across all files under a directory prefix.
+   * @param prefix - Directory prefix (e.g. "src/services/").
+   * @param limit - Maximum number of contributors to return.
+   * @returns Contributors ordered by total commit count descending.
+   */
+  getDirectoryContributors(
+    prefix: string,
+    limit: number = 5,
+  ): FileContributorRow[] {
+    return this.db
+      .query<FileContributorRow, [string, string, number]>(
+        `SELECT
+           ? as file_path,
+           author_name,
+           author_email,
+           SUM(commit_count) as commit_count
+         FROM file_contributors
+         WHERE file_path LIKE ? || '%'
+         GROUP BY author_email
+         ORDER BY commit_count DESC
+         LIMIT ?`,
+      )
+      .all(prefix, prefix, limit)
+  }
+
+  /**
+   * Returns the number of distinct files under a directory prefix.
+   * @param prefix - Directory prefix (e.g. "src/services/").
+   * @returns Count of files matching the prefix.
+   */
+  getDirectoryFileCount(prefix: string): number {
+    return this.db
+      .query<{ count: number }, [string]>(
+        "SELECT COUNT(*) as count FROM file_stats WHERE file_path LIKE ? || '%'",
+      )
+      .get(prefix)!.count
+  }
 }
