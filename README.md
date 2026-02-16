@@ -1,168 +1,106 @@
+<div align="center">
+
 # gitmem
 
-AI-powered git history index. Enrich commits once with Claude, then search and analyze instantly — no LLM calls at query time.
+gitmem indexes your git history with LLM-powered commit classification, then surfaces patterns — hotspots, file coupling, change trends — at query time with no LLM calls. Built for humans and AI agents alike.
+</div>
 
-gitmem extracts your repository's commit history, classifies each commit via the Anthropic API, and stores everything in a local SQLite database with full-text search. Run `gitmem index` to build, `gitmem query` to search.
+```sh
+# Index your repo (enriches commits via a LLM)
+gitmem index
 
-gitmem helps users and LLMs answer aggregate and pattern-based questions about a git repo. The end goal is a tool that augments coding agents with answers to questions that are hard to get from the Git CLI alone. Sample questions that an LLM can hopefully answer using this tool include:
+# Use the index to surface patterns and insights
+gitmem stats src/db          # Tell me everything about this path
+gitmem hotspots              # What files change the most?
+gitmem coupling src/db.ts    # What changes alongside this file?
+gitmem trends src/services   # Is this area stabilizing or getting worse?
+gitmem query "auth"          # Search commit history
+```
 
-- What types of bugs recur?
-- What files change the most? Why?
-- What files tend to change together?
-- Is this area of the code stabilizing or getting worse?
+## Table of Contents
 
-## Install
+1. **[Setup](#setup)**
+2. **[Development](#development)**
+3. **[Usage](#usage)**
+4. **[How `gitmem index` Works](#how-gitmem-index-works)**
+5. **[Motivation](#motivation)**
 
-Requires [Bun](https://bun.sh).
+## Setup
 
-```bash
+Requires [Bun](https://bun.sh). Once installed, clone the project, install dependencies, and build the CLI.
+
+```sh
 git clone git@github.com:jmcdonald-ut/gitmem.git && cd gitmem
 bun install
 ```
 
-Set your API key:
+The project is now primed for producing a build or proceeding with development. Produce a binary like so:
 
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+```sh
+bun run build   # Compile to standalone binary at build/gitmem
 ```
 
-Build the CLI tool:
+The produced binary can be found at `build/gitmem`. Add it to your path or copy it into a shared bin folder.
+
+**IMPORTANT:** At present, an Anthropic API key is required in order to index a repo. It's also required for one other command, `gitmem check`, which is used to help with development.
+
+```sh
+# One-time use
+ANTHROPIC_API_KEY="sk-ant-..." gitmem index
+
+# Or export for repeated use
+export ANTHROPIC_API_KEY="sk-ant-..."
+gitmem index
+```
+
+## Development
 
 ```bash
-bun run build
+bun test         # Run tests
+bun run lint     # ESLint
+bun run format   # Prettier
+bun run build    # Compile to standalone binary at build/gitmem
 ```
 
 ## Usage
 
-### Index a repository
+**Heads up:** Most commands require that the repo has been indexed first (`gitmem index`). For repos with an extensive history, use `--batch` to help reduce costs by ~50% (`gitmem index --batch`).
 
-```bash
-gitmem index
+```sh
+Usage: gitmem [options] [command]
+
+AI-powered git history index
+
+Options:
+  -V, --version                output the version number
+  --format <format>            Output format (text or json) (default: "text")
+  --json                       Shorthand for --format json
+  -h, --help                   display help for command
+
+Commands:
+  index|i [options]            Analyze new commits via Claude API and rebuild search index
+  status|s                     Show index health, coverage, and database statistics
+  query|q [options] <query>    Full-text search over enriched commits (no API calls)
+  check [options] [hash]       Evaluate enrichment quality via LLM-as-judge
+  hotspots|h [options]         Show most-changed files with classification breakdown
+  stats [options] <path>       Show detailed change statistics for a file or directory
+  coupling|c [options] [path]  Show files that frequently change together
+  trends|t [options] <path>    Show change velocity and classification mix over time
+  schema                       Display database schema documentation
+  help [command]               display help for command
+
+Getting started:
+  1. Export your Anthropic API key:  export ANTHROPIC_API_KEY=sk-ant-...
+  2. Run the indexer:                gitmem index
+  3. Search your history:            gitmem query "auth bug"
+
+Global options --format json and --json work with every command.
+Run gitmem schema for database table documentation.
 ```
 
-Discovers commits, sends each to the Anthropic API for classification and summarization, then builds aggregates and a full-text search index. Progress is displayed in real time:
+## How `gitmem index` Works
 
-```
-⠋ Enriching commits...
-Enriching commit 42 / 128 [a1b2c3d]
-
-Indexing complete!
-Enriched this run: 128
-Total coverage: 128 / 128 commits (100%)
-```
-
-Use a different model with `--model`:
-
-```bash
-gitmem index --model claude-sonnet-4-5-20250929
-```
-
-The default model is `claude-haiku-4-5-20251001`. Indexing is incremental — re-running only processes new or unenriched commits.
-
-#### Batch mode
-
-Use the Anthropic Message Batches API for 50% cost reduction:
-
-```bash
-gitmem index --batch
-```
-
-Batch mode is stateful across invocations. The first run submits all unenriched commits as a batch. Subsequent runs poll for progress and import results when complete:
-
-```
-# First run
-Batch submitted! ID: msg_bch_xxx. Run `gitmem index --batch` again to check status.
-
-# Later run
-Indexing complete!
-Enriched this run: 128
-Total coverage: 128 / 128 commits (100%)
-```
-
-### Search the index
-
-```bash
-gitmem query "authentication bug"
-```
-
-Searches are pure SQLite FTS5 lookups with no API calls:
-
-```
-Query: authentication bug
-
-Matching commits (3):
- a1b2c3d [bug-fix] Fixed session expiry causing silent auth failures
- e4f5a6b [bug-fix] Corrected OAuth token refresh race condition
- c7d8e9f [feature] Added JWT-based authentication flow
-
-Top hotspots:
-  src/auth/session.ts (24 changes, 8 bug fixes)
-  src/middleware/auth.ts (18 changes, 5 bug fixes)
-```
-
-Limit results with `--limit`:
-
-```bash
-gitmem query "refactor" --limit 5
-```
-
-### Evaluate enrichment quality
-
-```bash
-gitmem check abc123f
-```
-
-Evaluates a single commit's enrichment using an LLM-as-judge (default: Claude Sonnet 4.5). The judge assesses classification correctness, summary accuracy, and summary completeness:
-
-```
-Evaluation for abc123f
-
-  Original: [feature] Add batch indexing support
-
-  [PASS] Classification
-         The commit introduces a new feature...
-
-  [PASS] Summary accuracy
-         Accurately describes the changes made.
-
-  [PASS] Summary completeness
-         Covers the main changes adequately.
-```
-
-Evaluate a random sample of enriched commits with `--sample`:
-
-```bash
-gitmem check --sample 50
-```
-
-```
-Evaluation Summary (50 commits)
-
-  Classification: 47/50 correct
-  Summary accuracy: 45/50 accurate
-  Summary completeness: 43/50 complete
-
-  Details saved to: .gitmem/check-20260216T123045.json
-```
-
-### Check index status
-
-```bash
-gitmem status
-```
-
-```
-Indexed: 128 / 128 commits (100%)
-Enriched: 128 / 128 indexed commits (100%)
-Last run: 2025-01-15T10:30:00.000Z
-Model: claude-haiku-4-5-20251001
-DB: /path/to/repo/.gitmem/index.db
-DB size: 2.4 MB
-```
-
-## How it works
-
-gitmem runs a four-phase pipeline:
+`gitmem index` runs a four-phase pipeline:
 
 ```
 1. Discover   — extract commit metadata and file stats from git
@@ -171,52 +109,13 @@ gitmem runs a four-phase pipeline:
 4. Index      — rebuild SQLite FTS5 full-text search index
 ```
 
-All data is stored in `.gitmem/index.db` (SQLite, WAL mode). The database includes:
+## Motivation
 
-- **commits** — hash, author, timestamp, message, classification, AI summary
-- **commit_files** — per-file additions/deletions for each commit
-- **file_stats** — change counts by classification type, first/last seen dates
-- **file_contributors** — which authors modify which files
-- **file_coupling** — files that frequently change together
-- **batch_jobs** — batch API job state for resumable enrichment
-- **commits_fts** — FTS5 virtual table for fast text search
+I'm building `gitmem` for fun while also trying:
 
-## Project structure
+- To learn more about behavioral code analysis
+- To see if behavioral code analysis benefits when augmented with AI
+- To see if the resulting data can help coding agents with their tasks
+- And, to a lesser extent, to see what [Bun, the all-in-one-toolkit for TS applications](https://bun.sh/), is all about
 
-```
-src/
-├── cli.tsx                      # Entry point, command definitions
-├── types.ts                     # Shared types and interfaces
-├── commands/
-│   ├── index-command.tsx         # Index progress UI
-│   ├── batch-index-command.tsx   # Batch index progress UI
-│   ├── check-command.tsx         # Evaluation results display
-│   ├── query-command.tsx         # Search results display
-│   └── status-command.tsx        # Index health display
-├── db/
-│   ├── database.ts               # Schema creation, SQLite setup
-│   ├── commits.ts                # Commit CRUD operations
-│   ├── aggregates.ts             # File stats, coupling, contributors
-│   ├── batch-jobs.ts             # Batch job tracking
-│   └── search.ts                 # FTS5 index and search
-└── services/
-    ├── git.ts                    # Git command execution via Bun shell
-    ├── llm.ts                    # Anthropic API integration
-    ├── llm-shared.ts             # Shared prompt and response parsing
-    ├── batch-llm.ts              # Anthropic Message Batches API
-    ├── enricher.ts               # Orchestrates the 4-phase pipeline
-    ├── aggregator.ts             # Computes per-file stats, coupling, contributors
-    ├── checker.ts                # Quality evaluation workflow
-    ├── judge.ts                  # LLM-as-judge API client
-    └── judge-shared.ts           # Judge prompt and response parsing
-```
-
-## Development
-
-```bash
-bun test              # Run tests
-bun test --coverage   # Run tests with coverage
-bun run lint          # ESLint
-bun run format        # Prettier
-bun run build         # Compile to standalone binary at build/gitmem
-```
+Credit for most of the written code goes to [Claude Code](https://code.claude.com/docs/en/overview). I've let it do a lot of the heavy lifting so I can focus on the above bullets.
