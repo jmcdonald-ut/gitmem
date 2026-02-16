@@ -177,6 +177,13 @@ export interface IGitService {
   getDiff(hash: string, maxChars?: number): Promise<string>
   /** Returns the total number of commits on the given branch. */
   getTotalCommitCount(branch: string): Promise<number>
+  /** Retrieves commit metadata and file lists for multiple commits in bulk. */
+  getCommitInfoBatch(hashes: string[]): Promise<CommitInfo[]>
+  /** Returns unified diffs for multiple commits in bulk, each truncated to maxChars. */
+  getDiffBatch(
+    hashes: string[],
+    maxChars?: number,
+  ): Promise<Map<string, string>>
   /** Checks whether the working directory is inside a git repository. */
   isGitRepo(): Promise<boolean>
 }

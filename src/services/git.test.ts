@@ -115,6 +115,113 @@ describe("GitService", () => {
     expect(await git.getTotalCommitCount("main")).toBe(3)
   })
 
+  test("getCommitInfoBatch returns empty array for empty input", async () => {
+    const result = await git.getCommitInfoBatch([])
+    expect(result).toEqual([])
+  })
+
+  test("getCommitInfoBatch returns single commit", async () => {
+    await makeCommit("hello.txt", "hello", "add greeting")
+
+    const hashes = await git.getCommitHashes("main")
+    const batch = await git.getCommitInfoBatch(hashes)
+
+    expect(batch).toHaveLength(1)
+    expect(batch[0].hash).toBe(hashes[0])
+    expect(batch[0].authorName).toBe("Test User")
+    expect(batch[0].message).toBe("add greeting")
+    expect(batch[0].files).toHaveLength(1)
+    expect(batch[0].files[0].filePath).toBe("hello.txt")
+  })
+
+  test("getCommitInfoBatch returns N commits in input order", async () => {
+    await makeCommit("a.txt", "a", "first")
+    await makeCommit("b.txt", "b", "second")
+    await makeCommit("c.txt", "c", "third")
+
+    const hashes = await git.getCommitHashes("main")
+    expect(hashes).toHaveLength(3)
+
+    const batch = await git.getCommitInfoBatch(hashes)
+    expect(batch).toHaveLength(3)
+
+    // Verify order matches input hashes
+    for (let i = 0; i < hashes.length; i++) {
+      expect(batch[i].hash).toBe(hashes[i])
+    }
+  })
+
+  test("getCommitInfoBatch matches single-call results", async () => {
+    await makeCommit("x.txt", "x content", "add x")
+    await makeCommit("y.txt", "y content", "add y")
+
+    const hashes = await git.getCommitHashes("main")
+    const batch = await git.getCommitInfoBatch(hashes)
+    const singles = await Promise.all(hashes.map((h) => git.getCommitInfo(h)))
+
+    for (let i = 0; i < hashes.length; i++) {
+      expect(batch[i].hash).toBe(singles[i].hash)
+      expect(batch[i].authorName).toBe(singles[i].authorName)
+      expect(batch[i].authorEmail).toBe(singles[i].authorEmail)
+      expect(batch[i].message).toBe(singles[i].message)
+      expect(batch[i].files.length).toBe(singles[i].files.length)
+    }
+  })
+
+  test("getDiffBatch returns empty map for empty input", async () => {
+    const result = await git.getDiffBatch([])
+    expect(result.size).toBe(0)
+  })
+
+  test("getDiffBatch returns single diff", async () => {
+    await makeCommit("code.ts", "const x = 1\n", "add code")
+
+    const hashes = await git.getCommitHashes("main")
+    const diffs = await git.getDiffBatch(hashes)
+
+    expect(diffs.size).toBe(1)
+    expect(diffs.get(hashes[0])).toContain("const x = 1")
+  })
+
+  test("getDiffBatch returns N diffs", async () => {
+    await makeCommit("a.ts", "const a = 1\n", "add a")
+    await makeCommit("b.ts", "const b = 2\n", "add b")
+
+    const hashes = await git.getCommitHashes("main")
+    const diffs = await git.getDiffBatch(hashes)
+
+    expect(diffs.size).toBe(2)
+    for (const h of hashes) {
+      expect(diffs.has(h)).toBe(true)
+    }
+  })
+
+  test("getDiffBatch matches single-call results", async () => {
+    await makeCommit("p.ts", "const p = 1\n", "add p")
+    await makeCommit("q.ts", "const q = 2\n", "add q")
+
+    const hashes = await git.getCommitHashes("main")
+    const batchDiffs = await git.getDiffBatch(hashes)
+    const singleDiffs = await Promise.all(hashes.map((h) => git.getDiff(h)))
+
+    for (let i = 0; i < hashes.length; i++) {
+      // Both should contain the same core diff content
+      const batchDiff = batchDiffs.get(hashes[i]) ?? ""
+      expect(batchDiff).toContain(singleDiffs[i].trim().slice(0, 20))
+    }
+  })
+
+  test("getDiffBatch truncates long diffs", async () => {
+    const longContent = "x".repeat(500)
+    await makeCommit("big.txt", longContent, "big file")
+
+    const hashes = await git.getCommitHashes("main")
+    const diffs = await git.getDiffBatch(hashes, 100)
+
+    const diff = diffs.get(hashes[0]) ?? ""
+    expect(diff).toContain("[truncated]")
+  })
+
   test("getCommitInfo handles additions and deletions", async () => {
     await makeCommit("file.txt", "line1\nline2\nline3\n", "initial")
     await Bun.$`printf "line1\nmodified\nline3\nnew\n" > ${join(tmpDir, "file.txt")}`.quiet()

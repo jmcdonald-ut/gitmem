@@ -139,6 +139,126 @@ export class GitService implements IGitService {
   }
 
   /**
+   * Retrieves commit metadata and file lists for multiple commits in a small
+   * number of git process spawns instead of 2×N individual calls.
+   * Hashes are chunked at 500 to stay under ARG_MAX.
+   * @param hashes - Full SHA-1 commit hashes.
+   * @returns CommitInfo[] preserving input order.
+   */
+  async getCommitInfoBatch(hashes: string[]): Promise<CommitInfo[]> {
+    if (hashes.length === 0) return []
+
+    const CHUNK = 500
+    const DELIM = "---GITMEM_RECORD---"
+    const commitMap = new Map<string, CommitInfo>()
+
+    // Fetch metadata in chunks using --no-walk
+    for (let i = 0; i < hashes.length; i += CHUNK) {
+      const chunk = hashes.slice(i, i + CHUNK)
+      const format = `${DELIM}%n%H%n%an%n%ae%n%aI%n%B`
+      const result =
+        await Bun.$`git -C ${this.cwd} log --no-walk --format=${format} ${chunk}`.quiet()
+      const text = result.text()
+      const records = text.split(DELIM).filter((r) => r.trim().length > 0)
+
+      for (const record of records) {
+        const lines = record.trim().split("\n")
+        const hash = lines[0]
+        const authorName = lines[1]
+        const authorEmail = lines[2]
+        const committedAt = lines[3]
+        const message = lines.slice(4).join("\n").trim()
+        commitMap.set(hash, {
+          hash,
+          authorName,
+          authorEmail,
+          committedAt,
+          message,
+          files: [],
+        })
+      }
+    }
+
+    // Fetch file stats via stdin to avoid ARG_MAX
+    const stdinHashes = hashes.join("\n")
+    const numstatResult =
+      await Bun.$`echo ${stdinHashes} | git -C ${this.cwd} diff-tree --stdin --root -r --numstat`.quiet()
+    const numstatText = numstatResult.text()
+
+    let currentHash: string | null = null
+    for (const line of numstatText.split("\n")) {
+      if (line.length === 0) continue
+      // Commit hash lines from diff-tree --stdin are 40-char hex
+      if (/^[0-9a-f]{40}$/.test(line)) {
+        currentHash = line
+        continue
+      }
+      if (currentHash && line.includes("\t")) {
+        const parts = line.split("\t")
+        const additions = parts[0] === "-" ? 0 : parseInt(parts[0], 10)
+        const deletions = parts[1] === "-" ? 0 : parseInt(parts[1], 10)
+        const filePath = parts[2]
+        const commit = commitMap.get(currentHash)
+        if (commit) {
+          commit.files.push({
+            filePath,
+            changeType: "M",
+            additions,
+            deletions,
+          })
+        }
+      }
+    }
+
+    // Preserve input order
+    return hashes
+      .map((h) => commitMap.get(h))
+      .filter((c): c is CommitInfo => c !== undefined)
+  }
+
+  /**
+   * Returns unified diffs for multiple commits in a single git process spawn,
+   * piping hashes via stdin. Each diff is truncated at maxChars.
+   * @param hashes - Full SHA-1 commit hashes.
+   * @param maxChars - Maximum character length per diff.
+   * @returns Map from hash to diff string.
+   */
+  async getDiffBatch(
+    hashes: string[],
+    maxChars: number = 12000,
+  ): Promise<Map<string, string>> {
+    const result = new Map<string, string>()
+    if (hashes.length === 0) return result
+
+    const stdinHashes = hashes.join("\n")
+    const proc =
+      await Bun.$`echo ${stdinHashes} | git -C ${this.cwd} diff-tree --stdin --root -p`.quiet()
+    const output = proc.text()
+
+    // Split on commit hash boundaries — diff-tree --stdin outputs the hash on its own line
+    // before each diff. We split using a regex that matches a 40-char hex hash at start of line.
+    const parts = output.split(/^([0-9a-f]{40})$/m)
+    // parts array: ['', hash1, diff1, hash2, diff2, ...]
+    for (let i = 1; i < parts.length - 1; i += 2) {
+      const hash = parts[i].trim()
+      let diff = parts[i + 1]
+      if (diff.length > maxChars) {
+        diff = diff.slice(0, maxChars) + "\n... [truncated]"
+      }
+      result.set(hash, diff)
+    }
+
+    // Ensure all requested hashes have an entry
+    for (const h of hashes) {
+      if (!result.has(h)) {
+        result.set(h, "")
+      }
+    }
+
+    return result
+  }
+
+  /**
    * Returns the total number of commits on the given branch.
    * @param branch - Branch name to count commits on.
    */
