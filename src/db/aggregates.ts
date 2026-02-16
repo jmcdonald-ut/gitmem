@@ -119,13 +119,15 @@ export class AggregateRepository {
       params.push(pathPrefix)
     }
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+    const where =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
     params.push(limit)
 
     return this.db
-      .query<FileStatsRow, (string | number)[]>(
-        `SELECT * FROM file_stats ${where} ORDER BY ${column} DESC LIMIT ?`,
-      )
+      .query<
+        FileStatsRow,
+        (string | number)[]
+      >(`SELECT * FROM file_stats ${where} ORDER BY ${column} DESC LIMIT ?`)
       .all(...params)
   }
 

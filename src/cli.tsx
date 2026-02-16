@@ -18,6 +18,7 @@ import { BatchIndexCommand } from "@commands/batch-index-command"
 import { StatusCommand } from "@commands/status-command"
 import { QueryCommand } from "@commands/query-command"
 import { CheckCommand } from "@commands/check-command"
+import { HotspotsCommand } from "@commands/hotspots-command"
 import { JudgeService } from "@services/judge"
 import { CheckerService } from "@services/checker"
 import type { StatusInfo } from "@/types"
@@ -379,6 +380,83 @@ program
       }
     }
 
+    db.close()
+  })
+
+const VALID_SORT_FIELDS = [
+  "total",
+  "bug-fix",
+  "feature",
+  "refactor",
+  "docs",
+  "chore",
+  "perf",
+  "test",
+  "style",
+]
+
+program
+  .command("hotspots")
+  .alias("h")
+  .description("Show most-changed files with classification breakdown")
+  .option(
+    "--sort <field>",
+    "Sort by: total, bug-fix, feature, refactor, docs, chore, perf, test, style",
+    "total",
+  )
+  .option("--path <prefix>", "Filter by directory prefix")
+  .option("-l, --limit <number>", "Max results", "10")
+  .action(async (opts) => {
+    const format = resolveFormat(program.opts())
+    const cwd = process.cwd()
+    const git = new GitService(cwd)
+
+    if (!(await git.isGitRepo())) {
+      console.error("Error: not a git repository")
+      process.exit(1)
+    }
+
+    if (!VALID_SORT_FIELDS.includes(opts.sort)) {
+      console.error(
+        `Error: invalid sort field "${opts.sort}". Valid values: ${VALID_SORT_FIELDS.join(", ")}`,
+      )
+      process.exit(1)
+    }
+
+    const dbPath = getDbPath()
+    if (!existsSync(dbPath)) {
+      console.error("Error: no index found. Run `gitmem index` first.")
+      process.exit(1)
+    }
+
+    const db = createDatabase(dbPath)
+    const aggregates = new AggregateRepository(db)
+
+    const hotspots = aggregates.getHotspots({
+      limit: parseInt(opts.limit, 10),
+      sort: opts.sort,
+      pathPrefix: opts.path,
+    })
+
+    if (
+      formatOutput(format, {
+        sort: opts.sort,
+        path: opts.path ?? null,
+        hotspots,
+      })
+    ) {
+      db.close()
+      return
+    }
+
+    const instance = render(
+      <HotspotsCommand
+        hotspots={hotspots}
+        sort={opts.sort}
+        pathPrefix={opts.path}
+      />,
+    )
+    instance.unmount()
     db.close()
   })
 

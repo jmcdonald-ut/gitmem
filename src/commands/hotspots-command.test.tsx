@@ -62,9 +62,7 @@ describe("HotspotsCommand", () => {
   })
 
   test("shows empty state message", () => {
-    const { lastFrame } = render(
-      <HotspotsCommand hotspots={[]} sort="total" />,
-    )
+    const { lastFrame } = render(<HotspotsCommand hotspots={[]} sort="total" />)
     const output = lastFrame()
 
     expect(output).toContain("No hotspots found.")
