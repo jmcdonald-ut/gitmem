@@ -75,6 +75,7 @@ describe("EnricherService", () => {
         return Promise.resolve(map)
       }),
       getTotalCommitCount: mock(() => Promise.resolve(3)),
+      getFileContentsBatch: mock(() => Promise.resolve(new Map())),
     }
 
     mockLLM = {
@@ -229,6 +230,7 @@ describe("EnricherService", () => {
       commits,
       aggregates,
       search,
+      null,
       "claude-haiku-4-5-20251001",
       2, // concurrency = 2
     )
@@ -315,6 +317,7 @@ describe("EnricherService", () => {
       commits,
       aggregates,
       search,
+      null,
       "claude-haiku-4-5-20251001",
       8,
     )
@@ -420,6 +423,7 @@ describe("EnricherService", () => {
       commits,
       aggregates,
       search,
+      null,
       "claude-haiku-4-5-20251001",
       2,
     )

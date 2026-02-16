@@ -5,6 +5,7 @@ import { AggregateRepository } from "@db/aggregates"
 import { SearchService } from "@db/search"
 import { BatchJobRepository } from "@db/batch-jobs"
 import type { BatchLLMService } from "@services/batch-llm"
+import type { MeasurerService } from "@services/measurer"
 
 /**
  * Orchestrates the full indexing pipeline: discovers new commits, enriches them
@@ -16,6 +17,7 @@ export class EnricherService {
   private commits: CommitRepository
   private aggregates: AggregateRepository
   private search: SearchService
+  private measurer: MeasurerService | null
   private model: string
   private concurrency: number
 
@@ -25,6 +27,7 @@ export class EnricherService {
    * @param commits - Commit database repository.
    * @param aggregates - Aggregate statistics repository.
    * @param search - Full-text search service.
+   * @param measurer - Complexity measurement service.
    * @param model - Model identifier stored with enrichment results.
    * @param concurrency - Number of parallel LLM requests per window.
    */
@@ -34,6 +37,7 @@ export class EnricherService {
     commits: CommitRepository,
     aggregates: AggregateRepository,
     search: SearchService,
+    measurer: MeasurerService | null = null,
     model: string = "claude-haiku-4-5-20251001",
     concurrency: number = 8,
   ) {
@@ -42,6 +46,7 @@ export class EnricherService {
     this.commits = commits
     this.aggregates = aggregates
     this.search = search
+    this.measurer = measurer
     this.model = model
     this.concurrency = concurrency
   }
@@ -72,6 +77,11 @@ export class EnricherService {
     if (newHashes.length > 0) {
       const newCommits = await this.git.getCommitInfoBatch(newHashes)
       this.commits.insertRawCommits(newCommits)
+    }
+
+    // Phase 1.5: Measure complexity
+    if (this.measurer) {
+      await this.measurer.measure(onProgress)
     }
 
     // Phase 2: Enrich unenriched commits with parallel sliding window
@@ -201,6 +211,11 @@ export class EnricherService {
     if (newHashes.length > 0) {
       const newCommits = await this.git.getCommitInfoBatch(newHashes)
       this.commits.insertRawCommits(newCommits)
+    }
+
+    // Measure complexity
+    if (this.measurer) {
+      await this.measurer.measure(onProgress)
     }
 
     let enrichedThisRun = 0
