@@ -479,10 +479,7 @@ describe("AggregateRepository", () => {
     aggregates.rebuildFileStats()
     aggregates.rebuildFileCoupling()
 
-    const coupled = aggregates.getCoupledFilesForDirectory(
-      "src/services/",
-      10,
-    )
+    const coupled = aggregates.getCoupledFilesForDirectory("src/services/", 10)
     expect(coupled.length).toBeGreaterThanOrEqual(1)
     const dbCommits = coupled.find((c) => c.file === "src/db/commits.ts")
     expect(dbCommits).toBeDefined()

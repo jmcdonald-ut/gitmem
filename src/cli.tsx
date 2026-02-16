@@ -20,6 +20,7 @@ import { QueryCommand } from "@commands/query-command"
 import { CheckCommand } from "@commands/check-command"
 import { HotspotsCommand } from "@commands/hotspots-command"
 import { StatsCommand } from "@commands/stats-command"
+import { CouplingCommand } from "@commands/coupling-command"
 import { JudgeService } from "@services/judge"
 import { CheckerService } from "@services/checker"
 import type { StatusInfo } from "@/types"
@@ -560,6 +561,82 @@ program
         />,
       )
       instance.unmount()
+    }
+
+    db.close()
+  })
+
+program
+  .command("coupling [path]")
+  .alias("c")
+  .description("Show co-change pairs")
+  .option("-l, --limit <number>", "Max results", "10")
+  .action(async (path, opts) => {
+    const format = resolveFormat(program.opts())
+    const cwd = process.cwd()
+    const git = new GitService(cwd)
+
+    if (!(await git.isGitRepo())) {
+      console.error("Error: not a git repository")
+      process.exit(1)
+    }
+
+    const dbPath = getDbPath()
+    if (!existsSync(dbPath)) {
+      console.error("Error: no index found. Run `gitmem index` first.")
+      process.exit(1)
+    }
+
+    const db = createDatabase(dbPath)
+    const aggregates = new AggregateRepository(db)
+    const limit = parseInt(opts.limit, 10)
+
+    if (!path) {
+      // Global mode
+      const pairs = aggregates.getTopCoupledPairs(limit)
+
+      if (formatOutput(format, { path: null, pairs })) {
+        db.close()
+        return
+      }
+
+      const instance = render(<CouplingCommand path={null} pairs={pairs} />)
+      instance.unmount()
+    } else {
+      // Detect whether path is a file or directory
+      const fileStats = aggregates.getFileStats(path)
+      if (fileStats) {
+        // File mode
+        const pairs = aggregates.getCoupledFilesWithRatio(path, limit)
+
+        if (formatOutput(format, { path, pairs })) {
+          db.close()
+          return
+        }
+
+        const instance = render(<CouplingCommand path={path} pairs={pairs} />)
+        instance.unmount()
+      } else {
+        // Directory mode
+        const prefix = path.endsWith("/") ? path : path + "/"
+        const fileCount = aggregates.getDirectoryFileCount(prefix)
+
+        if (fileCount === 0) {
+          console.error(`Error: no indexed data found for "${path}"`)
+          db.close()
+          process.exit(1)
+        }
+
+        const pairs = aggregates.getCoupledFilesForDirectory(prefix, limit)
+
+        if (formatOutput(format, { path: prefix, pairs })) {
+          db.close()
+          return
+        }
+
+        const instance = render(<CouplingCommand path={prefix} pairs={pairs} />)
+        instance.unmount()
+      }
     }
 
     db.close()

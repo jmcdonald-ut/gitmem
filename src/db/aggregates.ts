@@ -310,7 +310,10 @@ export class AggregateRepository {
     limit: number = 10,
   ): CouplingPairRow[] {
     return this.db
-      .query<CouplingPairRow, [string, string, string, string, string, string, number]>(
+      .query<
+        CouplingPairRow,
+        [string, string, string, string, string, string, number]
+      >(
         `SELECT
            CASE
              WHEN fc.file_a LIKE ? || '%' THEN fc.file_b

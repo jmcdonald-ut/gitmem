@@ -8,11 +8,13 @@ describe("CouplingCommand", () => {
   test("renders global mode with file_a and file_b", () => {
     const pairs: CouplingPairGlobalRow[] = [
       { file_a: "src/main.ts", file_b: "src/utils.ts", co_change_count: 15 },
-      { file_a: "src/db/commits.ts", file_b: "src/services/git.ts", co_change_count: 8 },
+      {
+        file_a: "src/db/commits.ts",
+        file_b: "src/services/git.ts",
+        co_change_count: 8,
+      },
     ]
-    const { lastFrame } = render(
-      <CouplingCommand path={null} pairs={pairs} />,
-    )
+    const { lastFrame } = render(<CouplingCommand path={null} pairs={pairs} />)
     const output = lastFrame()
 
     expect(output).toContain("src/main.ts")
@@ -43,9 +45,7 @@ describe("CouplingCommand", () => {
   })
 
   test("shows empty state message", () => {
-    const { lastFrame } = render(
-      <CouplingCommand path={null} pairs={[]} />,
-    )
+    const { lastFrame } = render(<CouplingCommand path={null} pairs={[]} />)
     const output = lastFrame()
 
     expect(output).toContain("No coupling data found.")
@@ -68,9 +68,7 @@ describe("CouplingCommand", () => {
     const pairs: CouplingPairGlobalRow[] = [
       { file_a: "a.ts", file_b: "b.ts", co_change_count: 3 },
     ]
-    const { lastFrame } = render(
-      <CouplingCommand path={null} pairs={pairs} />,
-    )
+    const { lastFrame } = render(<CouplingCommand path={null} pairs={pairs} />)
     const output = lastFrame()
 
     expect(output).not.toContain("Path:")
