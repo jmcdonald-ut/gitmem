@@ -2,6 +2,7 @@ import { describe, test, expect, mock } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
 import { IndexCommand, phaseLabel } from "@commands/index-command"
+import { waitForFrame } from "@commands/test-utils"
 import type { EnricherService } from "@services/enricher"
 import type { IndexProgress } from "@/types"
 
@@ -35,12 +36,11 @@ function createMockEnricher(
 describe("IndexCommand", () => {
   test("shows completion message", async () => {
     const enricher = createMockEnricher("success")
-    const { lastFrame } = render(<IndexCommand enricher={enricher} />)
+    const { frames } = render(<IndexCommand enricher={enricher} />)
 
-    // Wait for async effect
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) =>
+      f.includes("Indexing complete!"),
+    )
     expect(output).toContain("Indexing complete!")
     expect(output).toContain("Enriched this run: 5")
     expect(output).toContain("50%")
@@ -48,22 +48,20 @@ describe("IndexCommand", () => {
 
   test("shows error message", async () => {
     const enricher = createMockEnricher("error")
-    const { lastFrame } = render(<IndexCommand enricher={enricher} />)
+    const { frames } = render(<IndexCommand enricher={enricher} />)
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) => f.includes("Error:"))
     expect(output).toContain("Error:")
     expect(output).toContain("LLM API failed")
   })
 
   test("shows zero results for empty repo", async () => {
     const enricher = createMockEnricher("empty")
-    const { lastFrame } = render(<IndexCommand enricher={enricher} />)
+    const { frames } = render(<IndexCommand enricher={enricher} />)
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) =>
+      f.includes("Enriched this run:"),
+    )
     expect(output).toContain("Enriched this run: 0")
     expect(output).toContain("0%")
   })
