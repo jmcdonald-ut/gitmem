@@ -151,15 +151,17 @@ export class EnricherService {
       }
     }
 
-    // Phase 3: Rebuild aggregates
-    onProgress({ phase: "aggregating", current: 0, total: 0 })
-    this.aggregates.rebuildFileStats()
-    this.aggregates.rebuildFileContributors()
-    this.aggregates.rebuildFileCoupling()
+    if (enrichedThisRun > 0 || newHashes.length > 0) {
+      // Phase 3: Rebuild aggregates
+      onProgress({ phase: "aggregating", current: 0, total: 0 })
+      this.aggregates.rebuildFileStats()
+      this.aggregates.rebuildFileContributors()
+      this.aggregates.rebuildFileCoupling()
 
-    // Phase 4: Rebuild FTS index
-    onProgress({ phase: "indexing", current: 0, total: 0 })
-    this.search.rebuildIndex()
+      // Phase 4: Rebuild FTS index
+      onProgress({ phase: "indexing", current: 0, total: 0 })
+      this.search.rebuildIndex()
+    }
 
     const totalEnriched = this.commits.getEnrichedCommitCount()
     const totalCommits = this.commits.getTotalCommitCount()
@@ -356,15 +358,17 @@ export class EnricherService {
       }
     }
 
-    // Phase 3: Rebuild aggregates
-    onProgress({ phase: "aggregating", current: 0, total: 0 })
-    this.aggregates.rebuildFileStats()
-    this.aggregates.rebuildFileContributors()
-    this.aggregates.rebuildFileCoupling()
+    if (enrichedThisRun > 0 || newHashes.length > 0) {
+      // Phase 3: Rebuild aggregates
+      onProgress({ phase: "aggregating", current: 0, total: 0 })
+      this.aggregates.rebuildFileStats()
+      this.aggregates.rebuildFileContributors()
+      this.aggregates.rebuildFileCoupling()
 
-    // Phase 4: Rebuild FTS index
-    onProgress({ phase: "indexing", current: 0, total: 0 })
-    this.search.rebuildIndex()
+      // Phase 4: Rebuild FTS index
+      onProgress({ phase: "indexing", current: 0, total: 0 })
+      this.search.rebuildIndex()
+    }
 
     const totalEnriched = this.commits.getEnrichedCommitCount()
     const totalCommits = this.commits.getTotalCommitCount()

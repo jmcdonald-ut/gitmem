@@ -261,11 +261,14 @@ describe("EnricherService", () => {
     expect(rebuildSearchSpy).toHaveBeenCalledTimes(1)
   })
 
-  test("run with no new commits", async () => {
+  test("run with no new commits skips aggregation and indexing", async () => {
     const emptyGit: IGitService = {
       ...mockGit,
       getCommitHashes: mock(() => Promise.resolve([])),
     }
+
+    const rebuildStatsSpy = spyOn(aggregates, "rebuildFileStats")
+    const rebuildSearchSpy = spyOn(search, "rebuildIndex")
 
     const enricher = new EnricherService(
       emptyGit,
@@ -279,6 +282,8 @@ describe("EnricherService", () => {
     expect(result.discoveredThisRun).toBe(0)
     expect(result.enrichedThisRun).toBe(0)
     expect(result.totalCommits).toBe(0)
+    expect(rebuildStatsSpy).not.toHaveBeenCalled()
+    expect(rebuildSearchSpy).not.toHaveBeenCalled()
   })
 
   test("run uses getDiffBatch for pre-fetching diffs", async () => {
@@ -910,7 +915,7 @@ describe("EnricherService", () => {
     expect(phases).toContain("done")
   })
 
-  test("runBatch skips to aggregation when no unenriched commits and no pending batch", async () => {
+  test("runBatch skips aggregation when no unenriched commits and no pending batch", async () => {
     const batchJobs = new BatchJobRepository(db)
     // Pre-insert all commits as already enriched
     commits.insertRawCommits([
@@ -953,7 +958,8 @@ describe("EnricherService", () => {
     )
 
     expect(result.enrichedThisRun).toBe(0)
-    expect(phases).toContain("aggregating")
+    expect(phases).not.toContain("aggregating")
+    expect(phases).not.toContain("indexing")
     expect(phases).toContain("done")
   })
 })
