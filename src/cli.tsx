@@ -22,6 +22,8 @@ import { HotspotsCommand } from "@commands/hotspots-command"
 import { StatsCommand } from "@commands/stats-command"
 import { CouplingCommand } from "@commands/coupling-command"
 import { TrendsCommand } from "@commands/trends-command"
+import { SchemaCommand } from "@commands/schema-command"
+import { SCHEMA } from "@/schema"
 import { computeTrend, WINDOW_FORMATS } from "@db/aggregates"
 import { JudgeService } from "@services/judge"
 import { CheckerService } from "@services/checker"
@@ -733,6 +735,20 @@ program
     )
     instance.unmount()
     db.close()
+  })
+
+program
+  .command("schema")
+  .description("Display database schema documentation")
+  .action(async () => {
+    const format = resolveFormat(program.opts())
+
+    if (formatOutput(format, { tables: SCHEMA })) {
+      return
+    }
+
+    const instance = render(<SchemaCommand tables={SCHEMA} />)
+    instance.unmount()
   })
 
 program.parse()

@@ -2,6 +2,7 @@ import { describe, test, expect } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
 import { SchemaCommand } from "@commands/schema-command"
+import { SCHEMA } from "@/schema"
 import type { SchemaTable } from "@/types"
 
 const sampleTables: SchemaTable[] = [
@@ -97,8 +98,6 @@ describe("SchemaCommand", () => {
   })
 
   test("renders full schema without errors", () => {
-    // Test with the actual SCHEMA data to ensure it renders
-    const { SCHEMA } = require("@/schema")
     const { lastFrame } = render(<SchemaCommand tables={SCHEMA} />)
     const output = lastFrame()
 
