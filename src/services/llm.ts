@@ -1,28 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk"
-import type {
-  CommitInfo,
-  EnrichmentResult,
-  ILLMService,
-  Classification,
-} from "@/types"
-import { CLASSIFICATIONS } from "@/types"
-
-const SYSTEM_PROMPT = `You are a git commit analyzer. Given a commit message and diff, classify the commit and provide a brief summary.
-
-Respond with valid JSON only, no markdown fences. Use this exact format:
-{"classification": "<type>", "summary": "<1-2 sentence summary>"}
-
-Classification must be one of: ${CLASSIFICATIONS.join(", ")}
-
-Guidelines:
-- bug-fix: fixes a bug or error
-- feature: adds new functionality
-- refactor: restructures code without changing behavior
-- docs: documentation changes
-- chore: maintenance, config, dependencies
-- perf: performance improvements
-- test: adds or modifies tests
-- style: formatting, whitespace, naming`
+import type { CommitInfo, EnrichmentResult, ILLMService } from "@/types"
+import {
+  SYSTEM_PROMPT,
+  buildUserMessage,
+  parseEnrichmentResponse,
+} from "@services/llm-shared"
 
 /** Classifies and summarizes git commits using the Anthropic API. */
 export class LLMService implements ILLMService {
@@ -49,12 +31,7 @@ export class LLMService implements ILLMService {
     commit: CommitInfo,
     diff: string,
   ): Promise<EnrichmentResult> {
-    const userMessage = `Commit message: ${commit.message}
-
-Files changed: ${commit.files.map((f) => f.filePath).join(", ")}
-
-Diff:
-${diff}`
+    const userMessage = buildUserMessage(commit, diff)
 
     let lastError: Error | null = null
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -68,7 +45,7 @@ ${diff}`
 
         const text =
           response.content[0].type === "text" ? response.content[0].text : ""
-        return this.parseResponse(text)
+        return parseEnrichmentResponse(text)
       } catch (error) {
         lastError = error as Error
         if (attempt < 2) {
@@ -77,23 +54,5 @@ ${diff}`
       }
     }
     throw lastError!
-  }
-
-  /**
-   * Parses the LLM JSON response into an EnrichmentResult,
-   * stripping any markdown fences and validating the classification.
-   * @param text - Raw text response from the LLM.
-   */
-  private parseResponse(text: string): EnrichmentResult {
-    const stripped = text
-      .replace(/^```(?:json)?\s*\n?/i, "")
-      .replace(/\n?```\s*$/, "")
-    const parsed = JSON.parse(stripped)
-    const classification = CLASSIFICATIONS.includes(parsed.classification)
-      ? (parsed.classification as Classification)
-      : "chore"
-    const summary =
-      typeof parsed.summary === "string" ? parsed.summary : "No summary"
-    return { classification, summary }
   }
 }
