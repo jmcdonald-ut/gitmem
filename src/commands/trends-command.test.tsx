@@ -17,6 +17,9 @@ const makePeriod = (overrides: Partial<TrendPeriod> = {}): TrendPeriod => ({
   style_count: 0,
   additions: 120,
   deletions: 45,
+  avg_complexity: null,
+  max_complexity: null,
+  avg_loc: null,
   ...overrides,
 })
 
@@ -25,6 +28,7 @@ const makeTrend = (overrides: Partial<TrendSummary> = {}): TrendSummary => ({
   recent_avg: 4.5,
   historical_avg: 2.1,
   bug_fix_trend: "stable",
+  complexity_trend: "stable",
   ...overrides,
 })
 

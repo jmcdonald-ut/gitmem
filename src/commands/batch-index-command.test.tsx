@@ -181,6 +181,12 @@ describe("batchPhaseLabel", () => {
     )
   })
 
+  test("returns measuring label", () => {
+    expect(batchPhaseLabel({ phase: "measuring", current: 0, total: 0 })).toBe(
+      "Measuring complexity...",
+    )
+  })
+
   test("returns standard labels for non-batch phases", () => {
     expect(
       batchPhaseLabel({ phase: "discovering", current: 0, total: 0 }),

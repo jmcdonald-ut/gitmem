@@ -91,6 +91,12 @@ export function TrendsCommand({
                 {trend.bug_fix_trend}
               </Text>
             </Text>
+            <Text>
+              Complexity trend:{" "}
+              <Text color={DIRECTION_DISPLAY[trend.complexity_trend].color}>
+                {trend.complexity_trend}
+              </Text>
+            </Text>
           </Box>
         </>
       )}
@@ -109,6 +115,12 @@ export function TrendsCommand({
               {p.total_changes} changes{"  "}
               <Text color="green">+{p.additions}</Text>{" "}
               <Text color="red">-{p.deletions}</Text>
+              {p.avg_complexity != null && (
+                <>
+                  {"  "}
+                  <Text color="yellow">cx:{Math.round(p.avg_complexity)}</Text>
+                </>
+              )}
               {nonZero.length > 0 ? "   " : ""}
               {nonZero.map((c, i) => (
                 <Text key={c.label}>

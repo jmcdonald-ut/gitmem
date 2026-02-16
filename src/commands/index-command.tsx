@@ -78,6 +78,12 @@ export function IndexCommand({ enricher }: IndexCommandProps) {
         </Text>
         <Text> {phaseLabel(progress)}</Text>
       </Box>
+      {progress.phase === "measuring" && progress.total > 0 && (
+        <Text>
+          Measuring file {progress.current.toLocaleString()} /{" "}
+          {progress.total.toLocaleString()}
+        </Text>
+      )}
       {progress.phase === "enriching" && progress.total > 0 && (
         <Text>
           Enriching commit {progress.current.toLocaleString()} /{" "}
@@ -98,6 +104,8 @@ export function phaseLabel(progress: IndexProgress): string {
   switch (progress.phase) {
     case "discovering":
       return "Discovering commits..."
+    case "measuring":
+      return "Measuring complexity..."
     case "enriching":
       return "Enriching commits..."
     case "aggregating":

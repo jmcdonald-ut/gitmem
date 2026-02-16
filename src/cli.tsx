@@ -11,6 +11,7 @@ import { SearchService } from "@db/search"
 import { GitService } from "@services/git"
 import { LLMService } from "@services/llm"
 import { EnricherService } from "@services/enricher"
+import { MeasurerService } from "@services/measurer"
 import { BatchLLMService } from "@services/batch-llm"
 import { BatchJobRepository } from "@db/batch-jobs"
 import { IndexCommand } from "@commands/index-command"
@@ -95,10 +96,14 @@ Hotspots highlight files with the most commits — indicators of churn,
 risk, or active development.
 
 Sort by a classification type to surface e.g. the buggiest files.
+Sort by complexity to find the most complex files, or combined to
+find files that are both frequently changed AND complex.
 
 Examples:
   gitmem hotspots
   gitmem hotspots --sort bug-fix
+  gitmem hotspots --sort complexity
+  gitmem hotspots --sort combined
   gitmem hotspots --path src/services/ --limit 20`
 
 const STATS_HELP = `
@@ -203,12 +208,14 @@ program
     const aggregates = new AggregateRepository(db)
     const search = new SearchService(db)
     const llm = new LLMService(apiKey, opts.model)
+    const measurer = new MeasurerService(git, commits)
     const enricher = new EnricherService(
       git,
       llm,
       commits,
       aggregates,
       search,
+      measurer,
       opts.model,
       parseInt(opts.concurrency, 10),
     )
@@ -522,6 +529,8 @@ const VALID_SORT_FIELDS = [
   "perf",
   "test",
   "style",
+  "complexity",
+  "combined",
 ]
 
 program
@@ -531,7 +540,7 @@ program
   .addHelpText("after", HOTSPOTS_HELP)
   .option(
     "--sort <field>",
-    "Sort by: total, bug-fix, feature, refactor, docs, chore, perf, test, style",
+    "Sort by: total, bug-fix, feature, refactor, docs, chore, perf, test, style, complexity, combined",
     "total",
   )
   .option("--path <prefix>", "Filter by directory prefix")

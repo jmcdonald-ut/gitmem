@@ -38,6 +38,23 @@ export function computeTrend(periods: TrendPeriod[]): TrendSummary | null {
   const historicalBugAvg =
     historical.reduce((sum, p) => sum + p.bug_fix_count, 0) / historical.length
 
+  const recentComplexityVals = recent
+    .map((p) => p.avg_complexity)
+    .filter((v): v is number => v != null)
+  const historicalComplexityVals = historical
+    .map((p) => p.avg_complexity)
+    .filter((v): v is number => v != null)
+  const recentComplexityAvg =
+    recentComplexityVals.length > 0
+      ? recentComplexityVals.reduce((s, v) => s + v, 0) /
+        recentComplexityVals.length
+      : 0
+  const historicalComplexityAvg =
+    historicalComplexityVals.length > 0
+      ? historicalComplexityVals.reduce((s, v) => s + v, 0) /
+        historicalComplexityVals.length
+      : 0
+
   const computeDirection = (
     recentVal: number,
     historicalVal: number,
@@ -56,6 +73,10 @@ export function computeTrend(periods: TrendPeriod[]): TrendSummary | null {
     recent_avg: Math.round(recentAvg * 10) / 10,
     historical_avg: Math.round(historicalAvg * 10) / 10,
     bug_fix_trend: computeDirection(recentBugAvg, historicalBugAvg),
+    complexity_trend: computeDirection(
+      recentComplexityAvg,
+      historicalComplexityAvg,
+    ),
   }
 }
 
@@ -79,6 +100,7 @@ const SORT_COLUMNS: Record<string, string> = {
   perf: "perf_count",
   test: "test_count",
   style: "style_count",
+  complexity: "current_complexity",
 }
 
 /** Repository for computing and querying pre-aggregated file-level statistics. */
@@ -99,7 +121,8 @@ export class AggregateRepository {
         bug_fix_count, feature_count, refactor_count, docs_count,
         chore_count, perf_count, test_count, style_count,
         first_seen, last_changed,
-        total_additions, total_deletions
+        total_additions, total_deletions,
+        current_loc, current_complexity, avg_complexity, max_complexity
       )
       SELECT
         cf.file_path,
@@ -115,7 +138,17 @@ export class AggregateRepository {
         MIN(c.committed_at) as first_seen,
         MAX(c.committed_at) as last_changed,
         COALESCE(SUM(cf.additions), 0) as total_additions,
-        COALESCE(SUM(cf.deletions), 0) as total_deletions
+        COALESCE(SUM(cf.deletions), 0) as total_deletions,
+        (SELECT cf2.lines_of_code FROM commit_files cf2
+         JOIN commits c2 ON c2.hash = cf2.commit_hash
+         WHERE cf2.file_path = cf.file_path AND cf2.lines_of_code > 0
+         ORDER BY c2.committed_at DESC LIMIT 1) as current_loc,
+        (SELECT cf2.indent_complexity FROM commit_files cf2
+         JOIN commits c2 ON c2.hash = cf2.commit_hash
+         WHERE cf2.file_path = cf.file_path AND cf2.indent_complexity > 0
+         ORDER BY c2.committed_at DESC LIMIT 1) as current_complexity,
+        AVG(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as avg_complexity,
+        MAX(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as max_complexity
       FROM commit_files cf
       JOIN commits c ON c.hash = cf.commit_hash
       WHERE c.enriched_at IS NOT NULL
@@ -160,12 +193,19 @@ export class AggregateRepository {
    * @param options - Limit, sort field, and path prefix filter.
    * @returns Files ordered by the chosen sort column descending.
    */
-  getHotspots(options: HotspotsOptions = {}): FileStatsRow[] {
+  getHotspots(
+    options: HotspotsOptions = {},
+  ): Array<FileStatsRow & { combined_score?: number }> {
     const { limit = 10, sort = "total", pathPrefix } = options
+
+    if (sort === "combined") {
+      return this.getHotspotsCombined(limit, pathPrefix)
+    }
+
     const column = SORT_COLUMNS[sort]
     if (!column) {
       throw new Error(
-        `Invalid sort field "${sort}". Valid values: ${Object.keys(SORT_COLUMNS).join(", ")}`,
+        `Invalid sort field "${sort}". Valid values: ${[...Object.keys(SORT_COLUMNS), "combined"].join(", ")}`,
       )
     }
 
@@ -186,6 +226,53 @@ export class AggregateRepository {
         FileStatsRow,
         (string | number)[]
       >(`SELECT * FROM file_stats ${where} ORDER BY ${column} DESC LIMIT ?`)
+      .all(...params)
+  }
+
+  /**
+   * Returns hotspots sorted by combined score: normalized changes * normalized complexity.
+   * Files without complexity data get score 0.
+   */
+  private getHotspotsCombined(
+    limit: number,
+    pathPrefix?: string,
+  ): Array<FileStatsRow & { combined_score: number }> {
+    const conditions: string[] = []
+    const params: (string | number)[] = []
+
+    if (pathPrefix) {
+      conditions.push("fs.file_path LIKE ? || '%'")
+      // Push pathPrefix twice: once for the CTE WHERE, once for the main WHERE
+      params.push(pathPrefix, pathPrefix)
+    }
+
+    const where =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+    params.push(limit)
+
+    return this.db
+      .query<FileStatsRow & { combined_score: number }, (string | number)[]>(
+        `WITH maxvals AS (
+           SELECT
+             MAX(total_changes) as max_changes,
+             MAX(current_complexity) as max_complexity
+           FROM file_stats ${where.replace("fs.", "")}
+         )
+         SELECT fs.*,
+           CASE
+             WHEN m.max_changes > 0 AND m.max_complexity > 0 AND fs.current_complexity IS NOT NULL
+             THEN ROUND(
+               (CAST(fs.total_changes AS REAL) / m.max_changes) *
+               (fs.current_complexity / m.max_complexity),
+               4
+             )
+             ELSE 0.0
+           END as combined_score
+         FROM file_stats fs, maxvals m
+         ${where}
+         ORDER BY combined_score DESC
+         LIMIT ?`,
+      )
       .all(...params)
   }
 
@@ -261,7 +348,11 @@ export class AggregateRepository {
            MIN(first_seen) as first_seen,
            MAX(last_changed) as last_changed,
            COALESCE(SUM(total_additions), 0) as total_additions,
-           COALESCE(SUM(total_deletions), 0) as total_deletions
+           COALESCE(SUM(total_deletions), 0) as total_deletions,
+           COALESCE(SUM(current_loc), 0) as current_loc,
+           AVG(current_complexity) as current_complexity,
+           AVG(avg_complexity) as avg_complexity,
+           MAX(max_complexity) as max_complexity
          FROM file_stats
          WHERE file_path LIKE ? || '%'`,
       )
@@ -377,7 +468,10 @@ export class AggregateRepository {
            COUNT(DISTINCT CASE WHEN c.classification = 'test' THEN cf.commit_hash END) as test_count,
            COUNT(DISTINCT CASE WHEN c.classification = 'style' THEN cf.commit_hash END) as style_count,
            COALESCE(SUM(cf.additions), 0) as additions,
-           COALESCE(SUM(cf.deletions), 0) as deletions
+           COALESCE(SUM(cf.deletions), 0) as deletions,
+           AVG(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as avg_complexity,
+           MAX(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as max_complexity,
+           AVG(CASE WHEN cf.lines_of_code > 0 THEN cf.lines_of_code END) as avg_loc
          FROM commit_files cf
          JOIN commits c ON c.hash = cf.commit_hash
          WHERE c.enriched_at IS NOT NULL AND cf.file_path = ?
@@ -414,7 +508,10 @@ export class AggregateRepository {
            COUNT(DISTINCT CASE WHEN c.classification = 'test' THEN cf.commit_hash END) as test_count,
            COUNT(DISTINCT CASE WHEN c.classification = 'style' THEN cf.commit_hash END) as style_count,
            COALESCE(SUM(cf.additions), 0) as additions,
-           COALESCE(SUM(cf.deletions), 0) as deletions
+           COALESCE(SUM(cf.deletions), 0) as deletions,
+           AVG(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as avg_complexity,
+           MAX(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as max_complexity,
+           AVG(CASE WHEN cf.lines_of_code > 0 THEN cf.lines_of_code END) as avg_loc
          FROM commit_files cf
          JOIN commits c ON c.hash = cf.commit_hash
          WHERE c.enriched_at IS NOT NULL AND cf.file_path LIKE ? || '%'

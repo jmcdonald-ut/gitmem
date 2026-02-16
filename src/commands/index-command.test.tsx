@@ -106,6 +106,9 @@ describe("phaseLabel", () => {
     expect(phaseLabel({ phase: "indexing", current: 0, total: 0 })).toBe(
       "Rebuilding search index...",
     )
+    expect(phaseLabel({ phase: "measuring", current: 0, total: 0 })).toBe(
+      "Measuring complexity...",
+    )
     expect(phaseLabel({ phase: "done", current: 5, total: 5 })).toBe("Done")
   })
 })

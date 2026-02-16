@@ -87,6 +87,34 @@ export function StatsCommand({
         </Text>
       </Box>
 
+      {stats.current_complexity != null && stats.current_complexity > 0 && (
+        <>
+          <Text> </Text>
+          <Box marginLeft={2} flexDirection="column">
+            <Text bold>Complexity:</Text>
+            <Box marginLeft={2}>
+              <Text>
+                current:{" "}
+                <Text bold>{Math.round(stats.current_complexity)}</Text>
+                {"  "}avg:{" "}
+                {stats.avg_complexity != null
+                  ? Math.round(stats.avg_complexity)
+                  : "—"}
+                {"  "}max:{" "}
+                {stats.max_complexity != null
+                  ? Math.round(stats.max_complexity)
+                  : "—"}
+                {stats.current_loc != null && stats.current_loc > 0 && (
+                  <>
+                    {"  "}LOC: {stats.current_loc}
+                  </>
+                )}
+              </Text>
+            </Box>
+          </Box>
+        </>
+      )}
+
       <Text> </Text>
       <Box marginLeft={2} flexDirection="column">
         <Text bold>Classification breakdown:</Text>

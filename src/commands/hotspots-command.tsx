@@ -5,7 +5,7 @@ import type { FileStatsRow } from "@/types"
 /** Props for the HotspotsCommand component. */
 interface HotspotsCommandProps {
   /** Hotspot file stats to display. */
-  hotspots: FileStatsRow[]
+  hotspots: Array<FileStatsRow & { combined_score?: number }>
   /** Active sort field. */
   sort: string
   /** Active path prefix filter, if any. */
@@ -82,6 +82,23 @@ export function HotspotsCommand({
                 <Text color="cyan">{file.file_path}</Text>
                 {"  "}
                 <Text bold>{file.total_changes}</Text> changes{"  "}
+                {file.current_complexity != null &&
+                  file.current_complexity > 0 && (
+                    <Text>
+                      <Text color="yellow">
+                        cx:{Math.round(file.current_complexity)}
+                      </Text>
+                      {"  "}
+                    </Text>
+                  )}
+                {file.combined_score != null && file.combined_score > 0 && (
+                  <Text>
+                    <Text bold color="magenta">
+                      score:{file.combined_score.toFixed(2)}
+                    </Text>
+                    {"  "}
+                  </Text>
+                )}
                 {tags.map((t) => (
                   <Text key={t.label}>
                     <Text color={TAG_COLORS[t.label]}>

@@ -117,6 +117,8 @@ export function batchPhaseLabel(progress: IndexProgress): string {
   switch (progress.phase) {
     case "discovering":
       return "Discovering commits..."
+    case "measuring":
+      return "Measuring complexity..."
     case "enriching":
       if (progress.batchId) {
         return `Batch ${progress.batchId}: ${progress.batchStatus}...`

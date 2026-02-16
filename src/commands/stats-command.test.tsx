@@ -19,6 +19,10 @@ const makeStats = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({
   last_changed: "2024-06-01T00:00:00Z",
   total_additions: 500,
   total_deletions: 100,
+  current_loc: null,
+  current_complexity: null,
+  avg_complexity: null,
+  max_complexity: null,
   ...overrides,
 })
 
@@ -259,6 +263,63 @@ describe("StatsCommand", () => {
     const output = lastFrame()
 
     expect(output).toContain("No recent commits")
+  })
+
+  test("renders complexity section when present", () => {
+    const { lastFrame } = render(
+      <StatsCommand
+        path="src/main.ts"
+        type="file"
+        stats={makeStats({
+          current_complexity: 42.5,
+          avg_complexity: 38.2,
+          max_complexity: 55.0,
+          current_loc: 150,
+        })}
+        contributors={[]}
+        recentCommits={[]}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("Complexity:")
+    expect(output).toContain("current:")
+    expect(output).toContain("43")
+    expect(output).toContain("avg:")
+    expect(output).toContain("38")
+    expect(output).toContain("max:")
+    expect(output).toContain("55")
+    expect(output).toContain("LOC: 150")
+  })
+
+  test("hides complexity section when no data", () => {
+    const { lastFrame } = render(
+      <StatsCommand
+        path="src/main.ts"
+        type="file"
+        stats={makeStats()}
+        contributors={[]}
+        recentCommits={[]}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).not.toContain("Complexity:")
+  })
+
+  test("hides complexity section when zero", () => {
+    const { lastFrame } = render(
+      <StatsCommand
+        path="src/main.ts"
+        type="file"
+        stats={makeStats({ current_complexity: 0 })}
+        contributors={[]}
+        recentCommits={[]}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).not.toContain("Complexity:")
   })
 
   test("shows empty state for top files", () => {

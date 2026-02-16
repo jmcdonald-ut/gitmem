@@ -262,6 +262,92 @@ describe("AggregateRepository", () => {
     }
   })
 
+  test("getHotspots sorts by complexity", () => {
+    seedData()
+    // Set complexity measurements
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 100, indent_complexity = 50, max_indent = 5 WHERE file_path = 'src/main.ts'",
+    )
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 200, indent_complexity = 120, max_indent = 8 WHERE file_path = 'src/new.ts'",
+    )
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 10, indent_complexity = 3, max_indent = 1 WHERE file_path = 'src/utils.ts'",
+    )
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots({
+      sort: "complexity",
+      limit: 10,
+    })
+    expect(hotspots.length).toBe(3)
+    // src/new.ts has highest complexity (120)
+    expect(hotspots[0].file_path).toBe("src/new.ts")
+  })
+
+  test("getHotspots sorts by combined score", () => {
+    seedData()
+    // main.ts: 3 changes, complexity 50 => normalized high
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 100, indent_complexity = 50, max_indent = 5 WHERE file_path = 'src/main.ts'",
+    )
+    // new.ts: 1 change, complexity 120 => high complexity but low churn
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 200, indent_complexity = 120, max_indent = 8 WHERE file_path = 'src/new.ts'",
+    )
+    // utils.ts: 2 changes, complexity 3 => low complexity
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 10, indent_complexity = 3, max_indent = 1 WHERE file_path = 'src/utils.ts'",
+    )
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots({
+      sort: "combined",
+      limit: 10,
+    })
+    expect(hotspots.length).toBe(3)
+    // All should have combined_score
+    for (const h of hotspots) {
+      expect((h as { combined_score: number }).combined_score).toBeDefined()
+    }
+    // First result should have highest combined score
+    expect(
+      (hotspots[0] as { combined_score: number }).combined_score,
+    ).toBeGreaterThanOrEqual(
+      (hotspots[1] as { combined_score: number }).combined_score,
+    )
+  })
+
+  test("getHotspots combined with path prefix", () => {
+    seedData()
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 100, indent_complexity = 50, max_indent = 5 WHERE file_path = 'src/main.ts'",
+    )
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots({
+      sort: "combined",
+      pathPrefix: "src/main",
+      limit: 10,
+    })
+    expect(hotspots.length).toBe(1)
+    expect(hotspots[0].file_path).toBe("src/main.ts")
+  })
+
+  test("getHotspots combined returns 0 for files without complexity", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots({
+      sort: "combined",
+      limit: 10,
+    })
+    // No complexity data => all scores should be 0
+    for (const h of hotspots) {
+      expect((h as { combined_score: number }).combined_score).toBe(0)
+    }
+  })
+
   test("getHotspots throws on invalid sort value", () => {
     seedData()
     aggregates.rebuildFileStats()
@@ -616,6 +702,9 @@ describe("computeTrend", () => {
     style_count: 0,
     additions: 100,
     deletions: 50,
+    avg_complexity: null,
+    max_complexity: null,
+    avg_loc: null,
     ...overrides,
   })
 
