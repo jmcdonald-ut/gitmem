@@ -1,8 +1,8 @@
 import { describe, test, expect, mock } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { CheckCommand } from "@commands/check-command"
-import { waitForFrame } from "@commands/test-utils"
+import { CheckCommand } from "@commands/check/CheckCommand"
+import { waitForFrame } from "@commands/utils/test-utils"
 import type { CheckerService } from "@services/checker"
 import type { CheckProgress, EvalResult, EvalSummary } from "@/types"
 

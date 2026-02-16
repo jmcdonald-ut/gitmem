@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { SchemaCommand } from "@commands/schema-command"
+import { SchemaCommand } from "@commands/schema/SchemaCommand"
 import { SCHEMA } from "@/schema"
 import type { SchemaTable } from "@/types"
 

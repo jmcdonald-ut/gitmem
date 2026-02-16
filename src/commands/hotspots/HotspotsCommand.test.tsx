@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { HotspotsCommand } from "@commands/hotspots-command"
+import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
 import type { FileStatsRow } from "@/types"
 
 const makeRow = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({

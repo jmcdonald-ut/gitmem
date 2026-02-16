@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { StatusCommand } from "@commands/status-command"
+import { StatusCommand } from "@commands/status/StatusCommand"
 import type { StatusInfo } from "@/types"
 
 describe("StatusCommand", () => {
