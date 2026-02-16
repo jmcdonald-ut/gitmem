@@ -10,6 +10,9 @@ export function createDatabase(path: string): Database {
   const db = new Database(path)
   db.run("PRAGMA journal_mode = WAL")
   db.run("PRAGMA foreign_keys = ON")
+  db.run("PRAGMA synchronous = NORMAL")
+  db.run("PRAGMA cache_size = -64000")
+  db.run("PRAGMA temp_store = MEMORY")
   createSchema(db)
   migrateSchema(db)
   return db

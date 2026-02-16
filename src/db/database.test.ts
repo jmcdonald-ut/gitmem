@@ -43,6 +43,27 @@ describe("createDatabase", () => {
     db.close()
   })
 
+  test("sets performance PRAGMAs", () => {
+    const db = createDatabase(":memory:")
+    const synchronous = db
+      .query<{ synchronous: number }, []>("PRAGMA synchronous")
+      .get()
+    // NORMAL = 1
+    expect(synchronous!.synchronous).toBe(1)
+
+    const cacheSize = db
+      .query<{ cache_size: number }, []>("PRAGMA cache_size")
+      .get()
+    expect(cacheSize!.cache_size).toBe(-64000)
+
+    const tempStore = db
+      .query<{ temp_store: number }, []>("PRAGMA temp_store")
+      .get()
+    // MEMORY = 2
+    expect(tempStore!.temp_store).toBe(2)
+    db.close()
+  })
+
   test("migrates old schema to add complexity columns", () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "gitmem-test-"))
     const tmpPath = join(tmpDir, "migrate-test.db")
