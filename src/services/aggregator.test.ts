@@ -135,7 +135,7 @@ describe("AggregatorService", () => {
     ])
     aggregator.rebuild()
 
-    const hotspots = aggregates.getHotspots(10)
+    const hotspots = aggregates.getHotspots({ limit: 10 })
     expect(hotspots).toHaveLength(0)
   })
 
@@ -144,7 +144,7 @@ describe("AggregatorService", () => {
     aggregator.rebuild()
     aggregator.rebuild()
 
-    const hotspots = aggregates.getHotspots(10)
+    const hotspots = aggregates.getHotspots({ limit: 10 })
     expect(hotspots.length).toBe(2)
     expect(hotspots[0].file_path).toBe("src/app.ts")
   })

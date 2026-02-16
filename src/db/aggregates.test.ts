@@ -165,7 +165,7 @@ describe("AggregateRepository", () => {
     seedData()
     aggregates.rebuildFileStats()
 
-    const hotspots = aggregates.getHotspots(10)
+    const hotspots = aggregates.getHotspots({ limit: 10 })
     expect(hotspots.length).toBe(3)
     expect(hotspots[0].file_path).toBe("src/main.ts")
     expect(hotspots[0].total_changes).toBe(3)
@@ -175,7 +175,7 @@ describe("AggregateRepository", () => {
     seedData()
     aggregates.rebuildFileStats()
 
-    const hotspots = aggregates.getHotspots(1)
+    const hotspots = aggregates.getHotspots({ limit: 1 })
     expect(hotspots).toHaveLength(1)
   })
 
@@ -202,12 +202,86 @@ describe("AggregateRepository", () => {
     expect(coupled).toHaveLength(0)
   })
 
+  test("getHotspots sorts by classification", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots({ sort: "bug-fix", limit: 10 })
+    // Only commit bbb is bug-fix, touching main.ts and utils.ts (1 each)
+    // new.ts has 0 bug-fix commits
+    expect(hotspots[0].bug_fix_count).toBeGreaterThanOrEqual(
+      hotspots[hotspots.length - 1].bug_fix_count,
+    )
+  })
+
+  test("getHotspots filters by path prefix", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots({
+      pathPrefix: "src/",
+      limit: 10,
+    })
+    expect(hotspots.length).toBe(3)
+    for (const h of hotspots) {
+      expect(h.file_path.startsWith("src/")).toBe(true)
+    }
+  })
+
+  test("getHotspots filters by path prefix narrowly", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots({
+      pathPrefix: "src/new",
+      limit: 10,
+    })
+    expect(hotspots).toHaveLength(1)
+    expect(hotspots[0].file_path).toBe("src/new.ts")
+  })
+
+  test("getHotspots combines sort and path prefix", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots({
+      sort: "feature",
+      pathPrefix: "src/",
+      limit: 2,
+    })
+    expect(hotspots.length).toBeLessThanOrEqual(2)
+    // Should be sorted by feature_count descending
+    if (hotspots.length >= 2) {
+      expect(hotspots[0].feature_count).toBeGreaterThanOrEqual(
+        hotspots[1].feature_count,
+      )
+    }
+  })
+
+  test("getHotspots throws on invalid sort value", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    expect(() => aggregates.getHotspots({ sort: "invalid" })).toThrow(
+      'Invalid sort field "invalid"',
+    )
+  })
+
+  test("getHotspots defaults work with no options", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const hotspots = aggregates.getHotspots()
+    expect(hotspots.length).toBe(3)
+    expect(hotspots[0].file_path).toBe("src/main.ts")
+  })
+
   test("rebuildFileStats is idempotent", () => {
     seedData()
     aggregates.rebuildFileStats()
     aggregates.rebuildFileStats()
 
-    const hotspots = aggregates.getHotspots(10)
+    const hotspots = aggregates.getHotspots({ limit: 10 })
     expect(hotspots.length).toBe(3)
   })
 

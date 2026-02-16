@@ -1,6 +1,28 @@
 import { Database } from "bun:sqlite"
 import type { FileStatsRow, FileContributorRow, FileCouplingRow } from "@/types"
 
+/** Options for querying file hotspots. */
+export interface HotspotsOptions {
+  /** Maximum number of files to return (default 10). */
+  limit?: number
+  /** Sort field — "total" or a classification name (default "total"). */
+  sort?: string
+  /** Only include files under this directory prefix. */
+  pathPrefix?: string
+}
+
+const SORT_COLUMNS: Record<string, string> = {
+  total: "total_changes",
+  "bug-fix": "bug_fix_count",
+  feature: "feature_count",
+  refactor: "refactor_count",
+  docs: "docs_count",
+  chore: "chore_count",
+  perf: "perf_count",
+  test: "test_count",
+  style: "style_count",
+}
+
 /** Repository for computing and querying pre-aggregated file-level statistics. */
 export class AggregateRepository {
   private db: Database
@@ -77,16 +99,34 @@ export class AggregateRepository {
 
   /**
    * Returns the most frequently changed files.
-   * @param limit - Maximum number of files to return.
-   * @returns Files ordered by total change count descending.
+   * @param options - Limit, sort field, and path prefix filter.
+   * @returns Files ordered by the chosen sort column descending.
    */
-  getHotspots(limit: number = 10): FileStatsRow[] {
+  getHotspots(options: HotspotsOptions = {}): FileStatsRow[] {
+    const { limit = 10, sort = "total", pathPrefix } = options
+    const column = SORT_COLUMNS[sort]
+    if (!column) {
+      throw new Error(
+        `Invalid sort field "${sort}". Valid values: ${Object.keys(SORT_COLUMNS).join(", ")}`,
+      )
+    }
+
+    const conditions: string[] = []
+    const params: (string | number)[] = []
+
+    if (pathPrefix) {
+      conditions.push("file_path LIKE ? || '%'")
+      params.push(pathPrefix)
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+    params.push(limit)
+
     return this.db
-      .query<
-        FileStatsRow,
-        [number]
-      >("SELECT * FROM file_stats ORDER BY total_changes DESC LIMIT ?")
-      .all(limit)
+      .query<FileStatsRow, (string | number)[]>(
+        `SELECT * FROM file_stats ${where} ORDER BY ${column} DESC LIMIT ?`,
+      )
+      .all(...params)
   }
 
   /**
