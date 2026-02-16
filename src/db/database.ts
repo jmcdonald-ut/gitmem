@@ -11,6 +11,7 @@ export function createDatabase(path: string): Database {
   db.run("PRAGMA journal_mode = WAL")
   db.run("PRAGMA foreign_keys = ON")
   createSchema(db)
+  migrateSchema(db)
   return db
 }
 
@@ -43,6 +44,9 @@ function createSchema(db: Database): void {
       change_type TEXT NOT NULL,
       additions INTEGER DEFAULT 0,
       deletions INTEGER DEFAULT 0,
+      lines_of_code INTEGER,
+      indent_complexity REAL,
+      max_indent INTEGER,
       PRIMARY KEY (commit_hash, file_path)
     );
 
@@ -60,7 +64,11 @@ function createSchema(db: Database): void {
       first_seen TEXT NOT NULL,
       last_changed TEXT NOT NULL,
       total_additions INTEGER NOT NULL DEFAULT 0,
-      total_deletions INTEGER NOT NULL DEFAULT 0
+      total_deletions INTEGER NOT NULL DEFAULT 0,
+      current_loc INTEGER,
+      current_complexity REAL,
+      avg_complexity REAL,
+      max_complexity REAL
     );
 
     CREATE TABLE IF NOT EXISTS file_contributors (
@@ -100,4 +108,46 @@ function createSchema(db: Database): void {
       summary
     );
   `)
+}
+
+/**
+ * Adds new columns to existing tables if they are missing.
+ * Ensures both fresh and upgraded databases have the same schema.
+ * @param db - The SQLite database instance.
+ */
+function migrateSchema(db: Database): void {
+  const hasColumn = (table: string, column: string): boolean => {
+    const cols = db
+      .query<
+        { name: string },
+        [string]
+      >("SELECT name FROM pragma_table_info(?)")
+      .all(table)
+    return cols.some((c) => c.name === column)
+  }
+
+  // commit_files complexity columns
+  if (!hasColumn("commit_files", "lines_of_code")) {
+    db.run("ALTER TABLE commit_files ADD COLUMN lines_of_code INTEGER")
+  }
+  if (!hasColumn("commit_files", "indent_complexity")) {
+    db.run("ALTER TABLE commit_files ADD COLUMN indent_complexity REAL")
+  }
+  if (!hasColumn("commit_files", "max_indent")) {
+    db.run("ALTER TABLE commit_files ADD COLUMN max_indent INTEGER")
+  }
+
+  // file_stats complexity columns
+  if (!hasColumn("file_stats", "current_loc")) {
+    db.run("ALTER TABLE file_stats ADD COLUMN current_loc INTEGER")
+  }
+  if (!hasColumn("file_stats", "current_complexity")) {
+    db.run("ALTER TABLE file_stats ADD COLUMN current_complexity REAL")
+  }
+  if (!hasColumn("file_stats", "avg_complexity")) {
+    db.run("ALTER TABLE file_stats ADD COLUMN avg_complexity REAL")
+  }
+  if (!hasColumn("file_stats", "max_complexity")) {
+    db.run("ALTER TABLE file_stats ADD COLUMN max_complexity REAL")
+  }
 }

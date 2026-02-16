@@ -211,6 +211,45 @@ export class CommitRepository {
   }
 
   /**
+   * Returns commit_files rows that have not yet been measured for complexity.
+   * @returns Rows where indent_complexity IS NULL.
+   */
+  getUnmeasuredFiles(): Pick<
+    CommitFileRow,
+    "commit_hash" | "file_path" | "change_type"
+  >[] {
+    return this.db
+      .query<
+        Pick<CommitFileRow, "commit_hash" | "file_path" | "change_type">,
+        []
+      >("SELECT commit_hash, file_path, change_type FROM commit_files WHERE indent_complexity IS NULL")
+      .all()
+  }
+
+  /**
+   * Updates complexity metrics for a specific file in a specific commit.
+   * @param commitHash - The commit hash.
+   * @param filePath - The file path.
+   * @param linesOfCode - Non-blank line count.
+   * @param indentComplexity - Sum of indentation levels.
+   * @param maxIndent - Maximum indentation level.
+   */
+  updateComplexity(
+    commitHash: string,
+    filePath: string,
+    linesOfCode: number,
+    indentComplexity: number,
+    maxIndent: number,
+  ): void {
+    this.db
+      .prepare(
+        `UPDATE commit_files SET lines_of_code = ?, indent_complexity = ?, max_indent = ?
+       WHERE commit_hash = ? AND file_path = ?`,
+      )
+      .run(linesOfCode, indentComplexity, maxIndent, commitHash, filePath)
+  }
+
+  /**
    * Returns recent enriched commits that touched any file under a directory prefix.
    * @param prefix - Directory prefix to match (e.g. "src/services/").
    * @param limit - Maximum number of commits to return.

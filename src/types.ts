@@ -86,6 +86,12 @@ export interface CommitFileRow {
   additions: number
   /** Number of lines deleted. */
   deletions: number
+  /** Non-blank lines of code, or null if not yet measured. */
+  lines_of_code: number | null
+  /** Sum of indentation levels across all lines, or null if not yet measured. */
+  indent_complexity: number | null
+  /** Maximum indentation level seen, or null if not yet measured. */
+  max_indent: number | null
 }
 
 /** Aggregated change statistics for a single file across all enriched commits. */
@@ -118,6 +124,14 @@ export interface FileStatsRow {
   total_additions: number
   /** Total lines deleted across all commits. */
   total_deletions: number
+  /** Lines of code from the most recent commit, or null if unmeasured. */
+  current_loc: number | null
+  /** Indentation complexity from the most recent commit, or null if unmeasured. */
+  current_complexity: number | null
+  /** Average indentation complexity across all measured commits. */
+  avg_complexity: number | null
+  /** Maximum indentation complexity across all measured commits. */
+  max_complexity: number | null
 }
 
 /** Per-file contributor statistics. */
@@ -190,6 +204,12 @@ export interface TrendPeriod {
   additions: number
   /** Total lines deleted. */
   deletions: number
+  /** Average indentation complexity for files in this period. */
+  avg_complexity: number | null
+  /** Maximum indentation complexity for files in this period. */
+  max_complexity: number | null
+  /** Average lines of code for files in this period. */
+  avg_loc: number | null
 }
 
 /** Summary of the overall trend direction computed from TrendPeriod data. */
@@ -202,6 +222,8 @@ export interface TrendSummary {
   historical_avg: number
   /** Direction of bug-fix frequency over time. */
   bug_fix_trend: "increasing" | "decreasing" | "stable"
+  /** Direction of complexity over time. */
+  complexity_trend: "increasing" | "decreasing" | "stable"
 }
 
 /** A full-text search result from the commits FTS index. */
@@ -221,7 +243,13 @@ export interface SearchResult {
 /** Tracks progress through the multi-phase indexing pipeline. */
 export interface IndexProgress {
   /** Current pipeline phase. */
-  phase: "discovering" | "enriching" | "aggregating" | "indexing" | "done"
+  phase:
+    | "discovering"
+    | "measuring"
+    | "enriching"
+    | "aggregating"
+    | "indexing"
+    | "done"
   /** Number of items processed in the current phase. */
   current: number
   /** Total items to process in the current phase. */
@@ -255,6 +283,10 @@ export interface IGitService {
   ): Promise<Map<string, string>>
   /** Checks whether the working directory is inside a git repository. */
   isGitRepo(): Promise<boolean>
+  /** Returns file contents at specific commits using git cat-file --batch. */
+  getFileContentsBatch(
+    entries: Array<{ hash: string; filePath: string }>,
+  ): Promise<Map<string, Buffer>>
 }
 
 /** Interface for LLM-based commit enrichment. */

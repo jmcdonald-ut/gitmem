@@ -113,6 +113,30 @@ export const SCHEMA: SchemaTable[] = [
         not_null: false,
         description: "Lines deleted (default 0)",
       },
+      {
+        name: "lines_of_code",
+        type: "INTEGER",
+        primary_key: false,
+        not_null: false,
+        description:
+          "Non-blank lines of code at this commit (NULL = unmeasured, 0 = skipped/binary/deleted)",
+      },
+      {
+        name: "indent_complexity",
+        type: "REAL",
+        primary_key: false,
+        not_null: false,
+        description:
+          "Sum of indentation levels across all lines (NULL = unmeasured, 0 = skipped)",
+      },
+      {
+        name: "max_indent",
+        type: "INTEGER",
+        primary_key: false,
+        not_null: false,
+        description:
+          "Maximum indentation level seen (NULL = unmeasured, 0 = skipped)",
+      },
     ],
   },
   {
@@ -218,6 +242,37 @@ export const SCHEMA: SchemaTable[] = [
         primary_key: false,
         not_null: true,
         description: "Total lines deleted across all commits",
+      },
+      {
+        name: "current_loc",
+        type: "INTEGER",
+        primary_key: false,
+        not_null: false,
+        description: "Lines of code from the most recent commit with data",
+      },
+      {
+        name: "current_complexity",
+        type: "REAL",
+        primary_key: false,
+        not_null: false,
+        description:
+          "Indentation complexity from the most recent commit with data",
+      },
+      {
+        name: "avg_complexity",
+        type: "REAL",
+        primary_key: false,
+        not_null: false,
+        description:
+          "Average indentation complexity across all measured commits",
+      },
+      {
+        name: "max_complexity",
+        type: "REAL",
+        primary_key: false,
+        not_null: false,
+        description:
+          "Maximum indentation complexity across all measured commits",
       },
     ],
   },

@@ -318,4 +318,66 @@ export class GitService implements IGitService {
       await Bun.$`git -C ${this.cwd} rev-list --count ${branch}`.quiet()
     return parseInt(result.text().trim(), 10)
   }
+
+  /**
+   * Returns file contents at specific commits using git cat-file --batch.
+   * Uses Bun.spawn for binary-safe I/O.
+   * @param entries - Array of { hash, filePath } to fetch.
+   * @returns Map keyed by "hash:filePath" to file content Buffer.
+   */
+  async getFileContentsBatch(
+    entries: Array<{ hash: string; filePath: string }>,
+  ): Promise<Map<string, Buffer>> {
+    const result = new Map<string, Buffer>()
+    if (entries.length === 0) return result
+
+    const proc = Bun.spawn(["git", "-C", this.cwd, "cat-file", "--batch"], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    // Write all refs to stdin
+    const input =
+      entries.map((e) => `${e.hash}:${e.filePath}`).join("\n") + "\n"
+    proc.stdin.write(input)
+    proc.stdin.end()
+
+    // Read all stdout as a single buffer
+    const output = Buffer.from(await new Response(proc.stdout).arrayBuffer())
+    await proc.exited
+
+    // Parse batch output: each object is either:
+    //   <ref> missing\n
+    //   <sha> <type> <size>\n<data>\n
+    let offset = 0
+    for (const entry of entries) {
+      const key = `${entry.hash}:${entry.filePath}`
+
+      // Find end of header line
+      const newlineIdx = output.indexOf(0x0a, offset)
+      if (newlineIdx === -1) break
+
+      const headerLine = output.subarray(offset, newlineIdx).toString("utf-8")
+
+      if (headerLine.endsWith("missing")) {
+        offset = newlineIdx + 1
+        continue
+      }
+
+      // Parse header: "<sha> <type> <size>"
+      const parts = headerLine.split(" ")
+      const size = parseInt(parts[parts.length - 1], 10)
+
+      // Data starts after the header newline
+      const dataStart = newlineIdx + 1
+      const dataEnd = dataStart + size
+      result.set(key, Buffer.from(output.subarray(dataStart, dataEnd)))
+
+      // Skip past data + trailing newline
+      offset = dataEnd + 1
+    }
+
+    return result
+  }
 }

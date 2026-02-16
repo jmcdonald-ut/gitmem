@@ -354,4 +354,72 @@ describe("GitService", () => {
     expect(info.files[0].additions).toBeGreaterThan(0)
     expect(info.files[0].deletions).toBeGreaterThan(0)
   })
+
+  test("getFileContentsBatch returns empty map for empty input", async () => {
+    const result = await git.getFileContentsBatch([])
+    expect(result.size).toBe(0)
+  })
+
+  test("getFileContentsBatch returns file contents", async () => {
+    await makeCommit("hello.txt", "hello world\n", "add hello")
+
+    const hashes = await git.getCommitHashes("main")
+    const result = await git.getFileContentsBatch([
+      { hash: hashes[0], filePath: "hello.txt" },
+    ])
+
+    expect(result.size).toBe(1)
+    const key = `${hashes[0]}:hello.txt`
+    expect(result.has(key)).toBe(true)
+    expect(result.get(key)!.toString("utf-8")).toBe("hello world\n")
+  })
+
+  test("getFileContentsBatch handles multiple files", async () => {
+    await Bun.$`printf "aaa" > ${join(tmpDir, "a.txt")}`.quiet()
+    await Bun.$`printf "bbb" > ${join(tmpDir, "b.txt")}`.quiet()
+    await Bun.$`git -C ${tmpDir} add a.txt b.txt`.quiet()
+    await Bun.$`git -C ${tmpDir} commit -m "add two"`.quiet()
+
+    const hashes = await git.getCommitHashes("main")
+    const result = await git.getFileContentsBatch([
+      { hash: hashes[0], filePath: "a.txt" },
+      { hash: hashes[0], filePath: "b.txt" },
+    ])
+
+    expect(result.size).toBe(2)
+    expect(result.get(`${hashes[0]}:a.txt`)!.toString("utf-8")).toBe("aaa")
+    expect(result.get(`${hashes[0]}:b.txt`)!.toString("utf-8")).toBe("bbb")
+  })
+
+  test("getFileContentsBatch skips missing files", async () => {
+    await makeCommit("exists.txt", "data", "add file")
+
+    const hashes = await git.getCommitHashes("main")
+    const result = await git.getFileContentsBatch([
+      { hash: hashes[0], filePath: "exists.txt" },
+      { hash: hashes[0], filePath: "nonexistent.txt" },
+    ])
+
+    expect(result.has(`${hashes[0]}:exists.txt`)).toBe(true)
+    expect(result.has(`${hashes[0]}:nonexistent.txt`)).toBe(false)
+  })
+
+  test("getFileContentsBatch handles binary content", async () => {
+    const binaryPath = join(tmpDir, "binary.bin")
+    await Bun.write(binaryPath, Buffer.from([0x00, 0x01, 0x02, 0xff]))
+    await Bun.$`git -C ${tmpDir} add binary.bin`.quiet()
+    await Bun.$`git -C ${tmpDir} commit -m "add binary"`.quiet()
+
+    const hashes = await git.getCommitHashes("main")
+    const result = await git.getFileContentsBatch([
+      { hash: hashes[0], filePath: "binary.bin" },
+    ])
+
+    const key = `${hashes[0]}:binary.bin`
+    expect(result.has(key)).toBe(true)
+    const buf = result.get(key)!
+    expect(buf[0]).toBe(0x00)
+    expect(buf[1]).toBe(0x01)
+    expect(buf[3]).toBe(0xff)
+  })
 })
