@@ -1,7 +1,7 @@
 import { Command } from "commander"
 import React from "react"
 import { render } from "ink"
-import { resolveFormat } from "@/output"
+import { runCommand } from "@commands/utils/command-context"
 import { formatOutput } from "@/output"
 import { SCHEMA } from "@/schema"
 import { SchemaCommand } from "@commands/schema/SchemaCommand"
@@ -19,9 +19,13 @@ export const schemaCommand = new Command("schema")
   .description("Display database schema documentation")
   .addHelpText("after", HELP_TEXT)
   .action(async (_opts, cmd) => {
-    const format = resolveFormat(cmd.parent!.opts())
+    await runCommand(
+      cmd.parent!.opts(),
+      { needsGit: false, needsDb: false },
+      async ({ format }) => {
+        if (formatOutput(format, { tables: SCHEMA })) return
 
-    if (formatOutput(format, { tables: SCHEMA })) return
-
-    render(<SchemaCommand tables={SCHEMA} />).unmount()
+        render(<SchemaCommand tables={SCHEMA} />).unmount()
+      },
+    )
   })
