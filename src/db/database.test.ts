@@ -26,6 +26,20 @@ describe("createDatabase", () => {
     db.close()
   })
 
+  test("creates indexes", () => {
+    const db = createDatabase(":memory:")
+    const indexes = db
+      .query<{ name: string }, []>(
+        "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name",
+      )
+      .all()
+      .map((r) => r.name)
+
+    expect(indexes).toContain("idx_commit_files_file_path")
+    expect(indexes).toContain("idx_commits_enriched_at")
+    db.close()
+  })
+
   test("is idempotent", () => {
     const db = createDatabase(":memory:")
     // Creating schema again should not throw

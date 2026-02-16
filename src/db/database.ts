@@ -111,6 +111,13 @@ function createSchema(db: Database): void {
       summary
     );
   `)
+
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_commit_files_file_path ON commit_files(file_path)",
+  )
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_commits_enriched_at ON commits(enriched_at)",
+  )
 }
 
 /**
