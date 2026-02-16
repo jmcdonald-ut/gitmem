@@ -198,6 +198,71 @@ export interface ILLMService {
   enrichCommit(commit: CommitInfo, diff: string): Promise<EnrichmentResult>
 }
 
+/** A pass/fail verdict with reasoning for a single evaluation dimension. */
+export interface EvalVerdict {
+  /** Whether this dimension passed. */
+  pass: boolean
+  /** The judge's reasoning for the verdict. */
+  reasoning: string
+  /** Suggested correct classification (only for classification dimension on fail). */
+  suggestedClassification?: Classification
+}
+
+/** Full evaluation result for a single commit. */
+export interface EvalResult {
+  /** The commit hash that was evaluated. */
+  hash: string
+  /** The original classification assigned during enrichment. */
+  classification: string
+  /** The original summary assigned during enrichment. */
+  summary: string
+  /** Verdict on classification correctness. */
+  classificationVerdict: EvalVerdict
+  /** Verdict on summary accuracy. */
+  accuracyVerdict: EvalVerdict
+  /** Verdict on summary completeness. */
+  completenessVerdict: EvalVerdict
+}
+
+/** Aggregate summary of evaluation results across multiple commits. */
+export interface EvalSummary {
+  /** Total number of commits evaluated. */
+  total: number
+  /** Number of commits with correct classification. */
+  classificationCorrect: number
+  /** Number of commits with accurate summaries. */
+  summaryAccurate: number
+  /** Number of commits with complete summaries. */
+  summaryComplete: number
+}
+
+/** Tracks progress through the check workflow. */
+export interface CheckProgress {
+  /** Current check phase. */
+  phase: "evaluating" | "done"
+  /** Number of commits evaluated so far. */
+  current: number
+  /** Total commits to evaluate. */
+  total: number
+  /** Hash of the commit currently being evaluated. */
+  currentHash?: string
+}
+
+/** Interface for LLM-based commit evaluation (judge). */
+export interface IJudgeService {
+  /** Evaluates a commit's enrichment quality using a stronger model. */
+  evaluateCommit(
+    commit: CommitInfo,
+    diff: string,
+    classification: string,
+    summary: string,
+  ): Promise<{
+    classificationVerdict: EvalVerdict
+    accuracyVerdict: EvalVerdict
+    completenessVerdict: EvalVerdict
+  }>
+}
+
 /** Summary of the current gitmem index state, displayed by the status command. */
 export interface StatusInfo {
   /** Total commits on the default branch in the git repo. */
