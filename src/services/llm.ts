@@ -38,7 +38,7 @@ export class LLMService implements ILLMService {
       try {
         const response = await this.client.messages.create({
           model: this.model,
-          max_tokens: 256,
+          max_tokens: 512,
           system: SYSTEM_PROMPT,
           messages: [{ role: "user", content: userMessage }],
         })
