@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite"
+import { copyFileSync, existsSync } from "node:fs"
 
 /**
  * Opens (or creates) the SQLite database at the given path, enables WAL mode
@@ -14,7 +15,12 @@ export function createDatabase(path: string): Database {
   db.run("PRAGMA cache_size = -64000")
   db.run("PRAGMA temp_store = MEMORY")
   createSchema(db)
-  migrateSchema(db)
+  if (needsMigration(db)) {
+    if (path !== ":memory:" && existsSync(path)) {
+      copyFileSync(path, `${path}.backup`)
+    }
+    migrateSchema(db)
+  }
   return db
 }
 
@@ -120,44 +126,54 @@ function createSchema(db: Database): void {
   )
 }
 
+function hasColumn(db: Database, table: string, column: string): boolean {
+  const cols = db
+    .query<{ name: string }, [string]>("SELECT name FROM pragma_table_info(?)")
+    .all(table)
+  return cols.some((c) => c.name === column)
+}
+
+/** Returns true if any known migration needs to run. */
+function needsMigration(db: Database): boolean {
+  return (
+    !hasColumn(db, "commit_files", "lines_of_code") ||
+    !hasColumn(db, "commit_files", "indent_complexity") ||
+    !hasColumn(db, "commit_files", "max_indent") ||
+    !hasColumn(db, "file_stats", "current_loc") ||
+    !hasColumn(db, "file_stats", "current_complexity") ||
+    !hasColumn(db, "file_stats", "avg_complexity") ||
+    !hasColumn(db, "file_stats", "max_complexity")
+  )
+}
+
 /**
  * Adds new columns to existing tables if they are missing.
  * Ensures both fresh and upgraded databases have the same schema.
  * @param db - The SQLite database instance.
  */
 function migrateSchema(db: Database): void {
-  const hasColumn = (table: string, column: string): boolean => {
-    const cols = db
-      .query<
-        { name: string },
-        [string]
-      >("SELECT name FROM pragma_table_info(?)")
-      .all(table)
-    return cols.some((c) => c.name === column)
-  }
-
   // commit_files complexity columns
-  if (!hasColumn("commit_files", "lines_of_code")) {
+  if (!hasColumn(db, "commit_files", "lines_of_code")) {
     db.run("ALTER TABLE commit_files ADD COLUMN lines_of_code INTEGER")
   }
-  if (!hasColumn("commit_files", "indent_complexity")) {
+  if (!hasColumn(db, "commit_files", "indent_complexity")) {
     db.run("ALTER TABLE commit_files ADD COLUMN indent_complexity REAL")
   }
-  if (!hasColumn("commit_files", "max_indent")) {
+  if (!hasColumn(db, "commit_files", "max_indent")) {
     db.run("ALTER TABLE commit_files ADD COLUMN max_indent INTEGER")
   }
 
   // file_stats complexity columns
-  if (!hasColumn("file_stats", "current_loc")) {
+  if (!hasColumn(db, "file_stats", "current_loc")) {
     db.run("ALTER TABLE file_stats ADD COLUMN current_loc INTEGER")
   }
-  if (!hasColumn("file_stats", "current_complexity")) {
+  if (!hasColumn(db, "file_stats", "current_complexity")) {
     db.run("ALTER TABLE file_stats ADD COLUMN current_complexity REAL")
   }
-  if (!hasColumn("file_stats", "avg_complexity")) {
+  if (!hasColumn(db, "file_stats", "avg_complexity")) {
     db.run("ALTER TABLE file_stats ADD COLUMN avg_complexity REAL")
   }
-  if (!hasColumn("file_stats", "max_complexity")) {
+  if (!hasColumn(db, "file_stats", "max_complexity")) {
     db.run("ALTER TABLE file_stats ADD COLUMN max_complexity REAL")
   }
 }
