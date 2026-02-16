@@ -105,6 +105,35 @@ export class CommitRepository {
   }
 
   /**
+   * Returns N random enriched commits for quality evaluation.
+   * @param n - Maximum number of commits to return.
+   * @returns Array of enriched commit rows in random order.
+   */
+  getRandomEnrichedCommits(n: number): CommitRow[] {
+    return this.db
+      .query<
+        CommitRow,
+        [number]
+      >("SELECT * FROM commits WHERE enriched_at IS NOT NULL ORDER BY RANDOM() LIMIT ?")
+      .all(n)
+  }
+
+  /**
+   * Returns commits whose hash starts with the given prefix.
+   * @param prefix - The hash prefix to match.
+   * @param limit - Maximum number of results (default 10).
+   * @returns Matching commit rows.
+   */
+  getCommitsByHashPrefix(prefix: string, limit: number = 10): CommitRow[] {
+    return this.db
+      .query<
+        CommitRow,
+        [string, number]
+      >("SELECT * FROM commits WHERE hash LIKE ? || '%' LIMIT ?")
+      .all(prefix, limit)
+  }
+
+  /**
    * Retrieves a single commit by its hash.
    * @param hash - The commit hash to look up.
    * @returns The commit row, or null if not found.

@@ -128,4 +128,75 @@ describe("CommitRepository", () => {
     expect(unenriched[0].hash).toBe("new")
     expect(unenriched[1].hash).toBe("old")
   })
+
+  test("getCommitsByHashPrefix matches unique prefix", () => {
+    repo.insertRawCommits([makeCommit("abc1234"), makeCommit("def5678")])
+    const results = repo.getCommitsByHashPrefix("abc")
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("abc1234")
+  })
+
+  test("getCommitsByHashPrefix returns multiple matches for ambiguous prefix", () => {
+    repo.insertRawCommits([makeCommit("abc1234"), makeCommit("abc5678")])
+    const results = repo.getCommitsByHashPrefix("abc")
+    expect(results).toHaveLength(2)
+  })
+
+  test("getCommitsByHashPrefix returns empty for no matches", () => {
+    repo.insertRawCommits([makeCommit("abc1234")])
+    const results = repo.getCommitsByHashPrefix("zzz")
+    expect(results).toHaveLength(0)
+  })
+
+  test("getCommitsByHashPrefix matches full hash exactly", () => {
+    repo.insertRawCommits([makeCommit("abc1234")])
+    const results = repo.getCommitsByHashPrefix("abc1234")
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("abc1234")
+  })
+
+  test("getCommitsByHashPrefix respects limit", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa111"),
+      makeCommit("aaa222"),
+      makeCommit("aaa333"),
+    ])
+    const results = repo.getCommitsByHashPrefix("aaa", 2)
+    expect(results).toHaveLength(2)
+  })
+
+  test("getRandomEnrichedCommits returns only enriched commits", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa"),
+      makeCommit("bbb"),
+      makeCommit("ccc"),
+    ])
+    repo.updateEnrichment("aaa", "feature", "summary a", "haiku-4.5")
+    repo.updateEnrichment("bbb", "bug-fix", "summary b", "haiku-4.5")
+
+    const results = repo.getRandomEnrichedCommits(10)
+    expect(results).toHaveLength(2)
+    const hashes = results.map((r) => r.hash).sort()
+    expect(hashes).toEqual(["aaa", "bbb"])
+  })
+
+  test("getRandomEnrichedCommits respects limit", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa"),
+      makeCommit("bbb"),
+      makeCommit("ccc"),
+    ])
+    repo.updateEnrichment("aaa", "feature", "summary a", "haiku-4.5")
+    repo.updateEnrichment("bbb", "bug-fix", "summary b", "haiku-4.5")
+    repo.updateEnrichment("ccc", "refactor", "summary c", "haiku-4.5")
+
+    const results = repo.getRandomEnrichedCommits(2)
+    expect(results).toHaveLength(2)
+  })
+
+  test("getRandomEnrichedCommits returns empty for no enriched commits", () => {
+    repo.insertRawCommits([makeCommit("aaa")])
+    const results = repo.getRandomEnrichedCommits(5)
+    expect(results).toHaveLength(0)
+  })
 })
