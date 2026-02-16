@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { QueryCommand } from "@commands/query-command"
+import { QueryCommand } from "@commands/query/QueryCommand"
 import type { SearchResult } from "@/types"
 
 describe("QueryCommand", () => {

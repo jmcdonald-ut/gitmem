@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { StatsCommand } from "@commands/stats-command"
+import { StatsCommand } from "@commands/stats/StatsCommand"
 import type { FileStatsRow, FileContributorRow, RecentCommit } from "@/types"
 
 const makeStats = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({

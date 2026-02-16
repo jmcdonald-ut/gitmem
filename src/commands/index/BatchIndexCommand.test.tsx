@@ -4,8 +4,8 @@ import { render } from "ink-testing-library"
 import {
   BatchIndexCommand,
   batchPhaseLabel,
-} from "@commands/batch-index-command"
-import { waitForFrame } from "@commands/test-utils"
+} from "@commands/index/BatchIndexCommand"
+import { waitForFrame } from "@commands/utils/test-utils"
 import type { EnricherService } from "@services/enricher"
 import type { BatchLLMService } from "@services/batch-llm"
 import type { BatchJobRepository } from "@db/batch-jobs"

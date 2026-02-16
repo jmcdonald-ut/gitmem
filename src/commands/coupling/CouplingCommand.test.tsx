@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { CouplingCommand } from "@commands/coupling-command"
+import { CouplingCommand } from "@commands/coupling/CouplingCommand"
 import type { CouplingPairRow, CouplingPairGlobalRow } from "@/types"
 
 describe("CouplingCommand", () => {

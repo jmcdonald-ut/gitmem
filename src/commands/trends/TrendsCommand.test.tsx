@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { TrendsCommand } from "@commands/trends-command"
+import { TrendsCommand } from "@commands/trends/TrendsCommand"
 import type { TrendPeriod, TrendSummary } from "@/types"
 
 const makePeriod = (overrides: Partial<TrendPeriod> = {}): TrendPeriod => ({

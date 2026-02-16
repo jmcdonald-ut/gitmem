@@ -1,8 +1,8 @@
 import { describe, test, expect, mock } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
-import { IndexCommand, phaseLabel } from "@commands/index-command"
-import { waitForFrame } from "@commands/test-utils"
+import { IndexCommand, phaseLabel } from "@commands/index/IndexCommand"
+import { waitForFrame } from "@commands/utils/test-utils"
 import type { EnricherService } from "@services/enricher"
 import type { IndexProgress } from "@/types"
 
