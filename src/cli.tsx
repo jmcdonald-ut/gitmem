@@ -30,6 +30,124 @@ import { CheckerService } from "@services/checker"
 import type { StatusInfo } from "@/types"
 import { resolveFormat, formatOutput } from "@/output"
 
+const PROGRAM_HELP = `
+Getting started:
+  1. Export your Anthropic API key:  export ANTHROPIC_API_KEY=sk-ant-...
+  2. Run the indexer:                gitmem index
+  3. Search your history:            gitmem query "auth bug"
+
+Global options --format json and --json work with every command.
+Run gitmem schema for database table documentation.`
+
+const INDEX_HELP = `
+Requires ANTHROPIC_API_KEY environment variable.
+
+Indexing is incremental — only new commits are analyzed. Re-running is
+safe and will pick up where it left off.
+
+Batch mode (--batch) submits all work to the Anthropic Message Batches
+API at 50% cost, but results are asynchronous. Run the command again
+to poll for completion.
+
+Examples:
+  gitmem index                                       # default (haiku)
+  gitmem index --batch                               # async batch, 50% cheaper
+  gitmem index --model claude-sonnet-4-5-20250929    # use a different model`
+
+const STATUS_HELP = `
+Displays coverage percentage, enriched/total commit counts, last index
+run timestamp, model used, and database path and size.
+
+Requires a prior gitmem index run.`
+
+const QUERY_HELP = `
+Uses SQLite FTS5 full-text search — no API calls at query time.
+
+FTS5 query syntax:
+  "exact phrase"          phrase match
+  auth NOT oauth          boolean operators
+  summary:performance     column filter (summary, classification, hash)
+
+Examples:
+  gitmem query "memory leak"
+  gitmem query "refactor" --classification refactor
+  gitmem query "auth NOT oauth" --limit 5`
+
+const CHECK_HELP = `
+Requires ANTHROPIC_API_KEY environment variable.
+
+Two modes:
+  gitmem check <hash>        evaluate a single enriched commit
+  gitmem check --sample N    evaluate N random enriched commits
+
+Evaluates three dimensions: classification correctness, summary
+accuracy, and summary completeness. Each dimension is scored 1-5.
+
+Default output for --sample mode:  .gitmem/check-<timestamp>.json
+
+Examples:
+  gitmem check abc1234
+  gitmem check --sample 20
+  gitmem check --sample 10 --model claude-sonnet-4-5-20250929`
+
+const HOTSPOTS_HELP = `
+Hotspots highlight files with the most commits — indicators of churn,
+risk, or active development.
+
+Sort by a classification type to surface e.g. the buggiest files.
+
+Examples:
+  gitmem hotspots
+  gitmem hotspots --sort bug-fix
+  gitmem hotspots --path src/services/ --limit 20`
+
+const STATS_HELP = `
+File mode: classification breakdown, top contributors, recent commits.
+Directory mode: aggregate stats, file count, top contributors, and
+hottest files within that directory.
+
+--limit controls the size of sub-lists (contributors, recent commits,
+top files). Default: 5.
+
+Examples:
+  gitmem stats src/db/commits.ts
+  gitmem stats src/services/`
+
+const COUPLING_HELP = `
+Co-change means two files were modified in the same commit. High
+coupling can indicate hidden dependencies.
+
+Three modes:
+  gitmem coupling                global top pairs
+  gitmem coupling <file>         files most coupled to a specific file
+  gitmem coupling <directory>    top pairs within a directory
+
+Examples:
+  gitmem coupling
+  gitmem coupling src/db/commits.ts
+  gitmem coupling src/services/`
+
+const TRENDS_HELP = `
+Trend direction indicators: increasing, decreasing, or stable — based
+on recent vs earlier period averages.
+
+Works for both files and directories. Use --window to change the time
+granularity.
+
+Examples:
+  gitmem trends src/db/commits.ts
+  gitmem trends src/services/ --window weekly
+  gitmem trends src/ --window quarterly --limit 8`
+
+const SCHEMA_HELP = `
+For writing custom SQL queries against the .gitmem/index.db database.
+
+Tables: commits, file_stats, file_contributors, file_coupling,
+commit_search, metadata, batch_jobs.
+
+Example:
+  gitmem schema --json`
+
 /**
  * Resolves the path to the SQLite database file, creating the .gitmem directory if needed.
  * @returns Absolute path to the index.db file.
@@ -42,15 +160,17 @@ function getDbPath(): string {
 
 const program = new Command()
   .name("gitmem")
-  .description("Pre-analyzed git history index")
+  .description("AI-powered git history index")
   .version("0.1.0")
   .option("--format <format>", "Output format (text or json)", "text")
   .option("--json", "Shorthand for --format json")
+  .addHelpText("after", PROGRAM_HELP)
 
 program
   .command("index")
   .alias("i")
-  .description("Enrich new commits via LLM and rebuild aggregates")
+  .description("Analyze new commits via Claude API and rebuild search index")
+  .addHelpText("after", INDEX_HELP)
   .option(
     "-m, --model <model>",
     "LLM model to use",
@@ -165,7 +285,8 @@ program
 program
   .command("status")
   .alias("s")
-  .description("Display index health and coverage")
+  .description("Show index health, coverage, and database statistics")
+  .addHelpText("after", STATUS_HELP)
   .action(async () => {
     const format = resolveFormat(program.opts())
     const cwd = process.cwd()
@@ -234,7 +355,8 @@ program
     "--classification <type>",
     "Filter by classification (bug-fix, feature, refactor, docs, chore, perf, test, style)",
   )
-  .description("Search the index (no LLM, retrieval only)")
+  .description("Full-text search over enriched commits (no API calls)")
+  .addHelpText("after", QUERY_HELP)
   .action(async (query, opts) => {
     const format = resolveFormat(program.opts())
     const cwd = process.cwd()
@@ -294,7 +416,8 @@ program
 program
   .command("check")
   .argument("[hash]", "Commit hash to evaluate")
-  .description("Evaluate enrichment quality using LLM-as-Judge")
+  .description("Evaluate enrichment quality via LLM-as-judge")
+  .addHelpText("after", CHECK_HELP)
   .option(
     "-s, --sample <number>",
     "Number of random enriched commits to evaluate",
@@ -405,6 +528,7 @@ program
   .command("hotspots")
   .alias("h")
   .description("Show most-changed files with classification breakdown")
+  .addHelpText("after", HOTSPOTS_HELP)
   .option(
     "--sort <field>",
     "Sort by: total, bug-fix, feature, refactor, docs, chore, perf, test, style",
@@ -470,7 +594,8 @@ program
   .command("stats")
   .argument("<path>", "File or directory path to inspect")
   .option("-l, --limit <number>", "Limit sub-lists", "5")
-  .description("Deep dive on a file or directory")
+  .description("Show detailed change statistics for a file or directory")
+  .addHelpText("after", STATS_HELP)
   .action(async (path, opts) => {
     const format = resolveFormat(program.opts())
     const cwd = process.cwd()
@@ -573,7 +698,8 @@ program
 program
   .command("coupling [path]")
   .alias("c")
-  .description("Show co-change pairs")
+  .description("Show files that frequently change together")
+  .addHelpText("after", COUPLING_HELP)
   .option("-l, --limit <number>", "Max results", "10")
   .action(async (path, opts) => {
     const format = resolveFormat(program.opts())
@@ -652,6 +778,7 @@ program
   .command("trends <path>")
   .alias("t")
   .description("Show change velocity and classification mix over time")
+  .addHelpText("after", TRENDS_HELP)
   .option(
     "-w, --window <period>",
     "Time window: weekly, monthly, quarterly",
@@ -740,6 +867,7 @@ program
 program
   .command("schema")
   .description("Display database schema documentation")
+  .addHelpText("after", SCHEMA_HELP)
   .action(async () => {
     const format = resolveFormat(program.opts())
 
