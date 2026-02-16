@@ -21,6 +21,7 @@ import { CheckCommand } from "@commands/check-command"
 import { JudgeService } from "@services/judge"
 import { CheckerService } from "@services/checker"
 import type { StatusInfo } from "@/types"
+import { resolveFormat, formatOutput } from "@/output"
 
 /**
  * Resolves the path to the SQLite database file, creating the .gitmem directory if needed.
@@ -119,6 +120,7 @@ program
   .alias("s")
   .description("Display index health and coverage")
   .action(async () => {
+    const format = resolveFormat(program.opts())
     const cwd = process.cwd()
     const git = new GitService(cwd)
 
@@ -166,6 +168,11 @@ program
       dbSize,
     }
 
+    if (formatOutput(format, status)) {
+      db.close()
+      return
+    }
+
     const instance = render(<StatusCommand status={status} />)
     instance.unmount()
     db.close()
@@ -178,6 +185,7 @@ program
   .option("-l, --limit <number>", "Max results", "20")
   .description("Search the index (no LLM, retrieval only)")
   .action(async (query, opts) => {
+    const format = resolveFormat(program.opts())
     const cwd = process.cwd()
     const git = new GitService(cwd)
 
@@ -203,6 +211,12 @@ program
       totalCommits > 0 ? Math.round((enrichedCommits / totalCommits) * 100) : 0
 
     const results = search.search(query, parseInt(opts.limit, 10))
+
+    if (formatOutput(format, { query, results, coveragePct })) {
+      db.close()
+      return
+    }
+
     const hotspots = aggregates.getHotspots(5)
 
     const instance = render(
