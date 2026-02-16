@@ -11,7 +11,10 @@ import { SearchService } from "@db/search"
 import { GitService } from "@services/git"
 import { LLMService } from "@services/llm"
 import { EnricherService } from "@services/enricher"
+import { BatchLLMService } from "@services/batch-llm"
+import { BatchJobRepository } from "@db/batch-jobs"
 import { IndexCommand } from "@commands/index-command"
+import { BatchIndexCommand } from "@commands/batch-index-command"
 import { StatusCommand } from "@commands/status-command"
 import { QueryCommand } from "@commands/query-command"
 import type { StatusInfo } from "@/types"
@@ -40,6 +43,12 @@ program
     "LLM model to use",
     "claude-haiku-4-5-20251001",
   )
+  .option(
+    "-c, --concurrency <number>",
+    "Number of parallel LLM requests",
+    "8",
+  )
+  .option("-b, --batch", "Use Anthropic Message Batches API (50% cost reduction)")
   .action(async (opts) => {
     const cwd = process.cwd()
     const git = new GitService(cwd)
@@ -68,6 +77,7 @@ program
       aggregates,
       search,
       opts.model,
+      parseInt(opts.concurrency, 10),
     )
 
     // Store metadata
@@ -75,9 +85,23 @@ program
       "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
     ).run("model_used", opts.model)
 
-    const instance = render(<IndexCommand enricher={enricher} />)
-    await instance.waitUntilExit()
-    instance.unmount()
+    if (opts.batch) {
+      const batchLLM = new BatchLLMService(apiKey, opts.model)
+      const batchJobs = new BatchJobRepository(db)
+      const instance = render(
+        <BatchIndexCommand
+          enricher={enricher}
+          batchLLM={batchLLM}
+          batchJobs={batchJobs}
+        />,
+      )
+      await instance.waitUntilExit()
+      instance.unmount()
+    } else {
+      const instance = render(<IndexCommand enricher={enricher} />)
+      await instance.waitUntilExit()
+      instance.unmount()
+    }
 
     db.prepare(
       "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
