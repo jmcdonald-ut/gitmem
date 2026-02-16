@@ -254,13 +254,23 @@ describe("CommitRepository", () => {
       makeCommit("aaa", {
         committedAt: "2024-01-01T00:00:00Z",
         files: [
-          { filePath: "src/main.ts", changeType: "A", additions: 10, deletions: 0 },
+          {
+            filePath: "src/main.ts",
+            changeType: "A",
+            additions: 10,
+            deletions: 0,
+          },
         ],
       }),
       makeCommit("bbb", {
         committedAt: "2024-02-01T00:00:00Z",
         files: [
-          { filePath: "src/main.ts", changeType: "M", additions: 5, deletions: 2 },
+          {
+            filePath: "src/main.ts",
+            changeType: "M",
+            additions: 5,
+            deletions: 2,
+          },
         ],
       }),
     ])
@@ -279,12 +289,22 @@ describe("CommitRepository", () => {
     repo.insertRawCommits([
       makeCommit("aaa", {
         files: [
-          { filePath: "src/main.ts", changeType: "A", additions: 10, deletions: 0 },
+          {
+            filePath: "src/main.ts",
+            changeType: "A",
+            additions: 10,
+            deletions: 0,
+          },
         ],
       }),
       makeCommit("bbb", {
         files: [
-          { filePath: "src/main.ts", changeType: "M", additions: 5, deletions: 2 },
+          {
+            filePath: "src/main.ts",
+            changeType: "M",
+            additions: 5,
+            deletions: 2,
+          },
         ],
       }),
     ])
@@ -319,19 +339,34 @@ describe("CommitRepository", () => {
       makeCommit("aaa", {
         committedAt: "2024-01-01T00:00:00Z",
         files: [
-          { filePath: "src/services/git.ts", changeType: "A", additions: 10, deletions: 0 },
+          {
+            filePath: "src/services/git.ts",
+            changeType: "A",
+            additions: 10,
+            deletions: 0,
+          },
         ],
       }),
       makeCommit("bbb", {
         committedAt: "2024-02-01T00:00:00Z",
         files: [
-          { filePath: "src/services/llm.ts", changeType: "A", additions: 20, deletions: 0 },
+          {
+            filePath: "src/services/llm.ts",
+            changeType: "A",
+            additions: 20,
+            deletions: 0,
+          },
         ],
       }),
       makeCommit("ccc", {
         committedAt: "2024-03-01T00:00:00Z",
         files: [
-          { filePath: "src/db/commits.ts", changeType: "A", additions: 5, deletions: 0 },
+          {
+            filePath: "src/db/commits.ts",
+            changeType: "A",
+            additions: 5,
+            deletions: 0,
+          },
         ],
       }),
     ])
@@ -350,8 +385,18 @@ describe("CommitRepository", () => {
       makeCommit("aaa", {
         committedAt: "2024-01-01T00:00:00Z",
         files: [
-          { filePath: "src/services/git.ts", changeType: "M", additions: 5, deletions: 1 },
-          { filePath: "src/services/llm.ts", changeType: "M", additions: 3, deletions: 1 },
+          {
+            filePath: "src/services/git.ts",
+            changeType: "M",
+            additions: 5,
+            deletions: 1,
+          },
+          {
+            filePath: "src/services/llm.ts",
+            changeType: "M",
+            additions: 3,
+            deletions: 1,
+          },
         ],
       }),
     ])
@@ -366,15 +411,21 @@ describe("CommitRepository", () => {
     repo.insertRawCommits([
       makeCommit("aaa", {
         committedAt: "2024-01-01T00:00:00Z",
-        files: [{ filePath: "src/a.ts", changeType: "A", additions: 1, deletions: 0 }],
+        files: [
+          { filePath: "src/a.ts", changeType: "A", additions: 1, deletions: 0 },
+        ],
       }),
       makeCommit("bbb", {
         committedAt: "2024-02-01T00:00:00Z",
-        files: [{ filePath: "src/b.ts", changeType: "A", additions: 1, deletions: 0 }],
+        files: [
+          { filePath: "src/b.ts", changeType: "A", additions: 1, deletions: 0 },
+        ],
       }),
       makeCommit("ccc", {
         committedAt: "2024-03-01T00:00:00Z",
-        files: [{ filePath: "src/c.ts", changeType: "A", additions: 1, deletions: 0 }],
+        files: [
+          { filePath: "src/c.ts", changeType: "A", additions: 1, deletions: 0 },
+        ],
       }),
     ])
     repo.updateEnrichment("aaa", "feature", "a", "haiku-4.5")

@@ -19,6 +19,7 @@ import { StatusCommand } from "@commands/status-command"
 import { QueryCommand } from "@commands/query-command"
 import { CheckCommand } from "@commands/check-command"
 import { HotspotsCommand } from "@commands/hotspots-command"
+import { StatsCommand } from "@commands/stats-command"
 import { JudgeService } from "@services/judge"
 import { CheckerService } from "@services/checker"
 import type { StatusInfo } from "@/types"
@@ -457,6 +458,110 @@ program
       />,
     )
     instance.unmount()
+    db.close()
+  })
+
+program
+  .command("stats")
+  .argument("<path>", "File or directory path to inspect")
+  .option("-l, --limit <number>", "Limit sub-lists", "5")
+  .description("Deep dive on a file or directory")
+  .action(async (path, opts) => {
+    const format = resolveFormat(program.opts())
+    const cwd = process.cwd()
+    const git = new GitService(cwd)
+
+    if (!(await git.isGitRepo())) {
+      console.error("Error: not a git repository")
+      process.exit(1)
+    }
+
+    const dbPath = getDbPath()
+    if (!existsSync(dbPath)) {
+      console.error("Error: no index found. Run `gitmem index` first.")
+      process.exit(1)
+    }
+
+    const db = createDatabase(dbPath)
+    const aggregates = new AggregateRepository(db)
+    const commits = new CommitRepository(db)
+    const limit = parseInt(opts.limit, 10)
+
+    // Detect whether path is a file or directory
+    const fileStats = aggregates.getFileStats(path)
+    if (fileStats) {
+      // File mode
+      const contributors = aggregates.getTopContributors(path, limit)
+      const recentCommits = commits.getRecentCommitsForFile(path, limit)
+
+      if (
+        formatOutput(format, {
+          path,
+          type: "file",
+          stats: fileStats,
+          contributors,
+          recent_commits: recentCommits,
+        })
+      ) {
+        db.close()
+        return
+      }
+
+      const instance = render(
+        <StatsCommand
+          path={path}
+          type="file"
+          stats={fileStats}
+          contributors={contributors}
+          recentCommits={recentCommits}
+        />,
+      )
+      instance.unmount()
+    } else {
+      // Try as directory prefix
+      const prefix = path.endsWith("/") ? path : path + "/"
+      const fileCount = aggregates.getDirectoryFileCount(prefix)
+
+      if (fileCount === 0) {
+        console.error(`Error: no indexed data found for "${path}"`)
+        db.close()
+        process.exit(1)
+      }
+
+      const dirStats = aggregates.getDirectoryStats(prefix)!
+      const contributors = aggregates.getDirectoryContributors(prefix, limit)
+      const topFiles = aggregates.getHotspots({
+        pathPrefix: prefix,
+        limit,
+      })
+
+      if (
+        formatOutput(format, {
+          path: prefix,
+          type: "directory",
+          file_count: fileCount,
+          stats: dirStats,
+          contributors,
+          top_files: topFiles,
+        })
+      ) {
+        db.close()
+        return
+      }
+
+      const instance = render(
+        <StatsCommand
+          path={prefix}
+          type="directory"
+          fileCount={fileCount}
+          stats={dirStats}
+          contributors={contributors}
+          topFiles={topFiles}
+        />,
+      )
+      instance.unmount()
+    }
+
     db.close()
   })
 

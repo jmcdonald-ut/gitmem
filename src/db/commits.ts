@@ -197,10 +197,7 @@ export class CommitRepository {
    * @param limit - Maximum number of commits to return.
    * @returns Recent commits ordered by date descending.
    */
-  getRecentCommitsForFile(
-    filePath: string,
-    limit: number = 5,
-  ): RecentCommit[] {
+  getRecentCommitsForFile(filePath: string, limit: number = 5): RecentCommit[] {
     return this.db
       .query<RecentCommit, [string, number]>(
         `SELECT c.hash, c.classification, c.summary, c.committed_at

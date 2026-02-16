@@ -245,9 +245,10 @@ export class AggregateRepository {
    */
   getDirectoryFileCount(prefix: string): number {
     return this.db
-      .query<{ count: number }, [string]>(
-        "SELECT COUNT(*) as count FROM file_stats WHERE file_path LIKE ? || '%'",
-      )
+      .query<
+        { count: number },
+        [string]
+      >("SELECT COUNT(*) as count FROM file_stats WHERE file_path LIKE ? || '%'")
       .get(prefix)!.count
   }
 }
