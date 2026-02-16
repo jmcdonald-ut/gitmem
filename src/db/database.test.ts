@@ -17,6 +17,7 @@ describe("createDatabase", () => {
     expect(tables).toContain("file_stats")
     expect(tables).toContain("file_contributors")
     expect(tables).toContain("file_coupling")
+    expect(tables).toContain("batch_jobs")
     expect(tables).toContain("commits_fts")
     db.close()
   })

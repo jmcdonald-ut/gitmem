@@ -80,6 +80,19 @@ function createSchema(db: Database): void {
   `)
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS batch_jobs (
+      batch_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'submitted',
+      request_count INTEGER NOT NULL DEFAULT 0,
+      succeeded_count INTEGER NOT NULL DEFAULT 0,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      submitted_at TEXT NOT NULL,
+      completed_at TEXT,
+      model_used TEXT NOT NULL
+    );
+  `)
+
+  db.run(`
     CREATE VIRTUAL TABLE IF NOT EXISTS commits_fts USING fts5(
       hash UNINDEXED,
       message,
