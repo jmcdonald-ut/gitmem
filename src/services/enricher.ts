@@ -1,5 +1,5 @@
 import type { IGitService, ILLMService, IndexProgress } from "@/types"
-import type { CommitRow } from "@/types"
+import type { CommitRow, EnrichmentResult } from "@/types"
 import { CommitRepository } from "@db/commits"
 import { AggregateRepository } from "@db/aggregates"
 import { SearchService } from "@db/search"
@@ -98,6 +98,13 @@ export class EnricherService {
         const settled = await Promise.allSettled(
           window.map(async (commit) => {
             const diff = diffMap.get(commit.hash) ?? ""
+            const mergeResult = this.tryMergeCommitEnrichment(
+              commit.message,
+              diff,
+            )
+            if (mergeResult) {
+              return { commit, result: mergeResult }
+            }
             return {
               commit,
               result: await this.llm.enrichCommit(
@@ -252,10 +259,32 @@ export class EnricherService {
       const unenriched = this.commits.getUnenrichedCommits()
       if (unenriched.length > 0) {
         const MAX_BATCH_SIZE = 10000
-        const batches = this.chunkCommits(unenriched, MAX_BATCH_SIZE)
         const unenrichedHashes = unenriched.map((c) => c.hash)
         const diffMap = await this.git.getDiffBatch(unenrichedHashes)
         const filesMap = this.commits.getCommitFilesByHashes(unenrichedHashes)
+
+        // Handle merge commits locally without LLM
+        const needsLLM: CommitRow[] = []
+        for (const commit of unenriched) {
+          const diff = diffMap.get(commit.hash) ?? ""
+          const mergeResult = this.tryMergeCommitEnrichment(
+            commit.message,
+            diff,
+          )
+          if (mergeResult) {
+            this.commits.updateEnrichment(
+              commit.hash,
+              mergeResult.classification,
+              mergeResult.summary,
+              this.model,
+            )
+            enrichedThisRun++
+          } else {
+            needsLLM.push(commit)
+          }
+        }
+
+        const batches = this.chunkCommits(needsLLM, MAX_BATCH_SIZE)
 
         for (const batch of batches) {
           const requests = batch.map((commit) => ({
@@ -318,6 +347,24 @@ export class EnricherService {
     onProgress({ phase: "done", current: totalEnriched, total: totalCommits })
 
     return { enrichedThisRun, totalEnriched, totalCommits }
+  }
+
+  /**
+   * Detects merge commits with empty diffs and returns a template enrichment
+   * result, skipping the LLM call entirely.
+   */
+  private tryMergeCommitEnrichment(
+    message: string,
+    diff: string,
+  ): EnrichmentResult | null {
+    if (message.startsWith("Merge") && diff.trim() === "") {
+      const firstLine = message.split("\n")[0]
+      return {
+        classification: "chore",
+        summary: `Merge commit: ${firstLine}`,
+      }
+    }
+    return null
   }
 
   private chunkCommits(commits: CommitRow[], size: number): CommitRow[][] {

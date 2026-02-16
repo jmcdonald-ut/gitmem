@@ -426,6 +426,116 @@ describe("EnricherService", () => {
     expect(maxConcurrentCalls).toBeLessThanOrEqual(2)
   })
 
+  // --- merge commit tests ---
+
+  test("run auto-classifies merge commits with empty diffs without calling LLM", async () => {
+    const mergeGit: IGitService = {
+      ...mockGit,
+      getCommitHashes: mock(() =>
+        Promise.resolve(["merge1", "normal1", "merge2"]),
+      ),
+      getCommitInfoBatch: mock((hashes: string[]) =>
+        Promise.resolve(
+          hashes.map((hash) => ({
+            hash,
+            authorName: "Test",
+            authorEmail: "test@example.com",
+            committedAt: "2024-01-01T00:00:00Z",
+            message: hash.startsWith("merge")
+              ? "Merge pull request #42 from feature-branch"
+              : `commit ${hash}`,
+            files: [
+              {
+                filePath: "src/main.ts",
+                changeType: "M",
+                additions: 10,
+                deletions: 5,
+              },
+            ],
+          })),
+        ),
+      ),
+      getDiffBatch: mock((hashes: string[]) => {
+        const map = new Map<string, string>()
+        for (const h of hashes) {
+          // Merge commits have empty diffs
+          map.set(h, h.startsWith("merge") ? "" : "diff content")
+        }
+        return Promise.resolve(map)
+      }),
+      getTotalCommitCount: mock(() => Promise.resolve(3)),
+    }
+
+    const enricher = new EnricherService(
+      mergeGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+    )
+    const result = await enricher.run(() => {})
+
+    expect(result.enrichedThisRun).toBe(3)
+
+    // LLM should only be called for the non-merge commit
+    expect(mockLLM.enrichCommit).toHaveBeenCalledTimes(1)
+
+    // Verify merge commits got the template classification and summary
+    const merge1 = commits.getCommit("merge1")
+    expect(merge1!.classification).toBe("chore")
+    expect(merge1!.summary).toBe(
+      "Merge commit: Merge pull request #42 from feature-branch",
+    )
+
+    const merge2 = commits.getCommit("merge2")
+    expect(merge2!.classification).toBe("chore")
+  })
+
+  test("run sends merge commits with non-empty diffs to LLM", async () => {
+    const mergeWithDiffGit: IGitService = {
+      ...mockGit,
+      getCommitHashes: mock(() => Promise.resolve(["merge1"])),
+      getCommitInfoBatch: mock((hashes: string[]) =>
+        Promise.resolve(
+          hashes.map((hash) => ({
+            hash,
+            authorName: "Test",
+            authorEmail: "test@example.com",
+            committedAt: "2024-01-01T00:00:00Z",
+            message: "Merge branch 'feature' with conflicts",
+            files: [
+              {
+                filePath: "src/main.ts",
+                changeType: "M",
+                additions: 10,
+                deletions: 5,
+              },
+            ],
+          })),
+        ),
+      ),
+      getDiffBatch: mock((hashes: string[]) => {
+        const map = new Map<string, string>()
+        for (const h of hashes) map.set(h, "actual conflict resolution diff")
+        return Promise.resolve(map)
+      }),
+      getTotalCommitCount: mock(() => Promise.resolve(1)),
+    }
+
+    const enricher = new EnricherService(
+      mergeWithDiffGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+    )
+    const result = await enricher.run(() => {})
+
+    // Merge commit with a diff should still go to LLM
+    expect(mockLLM.enrichCommit).toHaveBeenCalledTimes(1)
+    expect(result.enrichedThisRun).toBe(1)
+  })
+
   // --- runBatch tests ---
 
   test("runBatch submits batch when unenriched commits exist", async () => {
@@ -663,6 +773,131 @@ describe("EnricherService", () => {
     // Only aaa should be enriched, bbb stays unenriched
     expect(result.enrichedThisRun).toBe(1)
     expect(commits.getEnrichedCommitCount()).toBe(1)
+  })
+
+  test("runBatch handles merge commits locally and excludes them from batch submission", async () => {
+    const batchJobs = new BatchJobRepository(db)
+
+    const mergeGit: IGitService = {
+      ...mockGit,
+      getCommitHashes: mock(() =>
+        Promise.resolve(["merge1", "normal1", "merge2"]),
+      ),
+      getCommitInfoBatch: mock((hashes: string[]) =>
+        Promise.resolve(
+          hashes.map((hash) => ({
+            hash,
+            authorName: "Test",
+            authorEmail: "test@example.com",
+            committedAt: "2024-01-01T00:00:00Z",
+            message: hash.startsWith("merge")
+              ? "Merge pull request #99 from dev"
+              : `commit ${hash}`,
+            files: [
+              {
+                filePath: "src/main.ts",
+                changeType: "M",
+                additions: 10,
+                deletions: 5,
+              },
+            ],
+          })),
+        ),
+      ),
+      getDiffBatch: mock((hashes: string[]) => {
+        const map = new Map<string, string>()
+        for (const h of hashes) {
+          map.set(h, h.startsWith("merge") ? "" : "diff content")
+        }
+        return Promise.resolve(map)
+      }),
+      getTotalCommitCount: mock(() => Promise.resolve(3)),
+    }
+
+    const mockBatchLLM = {
+      submitBatch: mock(() =>
+        Promise.resolve({ batchId: "msgbatch_merge", requestCount: 1 }),
+      ),
+      getBatchStatus: mock(() => Promise.resolve({})),
+      getBatchResults: mock(() => Promise.resolve([])),
+    } as unknown as BatchLLMService
+
+    const enricher = new EnricherService(
+      mergeGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+    )
+
+    await enricher.runBatch(batchLLM(mockBatchLLM), batchJobs, () => {})
+
+    // 2 merge commits enriched locally
+    expect(commits.getCommit("merge1")!.classification).toBe("chore")
+    expect(commits.getCommit("merge2")!.classification).toBe("chore")
+
+    // Batch should only contain the 1 non-merge commit
+    expect(mockBatchLLM.submitBatch).toHaveBeenCalledTimes(1)
+    const submittedRequests = (
+      mockBatchLLM.submitBatch as ReturnType<typeof mock>
+    ).mock.calls[0][0]
+    expect(submittedRequests).toHaveLength(1)
+    expect(submittedRequests[0].hash).toBe("normal1")
+  })
+
+  test("runBatch skips batch submission when all commits are merge commits", async () => {
+    const batchJobs = new BatchJobRepository(db)
+
+    const allMergeGit: IGitService = {
+      ...mockGit,
+      getCommitHashes: mock(() => Promise.resolve(["merge1", "merge2"])),
+      getCommitInfoBatch: mock((hashes: string[]) =>
+        Promise.resolve(
+          hashes.map((hash) => ({
+            hash,
+            authorName: "Test",
+            authorEmail: "test@example.com",
+            committedAt: "2024-01-01T00:00:00Z",
+            message: "Merge branch 'dev'",
+            files: [],
+          })),
+        ),
+      ),
+      getDiffBatch: mock((hashes: string[]) => {
+        const map = new Map<string, string>()
+        for (const h of hashes) map.set(h, "")
+        return Promise.resolve(map)
+      }),
+      getTotalCommitCount: mock(() => Promise.resolve(2)),
+    }
+
+    const mockBatchLLM = {
+      submitBatch: mock(() => Promise.resolve({})),
+      getBatchStatus: mock(() => Promise.resolve({})),
+      getBatchResults: mock(() => Promise.resolve([])),
+    } as unknown as BatchLLMService
+
+    const enricher = new EnricherService(
+      allMergeGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+    )
+
+    const phases: string[] = []
+    const result = await enricher.runBatch(
+      batchLLM(mockBatchLLM),
+      batchJobs,
+      (p) => phases.push(p.phase),
+    )
+
+    // Both enriched locally, no batch submitted
+    expect(result.enrichedThisRun).toBe(2)
+    expect(mockBatchLLM.submitBatch).not.toHaveBeenCalled()
+    // Should proceed to aggregation
+    expect(phases).toContain("aggregating")
+    expect(phases).toContain("done")
   })
 
   test("runBatch skips to aggregation when no unenriched commits and no pending batch", async () => {
