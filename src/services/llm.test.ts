@@ -25,7 +25,7 @@ const commit = {
 
 describe("LLMService", () => {
   test("enrichCommit parses valid response", async () => {
-    const service = new LLMService("test-key")
+    const service = new LLMService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() =>
@@ -47,7 +47,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit defaults unknown classification to chore", async () => {
-    const service = new LLMService("test-key")
+    const service = new LLMService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() =>
@@ -67,7 +67,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit retries on failure", async () => {
-    const service = new LLMService("test-key")
+    const service = new LLMService("test-key", undefined, 0)
     let callCount = 0
     setClient(
       service,
@@ -93,7 +93,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit throws after max retries", async () => {
-    const service = new LLMService("test-key")
+    const service = new LLMService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() => Promise.reject(new Error("Persistent failure"))),
@@ -105,7 +105,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit strips markdown fences from response", async () => {
-    const service = new LLMService("test-key")
+    const service = new LLMService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() =>
@@ -126,7 +126,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit strips fences without language tag", async () => {
-    const service = new LLMService("test-key")
+    const service = new LLMService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() =>
@@ -147,7 +147,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit handles missing summary", async () => {
-    const service = new LLMService("test-key")
+    const service = new LLMService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() =>

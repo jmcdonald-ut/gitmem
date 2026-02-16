@@ -28,7 +28,7 @@ const commit = {
 
 describe("JudgeService", () => {
   test("evaluateCommit parses valid response", async () => {
-    const service = new JudgeService("test-key")
+    const service = new JudgeService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() =>
@@ -67,7 +67,7 @@ describe("JudgeService", () => {
   })
 
   test("evaluateCommit defaults malformed response to pass", async () => {
-    const service = new JudgeService("test-key")
+    const service = new JudgeService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() =>
@@ -90,7 +90,7 @@ describe("JudgeService", () => {
   })
 
   test("evaluateCommit retries on failure", async () => {
-    const service = new JudgeService("test-key")
+    const service = new JudgeService("test-key", undefined, 0)
     let callCount = 0
     setClient(
       service,
@@ -125,7 +125,7 @@ describe("JudgeService", () => {
   })
 
   test("evaluateCommit throws after max retries", async () => {
-    const service = new JudgeService("test-key")
+    const service = new JudgeService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() => Promise.reject(new Error("Persistent failure"))),
@@ -137,7 +137,7 @@ describe("JudgeService", () => {
   })
 
   test("evaluateCommit strips markdown fences from response", async () => {
-    const service = new JudgeService("test-key")
+    const service = new JudgeService("test-key", undefined, 0)
     setClient(
       service,
       mockClient(() =>

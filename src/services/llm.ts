@@ -10,14 +10,21 @@ import {
 export class LLMService implements ILLMService {
   private client: Anthropic
   private model: string
+  private retryDelayMs: number
 
   /**
    * @param apiKey - Anthropic API key.
    * @param model - Model identifier to use for enrichment requests.
+   * @param retryDelayMs - Base delay in ms for exponential backoff (default 1000).
    */
-  constructor(apiKey: string, model: string = "claude-haiku-4-5-20251001") {
+  constructor(
+    apiKey: string,
+    model: string = "claude-haiku-4-5-20251001",
+    retryDelayMs: number = 1000,
+  ) {
     this.client = new Anthropic({ apiKey })
     this.model = model
+    this.retryDelayMs = retryDelayMs
   }
 
   /**
@@ -49,7 +56,9 @@ export class LLMService implements ILLMService {
       } catch (error) {
         lastError = error as Error
         if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)))
+          await new Promise((r) =>
+            setTimeout(r, this.retryDelayMs * Math.pow(2, attempt)),
+          )
         }
       }
     }
