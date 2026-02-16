@@ -100,13 +100,14 @@ Run gitmem schema for database table documentation.
 
 ## How `gitmem index` Works
 
-`gitmem index` runs a four-phase pipeline:
+`gitmem index` runs a five-phase pipeline:
 
 ```
 1. Discover   — extract commit metadata and file stats from git
-2. Enrich     — classify each commit via Claude API (bug-fix, feature, refactor, docs, chore, perf, test, style)
-3. Aggregate  — compute per-file analytics: change hotspots, contributor breakdown, file coupling
-4. Index      — rebuild SQLite FTS5 full-text search index
+2. Measure    — compute indentation-based complexity metrics for changed files
+3. Enrich     — classify each commit via Claude API (bug-fix, feature, refactor, docs, chore, perf, test, style)
+4. Aggregate  — compute per-file analytics: change hotspots, contributor breakdown, file coupling
+5. Index      — rebuild SQLite FTS5 full-text search index
 ```
 
 ## Motivation
