@@ -99,6 +99,7 @@ describe("EnricherService", () => {
     const progress: IndexProgress[] = []
     const result = await enricher.run((p) => progress.push(p))
 
+    expect(result.discoveredThisRun).toBe(3)
     expect(result.enrichedThisRun).toBe(3)
     expect(result.totalEnriched).toBe(3)
     expect(result.totalCommits).toBe(3)
@@ -129,6 +130,7 @@ describe("EnricherService", () => {
     const result = await enricher.run(() => {})
 
     // Should only enrich bbb and ccc
+    expect(result.discoveredThisRun).toBe(2)
     expect(result.enrichedThisRun).toBe(2)
     expect(result.totalEnriched).toBe(3)
   })
@@ -151,6 +153,7 @@ describe("EnricherService", () => {
 
     const result = await enricher.run(() => {})
 
+    expect(result.discoveredThisRun).toBe(3)
     expect(result.enrichedThisRun).toBe(0)
     expect(result.totalCommits).toBe(3)
     consoleSpy.mockRestore()
@@ -271,6 +274,7 @@ describe("EnricherService", () => {
     )
     const result = await enricher.run(() => {})
 
+    expect(result.discoveredThisRun).toBe(0)
     expect(result.enrichedThisRun).toBe(0)
     expect(result.totalCommits).toBe(0)
   })
@@ -565,6 +569,7 @@ describe("EnricherService", () => {
 
     expect(result.batchId).toBe("msgbatch_001")
     expect(result.batchStatus).toBe("submitted")
+    expect(result.discoveredThisRun).toBe(3)
     expect(result.enrichedThisRun).toBe(0)
 
     // Verify batch was persisted
@@ -625,6 +630,7 @@ describe("EnricherService", () => {
     )
 
     expect(result.batchStatus).toBe("in_progress")
+    expect(result.discoveredThisRun).toBe(0)
     expect(result.enrichedThisRun).toBe(0)
   })
 

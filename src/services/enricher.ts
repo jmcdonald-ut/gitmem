@@ -56,6 +56,7 @@ export class EnricherService {
     onProgress: (progress: IndexProgress) => void,
     signal?: AbortSignal,
   ): Promise<{
+    discoveredThisRun: number
     enrichedThisRun: number
     totalEnriched: number
     totalCommits: number
@@ -161,7 +162,12 @@ export class EnricherService {
 
     onProgress({ phase: "done", current: totalEnriched, total: totalCommits })
 
-    return { enrichedThisRun, totalEnriched, totalCommits }
+    return {
+      discoveredThisRun: newHashes.length,
+      enrichedThisRun,
+      totalEnriched,
+      totalCommits,
+    }
   }
 
   /**
@@ -178,6 +184,7 @@ export class EnricherService {
     batchJobs: BatchJobRepository,
     onProgress: (progress: IndexProgress) => void,
   ): Promise<{
+    discoveredThisRun: number
     enrichedThisRun: number
     totalEnriched: number
     totalCommits: number
@@ -247,6 +254,7 @@ export class EnricherService {
           batchStatus: status.processingStatus,
         })
         return {
+          discoveredThisRun: newHashes.length,
           enrichedThisRun: 0,
           totalEnriched,
           totalCommits,
@@ -321,6 +329,7 @@ export class EnricherService {
           })
 
           return {
+            discoveredThisRun: newHashes.length,
             enrichedThisRun: 0,
             totalEnriched,
             totalCommits,
@@ -346,7 +355,12 @@ export class EnricherService {
 
     onProgress({ phase: "done", current: totalEnriched, total: totalCommits })
 
-    return { enrichedThisRun, totalEnriched, totalCommits }
+    return {
+      discoveredThisRun: newHashes.length,
+      enrichedThisRun,
+      totalEnriched,
+      totalCommits,
+    }
   }
 
   /**

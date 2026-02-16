@@ -55,6 +55,7 @@ program
     "Use Anthropic Message Batches API (50% cost reduction)",
   )
   .action(async (opts) => {
+    const format = resolveFormat(program.opts())
     const cwd = process.cwd()
     const git = new GitService(cwd)
 
@@ -90,27 +91,66 @@ program
       "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
     ).run("model_used", opts.model)
 
-    if (opts.batch) {
-      const batchLLM = new BatchLLMService(apiKey, opts.model)
-      const batchJobs = new BatchJobRepository(db)
-      const instance = render(
-        <BatchIndexCommand
-          enricher={enricher}
-          batchLLM={batchLLM}
-          batchJobs={batchJobs}
-        />,
-      )
-      await instance.waitUntilExit()
-      instance.unmount()
-    } else {
-      const instance = render(<IndexCommand enricher={enricher} />)
-      await instance.waitUntilExit()
-      instance.unmount()
-    }
+    if (format === "json") {
+      try {
+        let result
+        if (opts.batch) {
+          const batchLLM = new BatchLLMService(apiKey, opts.model)
+          const batchJobs = new BatchJobRepository(db)
+          result = await enricher.runBatch(batchLLM, batchJobs, () => {})
+        } else {
+          result = await enricher.run(() => {})
+        }
 
-    db.prepare(
-      "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
-    ).run("last_run", new Date().toISOString())
+        db.prepare(
+          "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+        ).run("last_run", new Date().toISOString())
+
+        formatOutput("json", {
+          success: true,
+          discovered: result.discoveredThisRun,
+          enriched: result.enrichedThisRun,
+          already_enriched: result.totalEnriched - result.enrichedThisRun,
+          failed: 0,
+          total_commits: result.totalCommits,
+          enriched_commits: result.totalEnriched,
+          coverage_pct:
+            result.totalCommits > 0
+              ? Math.round((result.totalEnriched / result.totalCommits) * 100)
+              : 0,
+          model: opts.model,
+          batch_id: result.batchId ?? null,
+        })
+      } catch (err) {
+        formatOutput("json", {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        })
+        process.exit(1)
+      }
+    } else {
+      if (opts.batch) {
+        const batchLLM = new BatchLLMService(apiKey, opts.model)
+        const batchJobs = new BatchJobRepository(db)
+        const instance = render(
+          <BatchIndexCommand
+            enricher={enricher}
+            batchLLM={batchLLM}
+            batchJobs={batchJobs}
+          />,
+        )
+        await instance.waitUntilExit()
+        instance.unmount()
+      } else {
+        const instance = render(<IndexCommand enricher={enricher} />)
+        await instance.waitUntilExit()
+        instance.unmount()
+      }
+
+      db.prepare(
+        "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+      ).run("last_run", new Date().toISOString())
+    }
 
     db.close()
   })
