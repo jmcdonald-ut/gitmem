@@ -12,7 +12,38 @@ Evaluate three dimensions:
 Respond with valid JSON only, no markdown fences. Use this exact format:
 {"classification":{"pass":true/false,"reasoning":"...","suggestedClassification":"only if pass is false"},"accuracy":{"pass":true/false,"reasoning":"..."},"completeness":{"pass":true/false,"reasoning":"..."}}
 
-Valid classifications: ${CLASSIFICATIONS.join(", ")}`
+Valid classifications: ${CLASSIFICATIONS.join(", ")}
+
+Classification guidelines (use these to judge correctness):
+- bug-fix: fixes a defect, corrects broken behavior, or restores intended functionality
+- feature: adds new user-facing functionality or capabilities that did not exist before
+- refactor: restructures existing code without changing external behavior (internal improvements only)
+- docs: changes to documentation content meant for humans to read (README, guides, tutorials, API docs)
+- chore: maintenance tasks — dependency updates, CI config, version bumps, merge commits, build tooling, changelogs, release notes, repo infrastructure (.github/*, PR templates, issue templates, .editorconfig)
+- perf: changes that improve efficiency or reduce resource usage, even small ones like moving work outside a loop
+- test: adds or modifies test files without changing production code
+- style: purely cosmetic changes — formatting, whitespace, semicolons, naming conventions, linting fixes. Must have zero semantic or behavioral effect.
+
+Classification edge cases:
+- Merge commits (message starts with "Merge") should be classified as "chore".
+- When a commit spans multiple categories, classify by its primary purpose.
+- Improving existing behavior or internal implementation without adding new user-facing capability is "refactor", not "feature".
+- Changing existing error messages, validation messages, or user-facing text wording is "style", not "feature". Only "feature" if entirely new message types or validation rules are added.
+- CHANGELOG and release note updates are "chore", not "docs".
+- Adding or configuring dev tooling (linters, git hooks, formatters, CI pipelines) is "chore", not "feature".
+- Moving code for efficiency (e.g. hoisting an assignment out of a loop) is "perf", not "style".
+
+Accuracy evaluation guidelines:
+- Fail if the summary claims something changed that didn't, describes the wrong component, or misidentifies what type of change was made.
+- Fail if the summary speculates about motivation or impact not supported by the diff.
+- Do not fail for omissions — that is a completeness issue, not an accuracy issue.
+- Pass if the summary correctly describes the change even with different wording or paraphrasing.
+
+Completeness evaluation guidelines:
+- Judge whether the summary captures the primary purpose and the most significant changes.
+- Fail if a major change or significant portion of the diff is unmentioned.
+- If the diff is empty or minimal (e.g. merge commits), do not fail completeness for lack of detail that cannot be inferred from the available information.
+- Do not fail for omitting minor or incidental details (e.g. a comment that wasn't updated, trivial formatting).`
 
 /**
  * Builds the user message sent to the judge for evaluation.

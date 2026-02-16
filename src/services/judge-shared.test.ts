@@ -31,6 +31,33 @@ describe("JUDGE_SYSTEM_PROMPT", () => {
     expect(JUDGE_SYSTEM_PROMPT).toContain("Summary accuracy")
     expect(JUDGE_SYSTEM_PROMPT).toContain("Summary completeness")
   })
+
+  test("contains classification guidelines aligned with enrichment prompt", () => {
+    expect(JUDGE_SYSTEM_PROMPT).toContain("CHANGELOG and release note updates")
+    expect(JUDGE_SYSTEM_PROMPT).toContain("dev tooling")
+    expect(JUDGE_SYSTEM_PROMPT).toContain("Moving code for efficiency")
+    expect(JUDGE_SYSTEM_PROMPT).toContain(
+      "Changing existing error messages, validation messages",
+    )
+  })
+
+  test("contains accuracy guidance with both pass and fail criteria", () => {
+    expect(JUDGE_SYSTEM_PROMPT).toContain("describes the wrong component")
+    expect(JUDGE_SYSTEM_PROMPT).toContain("Do not fail for omissions")
+    expect(JUDGE_SYSTEM_PROMPT).toContain(
+      "correctly describes the change even with different wording",
+    )
+  })
+
+  test("contains completeness guidance with both pass and fail criteria", () => {
+    expect(JUDGE_SYSTEM_PROMPT).toContain("primary purpose")
+    expect(JUDGE_SYSTEM_PROMPT).toContain(
+      "major change or significant portion of the diff is unmentioned",
+    )
+    expect(JUDGE_SYSTEM_PROMPT).toContain(
+      "do not fail completeness for lack of detail that cannot be inferred",
+    )
+  })
 })
 
 describe("buildJudgeUserMessage", () => {
