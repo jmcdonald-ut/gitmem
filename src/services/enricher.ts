@@ -143,12 +143,6 @@ export class EnricherService {
               result.summary,
               this.model,
             )
-            this.search.indexCommit(
-              commit.hash,
-              commit.message,
-              result.classification,
-              result.summary,
-            )
             enrichedThisRun++
           } else {
             console.error(`Failed to enrich commit: ${outcome.reason}`)
