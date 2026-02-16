@@ -16,7 +16,7 @@ gitmem helps users and LLMs answer aggregate and pattern-based questions about a
 Requires [Bun](https://bun.sh).
 
 ```bash
-git clone <repo-url> && cd gitmem
+git clone git@github.com:jmcdonald-ut/gitmem.git && cd gitmem
 bun install
 ```
 
@@ -29,7 +29,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 Build the CLI tool:
 
 ```bash
-bun build
+bun run build
 ```
 
 ## Usage
@@ -59,6 +59,26 @@ gitmem index --model claude-sonnet-4-5-20250929
 
 The default model is `claude-haiku-4-5-20251001`. Indexing is incremental — re-running only processes new or unenriched commits.
 
+#### Batch mode
+
+Use the Anthropic Message Batches API for 50% cost reduction:
+
+```bash
+gitmem index --batch
+```
+
+Batch mode is stateful across invocations. The first run submits all unenriched commits as a batch. Subsequent runs poll for progress and import results when complete:
+
+```
+# First run
+Batch submitted! ID: msg_bch_xxx. Run `gitmem index --batch` again to check status.
+
+# Later run
+Indexing complete!
+Enriched this run: 128
+Total coverage: 128 / 128 commits (100%)
+```
+
 ### Search the index
 
 ```bash
@@ -84,6 +104,45 @@ Limit results with `--limit`:
 
 ```bash
 gitmem query "refactor" --limit 5
+```
+
+### Evaluate enrichment quality
+
+```bash
+gitmem check abc123f
+```
+
+Evaluates a single commit's enrichment using an LLM-as-judge (default: Claude Sonnet 4.5). The judge assesses classification correctness, summary accuracy, and summary completeness:
+
+```
+Evaluation for abc123f
+
+  Original: [feature] Add batch indexing support
+
+  [PASS] Classification
+         The commit introduces a new feature...
+
+  [PASS] Summary accuracy
+         Accurately describes the changes made.
+
+  [PASS] Summary completeness
+         Covers the main changes adequately.
+```
+
+Evaluate a random sample of enriched commits with `--sample`:
+
+```bash
+gitmem check --sample 50
+```
+
+```
+Evaluation Summary (50 commits)
+
+  Classification: 47/50 correct
+  Summary accuracy: 45/50 accurate
+  Summary completeness: 43/50 complete
+
+  Details saved to: .gitmem/check-20260216T123045.json
 ```
 
 ### Check index status
@@ -119,28 +178,37 @@ All data is stored in `.gitmem/index.db` (SQLite, WAL mode). The database includ
 - **file_stats** — change counts by classification type, first/last seen dates
 - **file_contributors** — which authors modify which files
 - **file_coupling** — files that frequently change together
+- **batch_jobs** — batch API job state for resumable enrichment
 - **commits_fts** — FTS5 virtual table for fast text search
 
 ## Project structure
 
 ```
 src/
-├── cli.tsx                  # Entry point, command definitions
-├── types.ts                 # Shared types and interfaces
+├── cli.tsx                      # Entry point, command definitions
+├── types.ts                     # Shared types and interfaces
 ├── commands/
-│   ├── index-command.tsx     # Index progress UI
-│   ├── query-command.tsx     # Search results display
-│   └── status-command.tsx    # Index health display
+│   ├── index-command.tsx         # Index progress UI
+│   ├── batch-index-command.tsx   # Batch index progress UI
+│   ├── check-command.tsx         # Evaluation results display
+│   ├── query-command.tsx         # Search results display
+│   └── status-command.tsx        # Index health display
 ├── db/
-│   ├── database.ts           # Schema creation, SQLite setup
-│   ├── commits.ts            # Commit CRUD operations
-│   ├── aggregates.ts         # File stats, coupling, contributors
-│   └── search.ts             # FTS5 index and search
+│   ├── database.ts               # Schema creation, SQLite setup
+│   ├── commits.ts                # Commit CRUD operations
+│   ├── aggregates.ts             # File stats, coupling, contributors
+│   ├── batch-jobs.ts             # Batch job tracking
+│   └── search.ts                 # FTS5 index and search
 └── services/
-    ├── git.ts                # Git command execution via Bun shell
-    ├── llm.ts                # Anthropic API integration
-    ├── enricher.ts           # Orchestrates the 4-phase pipeline
-    └── aggregator.ts         # Computes per-file stats, coupling, contributors
+    ├── git.ts                    # Git command execution via Bun shell
+    ├── llm.ts                    # Anthropic API integration
+    ├── llm-shared.ts             # Shared prompt and response parsing
+    ├── batch-llm.ts              # Anthropic Message Batches API
+    ├── enricher.ts               # Orchestrates the 4-phase pipeline
+    ├── aggregator.ts             # Computes per-file stats, coupling, contributors
+    ├── checker.ts                # Quality evaluation workflow
+    ├── judge.ts                  # LLM-as-judge API client
+    └── judge-shared.ts           # Judge prompt and response parsing
 ```
 
 ## Development
