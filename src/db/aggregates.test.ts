@@ -368,4 +368,139 @@ describe("AggregateRepository", () => {
     expect(aggregates.getDirectoryFileCount("src/main")).toBe(1)
     expect(aggregates.getDirectoryFileCount("nonexistent/")).toBe(0)
   })
+
+  test("getTopCoupledPairs returns global pairs by co-change count", () => {
+    seedData()
+    aggregates.rebuildFileCoupling()
+
+    const pairs = aggregates.getTopCoupledPairs(10)
+    expect(pairs.length).toBeGreaterThanOrEqual(1)
+    expect(pairs[0].file_a).toBeDefined()
+    expect(pairs[0].file_b).toBeDefined()
+    expect(pairs[0].co_change_count).toBeGreaterThanOrEqual(2)
+    // main.ts + utils.ts co-change in aaa and bbb
+    const mainUtils = pairs.find(
+      (p) => p.file_a === "src/main.ts" && p.file_b === "src/utils.ts",
+    )
+    expect(mainUtils).toBeDefined()
+    expect(mainUtils!.co_change_count).toBe(2)
+  })
+
+  test("getTopCoupledPairs respects limit", () => {
+    seedData()
+    aggregates.rebuildFileCoupling()
+
+    const pairs = aggregates.getTopCoupledPairs(1)
+    expect(pairs).toHaveLength(1)
+  })
+
+  test("getTopCoupledPairs returns empty when no coupling data", () => {
+    const pairs = aggregates.getTopCoupledPairs(10)
+    expect(pairs).toHaveLength(0)
+  })
+
+  test("getCoupledFilesWithRatio returns files with ratio", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+    aggregates.rebuildFileCoupling()
+
+    const coupled = aggregates.getCoupledFilesWithRatio("src/main.ts", 10)
+    expect(coupled.length).toBeGreaterThanOrEqual(1)
+    const utils = coupled.find((c) => c.file === "src/utils.ts")
+    expect(utils).toBeDefined()
+    expect(utils!.co_change_count).toBe(2)
+    // main.ts has 3 total changes, ratio = 2/3 ≈ 0.67
+    expect(utils!.coupling_ratio).toBe(0.67)
+  })
+
+  test("getCoupledFilesWithRatio respects limit", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+    aggregates.rebuildFileCoupling()
+
+    const coupled = aggregates.getCoupledFilesWithRatio("src/main.ts", 1)
+    expect(coupled).toHaveLength(1)
+  })
+
+  test("getCoupledFilesWithRatio returns empty for unknown file", () => {
+    const coupled = aggregates.getCoupledFilesWithRatio("nonexistent.ts", 10)
+    expect(coupled).toHaveLength(0)
+  })
+
+  test("getCoupledFilesForDirectory returns external coupled files", () => {
+    // Add data with cross-directory coupling
+    const commitData: CommitInfo[] = [
+      {
+        hash: "d1",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "cross dir change 1",
+        files: [
+          {
+            filePath: "src/services/git.ts",
+            changeType: "M",
+            additions: 10,
+            deletions: 5,
+          },
+          {
+            filePath: "src/db/commits.ts",
+            changeType: "M",
+            additions: 5,
+            deletions: 2,
+          },
+        ],
+      },
+      {
+        hash: "d2",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-02-01T00:00:00Z",
+        message: "cross dir change 2",
+        files: [
+          {
+            filePath: "src/services/git.ts",
+            changeType: "M",
+            additions: 8,
+            deletions: 3,
+          },
+          {
+            filePath: "src/db/commits.ts",
+            changeType: "M",
+            additions: 4,
+            deletions: 1,
+          },
+        ],
+      },
+    ]
+    commits.insertRawCommits(commitData)
+    commits.updateEnrichment("d1", "feature", "Cross dir 1", "haiku-4.5")
+    commits.updateEnrichment("d2", "refactor", "Cross dir 2", "haiku-4.5")
+    aggregates.rebuildFileStats()
+    aggregates.rebuildFileCoupling()
+
+    const coupled = aggregates.getCoupledFilesForDirectory(
+      "src/services/",
+      10,
+    )
+    expect(coupled.length).toBeGreaterThanOrEqual(1)
+    const dbCommits = coupled.find((c) => c.file === "src/db/commits.ts")
+    expect(dbCommits).toBeDefined()
+    expect(dbCommits!.co_change_count).toBe(2)
+    expect(dbCommits!.coupling_ratio).toBeGreaterThan(0)
+  })
+
+  test("getCoupledFilesForDirectory returns empty for no matches", () => {
+    const coupled = aggregates.getCoupledFilesForDirectory("nonexistent/", 10)
+    expect(coupled).toHaveLength(0)
+  })
+
+  test("getCoupledFilesForDirectory respects limit", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+    aggregates.rebuildFileCoupling()
+
+    const coupled = aggregates.getCoupledFilesForDirectory("src/", 1)
+    expect(coupled.length).toBeLessThanOrEqual(1)
+  })
 })

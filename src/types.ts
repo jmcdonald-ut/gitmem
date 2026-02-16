@@ -142,6 +142,20 @@ export interface FileCouplingRow {
   co_change_count: number
 }
 
+/** A coupled file with co-change count and coupling ratio, for file/directory views. */
+export interface CouplingPairRow {
+  file: string
+  co_change_count: number
+  coupling_ratio: number
+}
+
+/** A co-change pair for the global view, showing both files. */
+export interface CouplingPairGlobalRow {
+  file_a: string
+  file_b: string
+  co_change_count: number
+}
+
 /** A recent enriched commit associated with a file or directory. */
 export interface RecentCommit {
   hash: string

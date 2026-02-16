@@ -1,5 +1,11 @@
 import { Database } from "bun:sqlite"
-import type { FileStatsRow, FileContributorRow, FileCouplingRow } from "@/types"
+import type {
+  FileStatsRow,
+  FileContributorRow,
+  FileCouplingRow,
+  CouplingPairRow,
+  CouplingPairGlobalRow,
+} from "@/types"
 
 /** Options for querying file hotspots. */
 export interface HotspotsOptions {
@@ -250,5 +256,79 @@ export class AggregateRepository {
         [string]
       >("SELECT COUNT(*) as count FROM file_stats WHERE file_path LIKE ? || '%'")
       .get(prefix)!.count
+  }
+
+  /**
+   * Returns the top co-change pairs ranked by co_change_count.
+   * @param limit - Maximum number of pairs to return.
+   * @returns Pairs ordered by co-change count descending.
+   */
+  getTopCoupledPairs(limit: number = 10): CouplingPairGlobalRow[] {
+    return this.db
+      .query<CouplingPairGlobalRow, [number]>(
+        `SELECT file_a, file_b, co_change_count
+         FROM file_coupling
+         ORDER BY co_change_count DESC
+         LIMIT ?`,
+      )
+      .all(limit)
+  }
+
+  /**
+   * Returns files most frequently changed alongside the given file, with coupling ratio.
+   * @param filePath - Repository-relative file path.
+   * @param limit - Maximum number of coupled files to return.
+   * @returns Coupled files with co-change count and ratio, ordered by count descending.
+   */
+  getCoupledFilesWithRatio(
+    filePath: string,
+    limit: number = 10,
+  ): CouplingPairRow[] {
+    return this.db
+      .query<CouplingPairRow, [string, string, string, string, number]>(
+        `SELECT
+           CASE WHEN fc.file_a = ? THEN fc.file_b ELSE fc.file_a END as file,
+           fc.co_change_count,
+           ROUND(CAST(fc.co_change_count AS REAL) / fs.total_changes, 2) as coupling_ratio
+         FROM file_coupling fc
+         JOIN file_stats fs ON fs.file_path = ?
+         WHERE fc.file_a = ? OR fc.file_b = ?
+         ORDER BY fc.co_change_count DESC
+         LIMIT ?`,
+      )
+      .all(filePath, filePath, filePath, filePath, limit)
+  }
+
+  /**
+   * Returns coupling between files inside a directory and files outside it.
+   * @param prefix - Directory prefix (e.g. "src/services/").
+   * @param limit - Maximum number of results to return.
+   * @returns External files coupled to the directory, with aggregated counts and ratios.
+   */
+  getCoupledFilesForDirectory(
+    prefix: string,
+    limit: number = 10,
+  ): CouplingPairRow[] {
+    return this.db
+      .query<CouplingPairRow, [string, string, string, string, string, string, number]>(
+        `SELECT
+           CASE
+             WHEN fc.file_a LIKE ? || '%' THEN fc.file_b
+             ELSE fc.file_a
+           END as file,
+           SUM(fc.co_change_count) as co_change_count,
+           ROUND(CAST(SUM(fc.co_change_count) AS REAL) / ds.total_changes, 2) as coupling_ratio
+         FROM file_coupling fc
+         JOIN (
+           SELECT COALESCE(SUM(total_changes), 0) as total_changes
+           FROM file_stats WHERE file_path LIKE ? || '%'
+         ) ds
+         WHERE (fc.file_a LIKE ? || '%' AND fc.file_b NOT LIKE ? || '%')
+            OR (fc.file_b LIKE ? || '%' AND fc.file_a NOT LIKE ? || '%')
+         GROUP BY file
+         ORDER BY co_change_count DESC
+         LIMIT ?`,
+      )
+      .all(prefix, prefix, prefix, prefix, prefix, prefix, limit)
   }
 }
