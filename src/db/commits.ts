@@ -250,6 +250,47 @@ export class CommitRepository {
   }
 
   /**
+   * Updates complexity metrics for multiple files in a single transaction.
+   * @param updates - Array of complexity measurements to write.
+   */
+  updateComplexityBatch(
+    updates: Array<{
+      commitHash: string
+      filePath: string
+      linesOfCode: number
+      indentComplexity: number
+      maxIndent: number
+    }>,
+  ): void {
+    const stmt = this.db.prepare(
+      `UPDATE commit_files SET lines_of_code = ?, indent_complexity = ?, max_indent = ?
+       WHERE commit_hash = ? AND file_path = ?`,
+    )
+    const transaction = this.db.transaction(
+      (
+        updates: Array<{
+          commitHash: string
+          filePath: string
+          linesOfCode: number
+          indentComplexity: number
+          maxIndent: number
+        }>,
+      ) => {
+        for (const u of updates) {
+          stmt.run(
+            u.linesOfCode,
+            u.indentComplexity,
+            u.maxIndent,
+            u.commitHash,
+            u.filePath,
+          )
+        }
+      },
+    )
+    transaction(updates)
+  }
+
+  /**
    * Returns recent enriched commits that touched any file under a directory prefix.
    * @param prefix - Directory prefix to match (e.g. "src/services/").
    * @param limit - Maximum number of commits to return.

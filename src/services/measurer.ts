@@ -36,10 +36,23 @@ export class MeasurerService {
 
       // Separate files that need fetching from those that can be skipped
       const toFetch: Array<{ hash: string; filePath: string }> = []
+      const updates: Array<{
+        commitHash: string
+        filePath: string
+        linesOfCode: number
+        indentComplexity: number
+        maxIndent: number
+      }> = []
 
       for (const row of batch) {
         if (row.change_type === "D" || isGenerated(row.file_path)) {
-          this.commits.updateComplexity(row.commit_hash, row.file_path, 0, 0, 0)
+          updates.push({
+            commitHash: row.commit_hash,
+            filePath: row.file_path,
+            linesOfCode: 0,
+            indentComplexity: 0,
+            maxIndent: 0,
+          })
           processed++
         } else {
           toFetch.push({ hash: row.commit_hash, filePath: row.file_path })
@@ -48,29 +61,36 @@ export class MeasurerService {
 
       onProgress({ phase: "measuring", current: processed, total })
 
-      if (toFetch.length === 0) continue
+      if (toFetch.length > 0) {
+        const contents = await this.git.getFileContentsBatch(toFetch)
 
-      const contents = await this.git.getFileContentsBatch(toFetch)
+        for (const entry of toFetch) {
+          const key = `${entry.hash}:${entry.filePath}`
+          const content = contents.get(key)
 
-      for (const entry of toFetch) {
-        const key = `${entry.hash}:${entry.filePath}`
-        const content = contents.get(key)
-
-        if (!content || isBinary(content)) {
-          this.commits.updateComplexity(entry.hash, entry.filePath, 0, 0, 0)
-        } else {
-          const result = computeComplexity(content.toString("utf-8"))
-          this.commits.updateComplexity(
-            entry.hash,
-            entry.filePath,
-            result.linesOfCode,
-            result.indentComplexity,
-            result.maxIndent,
-          )
+          if (!content || isBinary(content)) {
+            updates.push({
+              commitHash: entry.hash,
+              filePath: entry.filePath,
+              linesOfCode: 0,
+              indentComplexity: 0,
+              maxIndent: 0,
+            })
+          } else {
+            const result = computeComplexity(content.toString("utf-8"))
+            updates.push({
+              commitHash: entry.hash,
+              filePath: entry.filePath,
+              linesOfCode: result.linesOfCode,
+              indentComplexity: result.indentComplexity,
+              maxIndent: result.maxIndent,
+            })
+          }
+          processed++
         }
-        processed++
       }
 
+      this.commits.updateComplexityBatch(updates)
       onProgress({ phase: "measuring", current: processed, total })
     }
 
