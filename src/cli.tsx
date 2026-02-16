@@ -17,6 +17,9 @@ import { IndexCommand } from "@commands/index-command"
 import { BatchIndexCommand } from "@commands/batch-index-command"
 import { StatusCommand } from "@commands/status-command"
 import { QueryCommand } from "@commands/query-command"
+import { CheckCommand } from "@commands/check-command"
+import { JudgeService } from "@services/judge"
+import { CheckerService } from "@services/checker"
 import type { StatusInfo } from "@/types"
 
 /**
@@ -209,6 +212,86 @@ program
       />,
     )
     instance.unmount()
+    db.close()
+  })
+
+program
+  .command("check")
+  .argument("[hash]", "Commit hash to evaluate")
+  .description("Evaluate enrichment quality using LLM-as-Judge")
+  .option(
+    "-s, --sample <number>",
+    "Number of random enriched commits to evaluate",
+  )
+  .option(
+    "-m, --model <model>",
+    "Judge model to use",
+    "claude-sonnet-4-5-20250929",
+  )
+  .option("-o, --output <path>", "Detail file path for batch results")
+  .option(
+    "-c, --concurrency <number>",
+    "Number of parallel judge requests",
+    "4",
+  )
+  .action(async (hash, opts) => {
+    const cwd = process.cwd()
+    const git = new GitService(cwd)
+
+    if (!(await git.isGitRepo())) {
+      console.error("Error: not a git repository")
+      process.exit(1)
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      console.error("Error: ANTHROPIC_API_KEY environment variable is required")
+      process.exit(1)
+    }
+
+    const dbPath = getDbPath()
+    if (!existsSync(dbPath)) {
+      console.error("Error: no index found. Run `gitmem index` first.")
+      process.exit(1)
+    }
+
+    if (!hash && !opts.sample) {
+      console.error("Error: provide a commit hash or use --sample <N>")
+      process.exit(1)
+    }
+
+    const db = createDatabase(dbPath)
+    const commits = new CommitRepository(db)
+    const judge = new JudgeService(apiKey, opts.model)
+    const checker = new CheckerService(
+      git,
+      judge,
+      commits,
+      parseInt(opts.concurrency, 10),
+    )
+
+    if (opts.sample) {
+      const outputPath =
+        opts.output ??
+        join(
+          resolve(cwd, ".gitmem"),
+          `check-${new Date().toISOString().replace(/[:.]/g, "")}.json`,
+        )
+      const instance = render(
+        <CheckCommand
+          checker={checker}
+          sampleSize={parseInt(opts.sample, 10)}
+          outputPath={outputPath}
+        />,
+      )
+      await instance.waitUntilExit()
+      instance.unmount()
+    } else {
+      const instance = render(<CheckCommand checker={checker} hash={hash} />)
+      await instance.waitUntilExit()
+      instance.unmount()
+    }
+
     db.close()
   })
 
