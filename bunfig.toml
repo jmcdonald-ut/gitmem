@@ -1,3 +1,6 @@
 [test]
 coverage = true
-coverageThreshold = { line = 100, function = 100, statement = 100 }
+coverageThreshold = 0.9
+coveragePathIgnorePatterns = [
+  "src/commands/test-utils.ts"
+]

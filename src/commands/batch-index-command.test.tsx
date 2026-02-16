@@ -5,6 +5,7 @@ import {
   BatchIndexCommand,
   batchPhaseLabel,
 } from "@commands/batch-index-command"
+import { waitForFrame } from "@commands/test-utils"
 import type { EnricherService } from "@services/enricher"
 import type { BatchLLMService } from "@services/batch-llm"
 import type { BatchJobRepository } from "@db/batch-jobs"
@@ -72,7 +73,7 @@ const mockBatchJobs = {} as BatchJobRepository
 describe("BatchIndexCommand", () => {
   test("shows submitted message", async () => {
     const enricher = createMockEnricher("submitted")
-    const { lastFrame } = render(
+    const { frames } = render(
       <BatchIndexCommand
         enricher={enricher}
         batchLLM={mockBatchLLM}
@@ -80,16 +81,16 @@ describe("BatchIndexCommand", () => {
       />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) =>
+      f.includes("Batch submitted!"),
+    )
     expect(output).toContain("Batch submitted!")
     expect(output).toContain("msgbatch_test")
   })
 
   test("shows in-progress message", async () => {
     const enricher = createMockEnricher("in_progress")
-    const { lastFrame } = render(
+    const { frames } = render(
       <BatchIndexCommand
         enricher={enricher}
         batchLLM={mockBatchLLM}
@@ -97,16 +98,16 @@ describe("BatchIndexCommand", () => {
       />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) =>
+      f.includes("Batch in progress"),
+    )
     expect(output).toContain("Batch in progress")
     expect(output).toContain("msgbatch_poll")
   })
 
   test("shows completion message", async () => {
     const enricher = createMockEnricher("complete")
-    const { lastFrame } = render(
+    const { frames } = render(
       <BatchIndexCommand
         enricher={enricher}
         batchLLM={mockBatchLLM}
@@ -114,9 +115,9 @@ describe("BatchIndexCommand", () => {
       />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) =>
+      f.includes("Indexing complete!"),
+    )
     expect(output).toContain("Indexing complete!")
     expect(output).toContain("Enriched this run: 50")
     expect(output).toContain("100%")
@@ -124,7 +125,7 @@ describe("BatchIndexCommand", () => {
 
   test("shows error message", async () => {
     const enricher = createMockEnricher("error")
-    const { lastFrame } = render(
+    const { frames } = render(
       <BatchIndexCommand
         enricher={enricher}
         batchLLM={mockBatchLLM}
@@ -132,9 +133,7 @@ describe("BatchIndexCommand", () => {
       />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) => f.includes("Error:"))
     expect(output).toContain("Error:")
     expect(output).toContain("Batch API failed")
   })

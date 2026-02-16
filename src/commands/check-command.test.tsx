@@ -2,6 +2,7 @@ import { describe, test, expect, mock } from "bun:test"
 import React from "react"
 import { render } from "ink-testing-library"
 import { CheckCommand } from "@commands/check-command"
+import { waitForFrame } from "@commands/test-utils"
 import type { CheckerService } from "@services/checker"
 import type { CheckProgress, EvalResult, EvalSummary } from "@/types"
 
@@ -101,13 +102,11 @@ function createMockChecker(
 describe("CheckCommand", () => {
   test("shows single commit pass results", async () => {
     const checker = createMockChecker("single-pass")
-    const { lastFrame } = render(
+    const { frames } = render(
       <CheckCommand checker={checker} hash="abc1234def" />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) => f.includes("[PASS]"))
     expect(output).toContain("abc1234")
     expect(output).toContain("[feature]")
     expect(output).toContain("[PASS]")
@@ -118,13 +117,11 @@ describe("CheckCommand", () => {
 
   test("shows single commit fail results", async () => {
     const checker = createMockChecker("single-fail")
-    const { lastFrame } = render(
+    const { frames } = render(
       <CheckCommand checker={checker} hash="abc1234def" />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) => f.includes("[FAIL]"))
     expect(output).toContain("[FAIL]")
     expect(output).toContain("Should be bug-fix")
     expect(output).toContain("Missing rate limiting details")
@@ -132,26 +129,24 @@ describe("CheckCommand", () => {
 
   test("shows not found message for unenriched commit", async () => {
     const checker = createMockChecker("single-not-found")
-    const { lastFrame } = render(
+    const { frames } = render(
       <CheckCommand checker={checker} hash="nonexistent" />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) => f.includes("not found"))
     expect(output).toContain("not found or not yet enriched")
   })
 
   test("shows batch summary", async () => {
     const checker = createMockChecker("batch")
     const outputPath = "/tmp/claude/check-test.json"
-    const { lastFrame } = render(
+    const { frames } = render(
       <CheckCommand checker={checker} sampleSize={5} outputPath={outputPath} />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) =>
+      f.includes("Evaluation Summary"),
+    )
     expect(output).toContain("Evaluation Summary (5 commits)")
     expect(output).toContain("4/5 correct")
     expect(output).toContain("5/5 accurate")
@@ -161,13 +156,11 @@ describe("CheckCommand", () => {
 
   test("shows ambiguous hash error with matching hashes", async () => {
     const checker = createMockChecker("single-ambiguous")
-    const { lastFrame } = render(
-      <CheckCommand checker={checker} hash="abc1234" />,
+    const { frames } = render(<CheckCommand checker={checker} hash="abc1234" />)
+
+    const output = await waitForFrame(frames, (f) =>
+      f.includes("Ambiguous hash prefix"),
     )
-
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
     expect(output).toContain("Ambiguous hash prefix")
     expect(output).toContain("abc1234aaa")
     expect(output).toContain("abc1234bbb")
@@ -176,20 +169,16 @@ describe("CheckCommand", () => {
 
   test("shows error message for single check", async () => {
     const checker = createMockChecker("error")
-    const { lastFrame } = render(
-      <CheckCommand checker={checker} hash="abc123" />,
-    )
+    const { frames } = render(<CheckCommand checker={checker} hash="abc123" />)
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) => f.includes("Error:"))
     expect(output).toContain("Error:")
     expect(output).toContain("Judge API failed")
   })
 
   test("shows error message for batch check", async () => {
     const checker = createMockChecker("error")
-    const { lastFrame } = render(
+    const { frames } = render(
       <CheckCommand
         checker={checker}
         sampleSize={5}
@@ -197,9 +186,7 @@ describe("CheckCommand", () => {
       />,
     )
 
-    await new Promise((r) => setTimeout(r, 50))
-
-    const output = lastFrame()
+    const output = await waitForFrame(frames, (f) => f.includes("Error:"))
     expect(output).toContain("Error:")
     expect(output).toContain("Judge API failed")
   })
