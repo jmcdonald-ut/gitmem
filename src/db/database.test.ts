@@ -1,6 +1,8 @@
 import { describe, test, expect } from "bun:test"
 import { Database } from "bun:sqlite"
-import { unlinkSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { createDatabase } from "@db/database"
 
 describe("createDatabase", () => {
@@ -42,7 +44,8 @@ describe("createDatabase", () => {
   })
 
   test("migrates old schema to add complexity columns", () => {
-    const tmpPath = "/tmp/claude/migrate-test.db"
+    const tmpDir = mkdtempSync(join(tmpdir(), "gitmem-test-"))
+    const tmpPath = join(tmpDir, "migrate-test.db")
 
     // Create a database with old schema (no complexity columns)
     const oldDb = new Database(tmpPath)
@@ -141,6 +144,6 @@ describe("createDatabase", () => {
     expect(fsCols).toContain("max_complexity")
 
     db.close()
-    unlinkSync(tmpPath)
+    rmSync(tmpDir, { recursive: true })
   })
 })

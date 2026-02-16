@@ -36,7 +36,7 @@ export async function runCommand(
   const format = resolveFormat(programOpts)
   const cwd = process.cwd()
 
-  let git!: GitService
+  let git: GitService | undefined
   if (requirements.needsGit !== false) {
     git = new GitService(cwd)
     if (!(await git.isGitRepo())) {
@@ -54,7 +54,7 @@ export async function runCommand(
     }
   }
 
-  let db!: Database
+  let db: Database | undefined
   let dbPath = ""
   if (requirements.needsDb !== false) {
     dbPath = getDbPath()
@@ -66,7 +66,7 @@ export async function runCommand(
   }
 
   try {
-    await handler({ format, cwd, git, apiKey, db, dbPath })
+    await handler({ format, cwd, git: git!, apiKey, db: db!, dbPath })
   } finally {
     db?.close()
   }
