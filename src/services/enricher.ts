@@ -246,17 +246,24 @@ export class EnricherService {
           batchStatus: "importing",
         })
 
+        const updates: Array<{
+          hash: string
+          classification: string
+          summary: string
+        }> = []
         for (const item of results) {
           if (item.result) {
-            this.commits.updateEnrichment(
-              item.hash,
-              item.result.classification,
-              item.result.summary,
-              this.model,
-            )
-            enrichedThisRun++
+            updates.push({
+              hash: item.hash,
+              classification: item.result.classification,
+              summary: item.result.summary,
+            })
           }
         }
+        if (updates.length > 0) {
+          this.commits.updateEnrichmentBatch(updates, this.model)
+        }
+        enrichedThisRun = updates.length
       } else {
         // Still in progress — report and return
         const totalEnriched = this.commits.getEnrichedCommitCount()

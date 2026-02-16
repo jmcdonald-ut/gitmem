@@ -85,6 +85,40 @@ export class CommitRepository {
       .run(classification, summary, new Date().toISOString(), model, hash)
   }
 
+  /**
+   * Updates enrichment results for multiple commits in a single transaction.
+   * @param updates - Array of enrichment results to write.
+   * @param model - The model identifier used for enrichment.
+   */
+  updateEnrichmentBatch(
+    updates: Array<{
+      hash: string
+      classification: string
+      summary: string
+    }>,
+    model: string,
+  ): void {
+    const stmt = this.db.prepare(
+      `UPDATE commits SET classification = ?, summary = ?, enriched_at = ?, model_used = ?
+       WHERE hash = ?`,
+    )
+    const transaction = this.db.transaction(
+      (
+        updates: Array<{
+          hash: string
+          classification: string
+          summary: string
+        }>,
+      ) => {
+        const now = new Date().toISOString()
+        for (const u of updates) {
+          stmt.run(u.classification, u.summary, now, model, u.hash)
+        }
+      },
+    )
+    transaction(updates)
+  }
+
   /** Returns the set of all commit hashes currently stored in the database. */
   getIndexedHashes(): Set<string> {
     const rows = this.db
