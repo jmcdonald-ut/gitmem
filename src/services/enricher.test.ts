@@ -447,8 +447,10 @@ describe("EnricherService", () => {
     )
 
     const progress: IndexProgress[] = []
-    const result = await enricher.runBatch(batchLLM(mockBatchLLM), batchJobs, (p) =>
-      progress.push(p),
+    const result = await enricher.runBatch(
+      batchLLM(mockBatchLLM),
+      batchJobs,
+      (p) => progress.push(p),
     )
 
     expect(result.batchId).toBe("msgbatch_001")
@@ -506,7 +508,11 @@ describe("EnricherService", () => {
       search,
     )
 
-    const result = await enricher.runBatch(batchLLM(mockBatchLLM), batchJobs, () => {})
+    const result = await enricher.runBatch(
+      batchLLM(mockBatchLLM),
+      batchJobs,
+      () => {},
+    )
 
     expect(result.batchStatus).toBe("in_progress")
     expect(result.enrichedThisRun).toBe(0)
@@ -577,7 +583,11 @@ describe("EnricherService", () => {
       search,
     )
 
-    const result = await enricher.runBatch(batchLLM(mockBatchLLM), batchJobs, () => {})
+    const result = await enricher.runBatch(
+      batchLLM(mockBatchLLM),
+      batchJobs,
+      () => {},
+    )
 
     expect(result.enrichedThisRun).toBe(1)
     expect(commits.getEnrichedCommitCount()).toBe(1)
@@ -644,7 +654,11 @@ describe("EnricherService", () => {
       search,
     )
 
-    const result = await enricher.runBatch(batchLLM(mockBatchLLM), batchJobs, () => {})
+    const result = await enricher.runBatch(
+      batchLLM(mockBatchLLM),
+      batchJobs,
+      () => {},
+    )
 
     // Only aaa should be enriched, bbb stays unenriched
     expect(result.enrichedThisRun).toBe(1)
@@ -687,8 +701,10 @@ describe("EnricherService", () => {
     )
 
     const phases: string[] = []
-    const result = await enricher.runBatch(batchLLM(mockBatchLLM), batchJobs, (p) =>
-      phases.push(p.phase),
+    const result = await enricher.runBatch(
+      batchLLM(mockBatchLLM),
+      batchJobs,
+      (p) => phases.push(p.phase),
     )
 
     expect(result.enrichedThisRun).toBe(0)

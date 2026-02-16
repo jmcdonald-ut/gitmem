@@ -102,10 +102,8 @@ describe("BatchLLMService", () => {
 
   test("submitBatch uses custom_id as commit hash", async () => {
     const service = new BatchLLMService("test-key")
-    let capturedBody: unknown
     const client = mockClient({
-      create: (body?: unknown) => {
-        capturedBody = body
+      create: () => {
         return Promise.resolve({ id: "msgbatch_test" })
       },
     })
@@ -121,8 +119,7 @@ describe("BatchLLMService", () => {
     ])
 
     const call = client.messages.batches.create.mock.calls[0]
-    const requests = (call[0] as { requests: { custom_id: string }[] })
-      .requests
+    const requests = (call[0] as { requests: { custom_id: string }[] }).requests
     expect(requests[0].custom_id).toBe("abc123")
     expect(requests[1].custom_id).toBe("def456")
   })

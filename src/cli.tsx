@@ -43,12 +43,11 @@ program
     "LLM model to use",
     "claude-haiku-4-5-20251001",
   )
+  .option("-c, --concurrency <number>", "Number of parallel LLM requests", "8")
   .option(
-    "-c, --concurrency <number>",
-    "Number of parallel LLM requests",
-    "8",
+    "-b, --batch",
+    "Use Anthropic Message Batches API (50% cost reduction)",
   )
-  .option("-b, --batch", "Use Anthropic Message Batches API (50% cost reduction)")
   .action(async (opts) => {
     const cwd = process.cwd()
     const git = new GitService(cwd)

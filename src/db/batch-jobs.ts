@@ -37,8 +37,7 @@ export class BatchJobRepository {
     succeededCount: number,
     failedCount: number,
   ): void {
-    const completedAt =
-      status === "ended" ? new Date().toISOString() : null
+    const completedAt = status === "ended" ? new Date().toISOString() : null
     this.db
       .prepare(
         `UPDATE batch_jobs SET status = ?, succeeded_count = ?, failed_count = ?, completed_at = ?

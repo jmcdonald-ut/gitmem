@@ -176,9 +176,9 @@ describe("batchPhaseLabel", () => {
   })
 
   test("returns enriching label without batch info", () => {
-    expect(
-      batchPhaseLabel({ phase: "enriching", current: 1, total: 10 }),
-    ).toBe("Enriching commits...")
+    expect(batchPhaseLabel({ phase: "enriching", current: 1, total: 10 })).toBe(
+      "Enriching commits...",
+    )
   })
 
   test("returns standard labels for non-batch phases", () => {
@@ -188,9 +188,9 @@ describe("batchPhaseLabel", () => {
     expect(
       batchPhaseLabel({ phase: "aggregating", current: 0, total: 0 }),
     ).toBe("Rebuilding aggregates...")
-    expect(
-      batchPhaseLabel({ phase: "indexing", current: 0, total: 0 }),
-    ).toBe("Rebuilding search index...")
+    expect(batchPhaseLabel({ phase: "indexing", current: 0, total: 0 })).toBe(
+      "Rebuilding search index...",
+    )
     expect(batchPhaseLabel({ phase: "done", current: 0, total: 0 })).toBe(
       "Done",
     )

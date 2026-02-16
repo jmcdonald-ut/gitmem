@@ -277,8 +277,7 @@ export class EnricherService {
             batchStatus: "submitting",
           })
 
-          const { batchId, requestCount } =
-            await batchLLM.submitBatch(requests)
+          const { batchId, requestCount } = await batchLLM.submitBatch(requests)
           batchJobs.insert(batchId, requestCount, this.model)
 
           const totalEnriched = this.commits.getEnrichedCommitCount()
@@ -320,10 +319,7 @@ export class EnricherService {
     return { enrichedThisRun, totalEnriched, totalCommits }
   }
 
-  private chunkCommits(
-    commits: CommitRow[],
-    size: number,
-  ): CommitRow[][] {
+  private chunkCommits(commits: CommitRow[], size: number): CommitRow[][] {
     const chunks: CommitRow[][] = []
     for (let i = 0; i < commits.length; i += size) {
       chunks.push(commits.slice(i, i + size))

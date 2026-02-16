@@ -54,13 +54,11 @@ export function BatchIndexCommand({
     if (result.batchStatus === "submitted") {
       return (
         <Box flexDirection="column">
-          <Text color="yellow">
-            Batch submitted! ID: {result.batchId}
-          </Text>
-          <Text>Commits queued: {result.totalCommits - result.totalEnriched}</Text>
+          <Text color="yellow">Batch submitted! ID: {result.batchId}</Text>
           <Text>
-            Run `gitmem index --batch` again to check status.
+            Commits queued: {result.totalCommits - result.totalEnriched}
           </Text>
+          <Text>Run `gitmem index --batch` again to check status.</Text>
         </Box>
       )
     }
@@ -68,12 +66,8 @@ export function BatchIndexCommand({
     if (result.batchStatus === "in_progress") {
       return (
         <Box flexDirection="column">
-          <Text color="cyan">
-            Batch in progress: {result.batchId}
-          </Text>
-          <Text>
-            Run `gitmem index --batch` again to check status.
-          </Text>
+          <Text color="cyan">Batch in progress: {result.batchId}</Text>
+          <Text>Run `gitmem index --batch` again to check status.</Text>
         </Box>
       )
     }
