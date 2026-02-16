@@ -25,6 +25,17 @@ describe("SYSTEM_PROMPT", () => {
     expect(SYSTEM_PROMPT).toContain("refactor")
     expect(SYSTEM_PROMPT).toContain("chore")
   })
+
+  test("contains edge case rules", () => {
+    expect(SYSTEM_PROMPT).toContain("Merge")
+    expect(SYSTEM_PROMPT).toContain("primary purpose")
+    expect(SYSTEM_PROMPT).toContain("trust the diff")
+  })
+
+  test("contains summary grounding instructions", () => {
+    expect(SYSTEM_PROMPT).toContain("actual diff content")
+    expect(SYSTEM_PROMPT).toContain("Do not speculate")
+  })
 })
 
 describe("buildUserMessage", () => {
