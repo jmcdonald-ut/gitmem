@@ -142,6 +142,14 @@ export interface FileCouplingRow {
   co_change_count: number
 }
 
+/** A recent enriched commit associated with a file or directory. */
+export interface RecentCommit {
+  hash: string
+  classification: string
+  summary: string
+  committed_at: string
+}
+
 /** A full-text search result from the commits FTS index. */
 export interface SearchResult {
   /** Full SHA-1 commit hash. */

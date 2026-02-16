@@ -1,5 +1,11 @@
 import { Database } from "bun:sqlite"
-import type { CommitInfo, CommitRow, CommitFile, CommitFileRow } from "@/types"
+import type {
+  CommitInfo,
+  CommitRow,
+  CommitFile,
+  CommitFileRow,
+  RecentCommit,
+} from "@/types"
 
 /** Repository for reading and writing commit records in the SQLite database. */
 export class CommitRepository {
@@ -183,5 +189,49 @@ export class CommitRepository {
     }
 
     return result
+  }
+
+  /**
+   * Returns recent enriched commits that touched a specific file.
+   * @param filePath - Exact file path to match.
+   * @param limit - Maximum number of commits to return.
+   * @returns Recent commits ordered by date descending.
+   */
+  getRecentCommitsForFile(
+    filePath: string,
+    limit: number = 5,
+  ): RecentCommit[] {
+    return this.db
+      .query<RecentCommit, [string, number]>(
+        `SELECT c.hash, c.classification, c.summary, c.committed_at
+         FROM commits c
+         JOIN commit_files cf ON cf.commit_hash = c.hash
+         WHERE cf.file_path = ? AND c.enriched_at IS NOT NULL
+         ORDER BY c.committed_at DESC
+         LIMIT ?`,
+      )
+      .all(filePath, limit)
+  }
+
+  /**
+   * Returns recent enriched commits that touched any file under a directory prefix.
+   * @param prefix - Directory prefix to match (e.g. "src/services/").
+   * @param limit - Maximum number of commits to return.
+   * @returns Recent commits ordered by date descending, deduplicated.
+   */
+  getRecentCommitsForDirectory(
+    prefix: string,
+    limit: number = 5,
+  ): RecentCommit[] {
+    return this.db
+      .query<RecentCommit, [string, number]>(
+        `SELECT DISTINCT c.hash, c.classification, c.summary, c.committed_at
+         FROM commits c
+         JOIN commit_files cf ON cf.commit_hash = c.hash
+         WHERE cf.file_path LIKE ? || '%' AND c.enriched_at IS NOT NULL
+         ORDER BY c.committed_at DESC
+         LIMIT ?`,
+      )
+      .all(prefix, limit)
   }
 }

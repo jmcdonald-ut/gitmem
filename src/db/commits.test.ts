@@ -248,4 +248,145 @@ describe("CommitRepository", () => {
     const filesMap = repo.getCommitFilesByHashes([])
     expect(filesMap.size).toBe(0)
   })
+
+  test("getRecentCommitsForFile returns enriched commits for a file", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa", {
+        committedAt: "2024-01-01T00:00:00Z",
+        files: [
+          { filePath: "src/main.ts", changeType: "A", additions: 10, deletions: 0 },
+        ],
+      }),
+      makeCommit("bbb", {
+        committedAt: "2024-02-01T00:00:00Z",
+        files: [
+          { filePath: "src/main.ts", changeType: "M", additions: 5, deletions: 2 },
+        ],
+      }),
+    ])
+    repo.updateEnrichment("aaa", "feature", "Initial setup", "haiku-4.5")
+    repo.updateEnrichment("bbb", "bug-fix", "Fix null check", "haiku-4.5")
+
+    const results = repo.getRecentCommitsForFile("src/main.ts")
+    expect(results).toHaveLength(2)
+    expect(results[0].hash).toBe("bbb")
+    expect(results[0].classification).toBe("bug-fix")
+    expect(results[0].summary).toBe("Fix null check")
+    expect(results[1].hash).toBe("aaa")
+  })
+
+  test("getRecentCommitsForFile excludes unenriched commits", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa", {
+        files: [
+          { filePath: "src/main.ts", changeType: "A", additions: 10, deletions: 0 },
+        ],
+      }),
+      makeCommit("bbb", {
+        files: [
+          { filePath: "src/main.ts", changeType: "M", additions: 5, deletions: 2 },
+        ],
+      }),
+    ])
+    repo.updateEnrichment("aaa", "feature", "Initial setup", "haiku-4.5")
+
+    const results = repo.getRecentCommitsForFile("src/main.ts")
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("aaa")
+  })
+
+  test("getRecentCommitsForFile respects limit", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa", { committedAt: "2024-01-01T00:00:00Z" }),
+      makeCommit("bbb", { committedAt: "2024-02-01T00:00:00Z" }),
+      makeCommit("ccc", { committedAt: "2024-03-01T00:00:00Z" }),
+    ])
+    repo.updateEnrichment("aaa", "feature", "a", "haiku-4.5")
+    repo.updateEnrichment("bbb", "bug-fix", "b", "haiku-4.5")
+    repo.updateEnrichment("ccc", "refactor", "c", "haiku-4.5")
+
+    const results = repo.getRecentCommitsForFile("src/main.ts", 2)
+    expect(results).toHaveLength(2)
+  })
+
+  test("getRecentCommitsForFile returns empty for unknown file", () => {
+    const results = repo.getRecentCommitsForFile("nonexistent.ts")
+    expect(results).toHaveLength(0)
+  })
+
+  test("getRecentCommitsForDirectory matches files by prefix", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa", {
+        committedAt: "2024-01-01T00:00:00Z",
+        files: [
+          { filePath: "src/services/git.ts", changeType: "A", additions: 10, deletions: 0 },
+        ],
+      }),
+      makeCommit("bbb", {
+        committedAt: "2024-02-01T00:00:00Z",
+        files: [
+          { filePath: "src/services/llm.ts", changeType: "A", additions: 20, deletions: 0 },
+        ],
+      }),
+      makeCommit("ccc", {
+        committedAt: "2024-03-01T00:00:00Z",
+        files: [
+          { filePath: "src/db/commits.ts", changeType: "A", additions: 5, deletions: 0 },
+        ],
+      }),
+    ])
+    repo.updateEnrichment("aaa", "feature", "Add git service", "haiku-4.5")
+    repo.updateEnrichment("bbb", "feature", "Add LLM service", "haiku-4.5")
+    repo.updateEnrichment("ccc", "feature", "Add commits repo", "haiku-4.5")
+
+    const results = repo.getRecentCommitsForDirectory("src/services/")
+    expect(results).toHaveLength(2)
+    expect(results[0].hash).toBe("bbb")
+    expect(results[1].hash).toBe("aaa")
+  })
+
+  test("getRecentCommitsForDirectory deduplicates commits touching multiple files", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa", {
+        committedAt: "2024-01-01T00:00:00Z",
+        files: [
+          { filePath: "src/services/git.ts", changeType: "M", additions: 5, deletions: 1 },
+          { filePath: "src/services/llm.ts", changeType: "M", additions: 3, deletions: 1 },
+        ],
+      }),
+    ])
+    repo.updateEnrichment("aaa", "refactor", "Refactor services", "haiku-4.5")
+
+    const results = repo.getRecentCommitsForDirectory("src/services/")
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("aaa")
+  })
+
+  test("getRecentCommitsForDirectory respects limit", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa", {
+        committedAt: "2024-01-01T00:00:00Z",
+        files: [{ filePath: "src/a.ts", changeType: "A", additions: 1, deletions: 0 }],
+      }),
+      makeCommit("bbb", {
+        committedAt: "2024-02-01T00:00:00Z",
+        files: [{ filePath: "src/b.ts", changeType: "A", additions: 1, deletions: 0 }],
+      }),
+      makeCommit("ccc", {
+        committedAt: "2024-03-01T00:00:00Z",
+        files: [{ filePath: "src/c.ts", changeType: "A", additions: 1, deletions: 0 }],
+      }),
+    ])
+    repo.updateEnrichment("aaa", "feature", "a", "haiku-4.5")
+    repo.updateEnrichment("bbb", "feature", "b", "haiku-4.5")
+    repo.updateEnrichment("ccc", "feature", "c", "haiku-4.5")
+
+    const results = repo.getRecentCommitsForDirectory("src/", 2)
+    expect(results).toHaveLength(2)
+  })
+
+  test("getRecentCommitsForDirectory returns empty for no matches", () => {
+    const results = repo.getRecentCommitsForDirectory("nonexistent/")
+    expect(results).toHaveLength(0)
+  })
 })
