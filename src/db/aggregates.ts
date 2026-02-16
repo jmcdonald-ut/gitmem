@@ -5,7 +5,59 @@ import type {
   FileCouplingRow,
   CouplingPairRow,
   CouplingPairGlobalRow,
+  TrendPeriod,
+  TrendSummary,
 } from "@/types"
+
+/** SQL strftime expressions for grouping commits into time windows. */
+export const WINDOW_FORMATS: Record<string, string> = {
+  weekly: "strftime('%Y-W%W', c.committed_at)",
+  monthly: "strftime('%Y-%m', c.committed_at)",
+  quarterly:
+    "strftime('%Y', c.committed_at) || '-Q' || ((CAST(strftime('%m', c.committed_at) AS INTEGER) - 1) / 3 + 1)",
+}
+
+/**
+ * Computes a trend summary from an array of periods (most recent first).
+ * Returns null if fewer than 2 periods are provided.
+ */
+export function computeTrend(periods: TrendPeriod[]): TrendSummary | null {
+  if (periods.length < 2) return null
+
+  const recentCount = periods.length < 6 ? Math.floor(periods.length / 2) : 3
+  const recent = periods.slice(0, recentCount)
+  const historical = periods.slice(recentCount)
+
+  const recentAvg =
+    recent.reduce((sum, p) => sum + p.total_changes, 0) / recent.length
+  const historicalAvg =
+    historical.reduce((sum, p) => sum + p.total_changes, 0) / historical.length
+
+  const recentBugAvg =
+    recent.reduce((sum, p) => sum + p.bug_fix_count, 0) / recent.length
+  const historicalBugAvg =
+    historical.reduce((sum, p) => sum + p.bug_fix_count, 0) / historical.length
+
+  const computeDirection = (
+    recentVal: number,
+    historicalVal: number,
+  ): "increasing" | "decreasing" | "stable" => {
+    if (historicalVal === 0) {
+      return recentVal > 0 ? "increasing" : "stable"
+    }
+    const ratio = recentVal / historicalVal
+    if (ratio > 1.2) return "increasing"
+    if (ratio < 0.8) return "decreasing"
+    return "stable"
+  }
+
+  return {
+    direction: computeDirection(recentAvg, historicalAvg),
+    recent_avg: Math.round(recentAvg * 10) / 10,
+    historical_avg: Math.round(historicalAvg * 10) / 10,
+    bug_fix_trend: computeDirection(recentBugAvg, historicalBugAvg),
+  }
+}
 
 /** Options for querying file hotspots. */
 export interface HotspotsOptions {
@@ -297,6 +349,80 @@ export class AggregateRepository {
          LIMIT ?`,
       )
       .all(filePath, filePath, filePath, filePath, limit)
+  }
+
+  /**
+   * Returns change trends per time period for a single file.
+   * @param filePath - Repository-relative file path.
+   * @param window - Time window SQL expression from WINDOW_FORMATS.
+   * @param limit - Maximum number of most recent periods to return.
+   * @returns Periods ordered by period label descending (most recent first).
+   */
+  getTrendsForFile(
+    filePath: string,
+    window: string,
+    limit: number,
+  ): TrendPeriod[] {
+    return this.db
+      .query<TrendPeriod, [string, number]>(
+        `SELECT
+           ${window} as period,
+           COUNT(DISTINCT cf.commit_hash) as total_changes,
+           COUNT(DISTINCT CASE WHEN c.classification = 'bug-fix' THEN cf.commit_hash END) as bug_fix_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'feature' THEN cf.commit_hash END) as feature_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'refactor' THEN cf.commit_hash END) as refactor_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'docs' THEN cf.commit_hash END) as docs_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'chore' THEN cf.commit_hash END) as chore_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'perf' THEN cf.commit_hash END) as perf_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'test' THEN cf.commit_hash END) as test_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'style' THEN cf.commit_hash END) as style_count,
+           COALESCE(SUM(cf.additions), 0) as additions,
+           COALESCE(SUM(cf.deletions), 0) as deletions
+         FROM commit_files cf
+         JOIN commits c ON c.hash = cf.commit_hash
+         WHERE c.enriched_at IS NOT NULL AND cf.file_path = ?
+         GROUP BY period
+         ORDER BY period DESC
+         LIMIT ?`,
+      )
+      .all(filePath, limit)
+  }
+
+  /**
+   * Returns change trends per time period for all files under a directory prefix.
+   * @param prefix - Directory prefix (e.g. "src/services/").
+   * @param window - Time window SQL expression from WINDOW_FORMATS.
+   * @param limit - Maximum number of most recent periods to return.
+   * @returns Periods ordered by period label descending (most recent first).
+   */
+  getTrendsForDirectory(
+    prefix: string,
+    window: string,
+    limit: number,
+  ): TrendPeriod[] {
+    return this.db
+      .query<TrendPeriod, [string, number]>(
+        `SELECT
+           ${window} as period,
+           COUNT(DISTINCT cf.commit_hash) as total_changes,
+           COUNT(DISTINCT CASE WHEN c.classification = 'bug-fix' THEN cf.commit_hash END) as bug_fix_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'feature' THEN cf.commit_hash END) as feature_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'refactor' THEN cf.commit_hash END) as refactor_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'docs' THEN cf.commit_hash END) as docs_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'chore' THEN cf.commit_hash END) as chore_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'perf' THEN cf.commit_hash END) as perf_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'test' THEN cf.commit_hash END) as test_count,
+           COUNT(DISTINCT CASE WHEN c.classification = 'style' THEN cf.commit_hash END) as style_count,
+           COALESCE(SUM(cf.additions), 0) as additions,
+           COALESCE(SUM(cf.deletions), 0) as deletions
+         FROM commit_files cf
+         JOIN commits c ON c.hash = cf.commit_hash
+         WHERE c.enriched_at IS NOT NULL AND cf.file_path LIKE ? || '%'
+         GROUP BY period
+         ORDER BY period DESC
+         LIMIT ?`,
+      )
+      .all(prefix, limit)
   }
 
   /**

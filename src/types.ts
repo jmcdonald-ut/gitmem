@@ -164,6 +164,46 @@ export interface RecentCommit {
   committed_at: string
 }
 
+/** Change velocity and classification mix for a single time period. */
+export interface TrendPeriod {
+  /** Period label, e.g. "2025-01", "2025-W03", "2025-Q1". */
+  period: string
+  /** Total number of distinct commits in this period. */
+  total_changes: number
+  /** Number of bug-fix commits. */
+  bug_fix_count: number
+  /** Number of feature commits. */
+  feature_count: number
+  /** Number of refactor commits. */
+  refactor_count: number
+  /** Number of docs commits. */
+  docs_count: number
+  /** Number of chore commits. */
+  chore_count: number
+  /** Number of perf commits. */
+  perf_count: number
+  /** Number of test commits. */
+  test_count: number
+  /** Number of style commits. */
+  style_count: number
+  /** Total lines added. */
+  additions: number
+  /** Total lines deleted. */
+  deletions: number
+}
+
+/** Summary of the overall trend direction computed from TrendPeriod data. */
+export interface TrendSummary {
+  /** Overall change velocity direction. */
+  direction: "increasing" | "decreasing" | "stable"
+  /** Average changes per period in the recent window. */
+  recent_avg: number
+  /** Average changes per period in the historical window. */
+  historical_avg: number
+  /** Direction of bug-fix frequency over time. */
+  bug_fix_trend: "increasing" | "decreasing" | "stable"
+}
+
 /** A full-text search result from the commits FTS index. */
 export interface SearchResult {
   /** Full SHA-1 commit hash. */

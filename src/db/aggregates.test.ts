@@ -1,8 +1,12 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import { createDatabase } from "@db/database"
 import { CommitRepository } from "@db/commits"
-import { AggregateRepository } from "@db/aggregates"
-import type { CommitInfo } from "@/types"
+import {
+  AggregateRepository,
+  WINDOW_FORMATS,
+  computeTrend,
+} from "@db/aggregates"
+import type { CommitInfo, TrendPeriod } from "@/types"
 import { Database } from "bun:sqlite"
 
 describe("AggregateRepository", () => {
@@ -499,5 +503,228 @@ describe("AggregateRepository", () => {
 
     const coupled = aggregates.getCoupledFilesForDirectory("src/", 1)
     expect(coupled.length).toBeLessThanOrEqual(1)
+  })
+
+  test("getTrendsForFile returns correct period breakdown", () => {
+    seedData()
+    const window = WINDOW_FORMATS["monthly"]
+    const periods = aggregates.getTrendsForFile("src/main.ts", window, 12)
+
+    expect(periods).toHaveLength(3)
+    // Most recent first (2024-03, 2024-02, 2024-01)
+    expect(periods[0].period).toBe("2024-03")
+    expect(periods[0].total_changes).toBe(1)
+    expect(periods[0].feature_count).toBe(1)
+    expect(periods[1].period).toBe("2024-02")
+    expect(periods[1].total_changes).toBe(1)
+    expect(periods[1].bug_fix_count).toBe(1)
+    expect(periods[2].period).toBe("2024-01")
+    expect(periods[2].total_changes).toBe(1)
+    expect(periods[2].feature_count).toBe(1)
+  })
+
+  test("getTrendsForFile respects limit", () => {
+    seedData()
+    const window = WINDOW_FORMATS["monthly"]
+    const periods = aggregates.getTrendsForFile("src/main.ts", window, 2)
+
+    expect(periods).toHaveLength(2)
+    expect(periods[0].period).toBe("2024-03")
+    expect(periods[1].period).toBe("2024-02")
+  })
+
+  test("getTrendsForFile only counts enriched commits", () => {
+    commits.insertRawCommits([
+      {
+        hash: "unenriched",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "test",
+        files: [
+          {
+            filePath: "src/foo.ts",
+            changeType: "A",
+            additions: 10,
+            deletions: 0,
+          },
+        ],
+      },
+    ])
+
+    const window = WINDOW_FORMATS["monthly"]
+    const periods = aggregates.getTrendsForFile("src/foo.ts", window, 12)
+    expect(periods).toHaveLength(0)
+  })
+
+  test("getTrendsForFile returns empty for unknown file", () => {
+    seedData()
+    const window = WINDOW_FORMATS["monthly"]
+    const periods = aggregates.getTrendsForFile("nonexistent.ts", window, 12)
+    expect(periods).toHaveLength(0)
+  })
+
+  test("getTrendsForDirectory aggregates across files in prefix", () => {
+    seedData()
+    const window = WINDOW_FORMATS["monthly"]
+    const periods = aggregates.getTrendsForDirectory("src/", window, 12)
+
+    expect(periods).toHaveLength(3)
+    // 2024-03: ccc touches main.ts + new.ts = 1 distinct commit
+    expect(periods[0].period).toBe("2024-03")
+    expect(periods[0].total_changes).toBe(1)
+    // 2024-02: bbb touches main.ts + utils.ts = 1 distinct commit
+    expect(periods[1].period).toBe("2024-02")
+    expect(periods[1].total_changes).toBe(1)
+    // 2024-01: aaa touches main.ts + utils.ts = 1 distinct commit
+    expect(periods[2].period).toBe("2024-01")
+    expect(periods[2].total_changes).toBe(1)
+  })
+
+  test("getTrendsForDirectory returns empty for no matches", () => {
+    seedData()
+    const window = WINDOW_FORMATS["monthly"]
+    const periods = aggregates.getTrendsForDirectory("nonexistent/", window, 12)
+    expect(periods).toHaveLength(0)
+  })
+
+  test("getTrendsForFile includes additions and deletions", () => {
+    seedData()
+    const window = WINDOW_FORMATS["monthly"]
+    const periods = aggregates.getTrendsForFile("src/main.ts", window, 12)
+
+    // 2024-03: ccc adds 20, deletes 5
+    expect(periods[0].additions).toBe(20)
+    expect(periods[0].deletions).toBe(5)
+    // 2024-02: bbb adds 5, deletes 3
+    expect(periods[1].additions).toBe(5)
+    expect(periods[1].deletions).toBe(3)
+  })
+})
+
+describe("computeTrend", () => {
+  const makePeriod = (overrides: Partial<TrendPeriod> = {}): TrendPeriod => ({
+    period: "2024-01",
+    total_changes: 5,
+    bug_fix_count: 1,
+    feature_count: 2,
+    refactor_count: 1,
+    docs_count: 0,
+    chore_count: 0,
+    perf_count: 0,
+    test_count: 0,
+    style_count: 0,
+    additions: 100,
+    deletions: 50,
+    ...overrides,
+  })
+
+  test("returns null for fewer than 2 periods", () => {
+    expect(computeTrend([])).toBeNull()
+    expect(computeTrend([makePeriod()])).toBeNull()
+  })
+
+  test("returns increasing when recent avg > historical avg * 1.2", () => {
+    // 4 periods: recent half = first 2, historical = last 2
+    const periods = [
+      makePeriod({ period: "2024-04", total_changes: 10 }),
+      makePeriod({ period: "2024-03", total_changes: 10 }),
+      makePeriod({ period: "2024-02", total_changes: 3 }),
+      makePeriod({ period: "2024-01", total_changes: 3 }),
+    ]
+    const trend = computeTrend(periods)!
+    expect(trend.direction).toBe("increasing")
+    expect(trend.recent_avg).toBe(10)
+    expect(trend.historical_avg).toBe(3)
+  })
+
+  test("returns decreasing when recent avg < historical avg * 0.8", () => {
+    const periods = [
+      makePeriod({ period: "2024-04", total_changes: 2 }),
+      makePeriod({ period: "2024-03", total_changes: 2 }),
+      makePeriod({ period: "2024-02", total_changes: 10 }),
+      makePeriod({ period: "2024-01", total_changes: 10 }),
+    ]
+    const trend = computeTrend(periods)!
+    expect(trend.direction).toBe("decreasing")
+    expect(trend.recent_avg).toBe(2)
+    expect(trend.historical_avg).toBe(10)
+  })
+
+  test("returns stable when averages are similar", () => {
+    const periods = [
+      makePeriod({ period: "2024-04", total_changes: 5 }),
+      makePeriod({ period: "2024-03", total_changes: 5 }),
+      makePeriod({ period: "2024-02", total_changes: 5 }),
+      makePeriod({ period: "2024-01", total_changes: 5 }),
+    ]
+    const trend = computeTrend(periods)!
+    expect(trend.direction).toBe("stable")
+  })
+
+  test("handles zero historical avg", () => {
+    const periods = [
+      makePeriod({ period: "2024-02", total_changes: 5, bug_fix_count: 3 }),
+      makePeriod({ period: "2024-01", total_changes: 0, bug_fix_count: 0 }),
+    ]
+    const trend = computeTrend(periods)!
+    expect(trend.direction).toBe("increasing")
+    expect(trend.bug_fix_trend).toBe("increasing")
+  })
+
+  test("computes bug_fix_trend independently", () => {
+    // Recent: high total but low bugs; historical: low total but high bugs
+    const periods = [
+      makePeriod({
+        period: "2024-04",
+        total_changes: 10,
+        bug_fix_count: 1,
+      }),
+      makePeriod({
+        period: "2024-03",
+        total_changes: 10,
+        bug_fix_count: 1,
+      }),
+      makePeriod({
+        period: "2024-02",
+        total_changes: 3,
+        bug_fix_count: 8,
+      }),
+      makePeriod({
+        period: "2024-01",
+        total_changes: 3,
+        bug_fix_count: 8,
+      }),
+    ]
+    const trend = computeTrend(periods)!
+    expect(trend.direction).toBe("increasing")
+    expect(trend.bug_fix_trend).toBe("decreasing")
+  })
+
+  test("rounds averages to 1 decimal place", () => {
+    const periods = [
+      makePeriod({ period: "2024-03", total_changes: 7 }),
+      makePeriod({ period: "2024-02", total_changes: 4 }),
+      makePeriod({ period: "2024-01", total_changes: 3 }),
+    ]
+    const trend = computeTrend(periods)!
+    // recent = [7], historical = [4, 3] => recent_avg = 7, historical_avg = 3.5
+    expect(trend.recent_avg).toBe(7)
+    expect(trend.historical_avg).toBe(3.5)
+  })
+
+  test("uses 3 recent periods when 6 or more available", () => {
+    const periods = [
+      makePeriod({ period: "2024-06", total_changes: 10 }),
+      makePeriod({ period: "2024-05", total_changes: 10 }),
+      makePeriod({ period: "2024-04", total_changes: 10 }),
+      makePeriod({ period: "2024-03", total_changes: 2 }),
+      makePeriod({ period: "2024-02", total_changes: 2 }),
+      makePeriod({ period: "2024-01", total_changes: 2 }),
+    ]
+    const trend = computeTrend(periods)!
+    expect(trend.recent_avg).toBe(10)
+    expect(trend.historical_avg).toBe(2)
+    expect(trend.direction).toBe("increasing")
   })
 })
