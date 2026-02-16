@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Box, Text } from "ink"
+import { Box, Text, useApp } from "ink"
 import Spinner from "ink-spinner"
 import type { CheckProgress, EvalResult, EvalSummary } from "@/types"
 import { CheckerService } from "@services/checker"
@@ -25,6 +25,7 @@ type CheckCommandProps = SingleCheckProps | BatchCheckProps
  * evaluation results inline (single) or as aggregate summary (batch).
  */
 export function CheckCommand(props: CheckCommandProps) {
+  const { exit } = useApp()
   const [progress, setProgress] = useState<CheckProgress>({
     phase: "evaluating",
     current: 0,
@@ -64,6 +65,10 @@ export function CheckCommand(props: CheckCommandProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.checker])
+
+  useEffect(() => {
+    if (singleResult || batchResult || error || notFound) exit()
+  }, [singleResult, batchResult, error, notFound, exit])
 
   if (error) {
     return (

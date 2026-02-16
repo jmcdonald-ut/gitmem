@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Box, Text } from "ink"
+import { Box, Text, useApp } from "ink"
 import Spinner from "ink-spinner"
 import type { IndexProgress } from "@/types"
 import { EnricherService } from "@services/enricher"
@@ -15,6 +15,7 @@ interface IndexCommandProps {
  * including phase labels, commit counts, and a final coverage summary.
  */
 export function IndexCommand({ enricher }: IndexCommandProps) {
+  const { exit } = useApp()
   const [progress, setProgress] = useState<IndexProgress>({
     phase: "discovering",
     current: 0,
@@ -37,6 +38,10 @@ export function IndexCommand({ enricher }: IndexCommandProps) {
 
     return () => controller.abort()
   }, [enricher])
+
+  useEffect(() => {
+    if (result || error) exit()
+  }, [result, error, exit])
 
   if (error) {
     return (

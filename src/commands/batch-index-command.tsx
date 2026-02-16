@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Box, Text } from "ink"
+import { Box, Text, useApp } from "ink"
 import Spinner from "ink-spinner"
 import type { IndexProgress } from "@/types"
 import type { EnricherService } from "@services/enricher"
@@ -21,6 +21,7 @@ export function BatchIndexCommand({
   batchLLM,
   batchJobs,
 }: BatchIndexCommandProps) {
+  const { exit } = useApp()
   const [progress, setProgress] = useState<IndexProgress>({
     phase: "discovering",
     current: 0,
@@ -41,6 +42,10 @@ export function BatchIndexCommand({
       .then(setResult)
       .catch((err) => setError(err.message))
   }, [enricher, batchLLM, batchJobs])
+
+  useEffect(() => {
+    if (result || error) exit()
+  }, [result, error, exit])
 
   if (error) {
     return (
