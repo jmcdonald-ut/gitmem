@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { Database } from "bun:sqlite"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createDatabase } from "@db/database"
@@ -178,7 +178,30 @@ describe("createDatabase", () => {
     expect(fsCols).toContain("avg_complexity")
     expect(fsCols).toContain("max_complexity")
 
+    // Verify backup was created before migration
+    expect(existsSync(`${tmpPath}.backup`)).toBe(true)
+
     db.close()
+    rmSync(tmpDir, { recursive: true })
+  })
+
+  test("does not create backup when no migration is needed", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "gitmem-test-"))
+    const tmpPath = join(tmpDir, "no-migrate.db")
+
+    // Create a fresh database (all columns present)
+    const db1 = createDatabase(tmpPath)
+    db1.close()
+
+    // Remove any backup from first create (fresh schema has no migration)
+    const backupPath = `${tmpPath}.backup`
+    if (existsSync(backupPath)) rmSync(backupPath)
+
+    // Reopen — should not create backup since schema is current
+    const db2 = createDatabase(tmpPath)
+    expect(existsSync(backupPath)).toBe(false)
+    db2.close()
+
     rmSync(tmpDir, { recursive: true })
   })
 })
