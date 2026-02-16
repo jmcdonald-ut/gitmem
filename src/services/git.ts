@@ -1,5 +1,63 @@
 import type { CommitInfo, CommitFile, IGitService } from "@/types"
 
+/**
+ * Truncates a unified diff to fit within maxChars while preserving breadth
+ * across all files. Instead of naively slicing (which shows full diffs for the
+ * first few files and nothing for the rest), this splits the diff into per-file
+ * sections, lets small files keep their full content, and distributes the
+ * remaining budget evenly among oversized files.
+ */
+export function truncateDiff(diff: string, maxChars: number): string {
+  if (diff.length <= maxChars) return diff
+
+  const sections = diff.split(/(?=^diff --git )/m).filter((s) => s.length > 0)
+  if (sections.length <= 1) {
+    return safeSlice(diff, maxChars) + "\n... [truncated]"
+  }
+
+  const MARKER = "\n... [truncated]"
+  const equalShare = Math.floor(maxChars / sections.length)
+
+  // First pass: small files keep their full content, track remaining budget
+  let remainingBudget = maxChars
+  let oversizedCount = 0
+  const fits: boolean[] = sections.map((section) => {
+    if (section.length <= equalShare) {
+      remainingBudget -= section.length
+      return true
+    }
+    oversizedCount++
+    return false
+  })
+
+  // Second pass: distribute remaining budget to oversized files
+  const perOversized =
+    oversizedCount > 0 ? Math.floor(remainingBudget / oversizedCount) : 0
+
+  return sections
+    .map((section, i) => {
+      if (fits[i]) return section
+      const truncLen = Math.max(0, perOversized - MARKER.length)
+      return safeSlice(section, truncLen) + MARKER
+    })
+    .join("")
+}
+
+/**
+ * Slices a string without splitting a UTF-16 surrogate pair.
+ * If the cut point falls between a high and low surrogate,
+ * backs up one position to exclude the orphaned high surrogate.
+ */
+function safeSlice(str: string, end: number): string {
+  if (end <= 0) return ""
+  if (end >= str.length) return str
+  const code = str.charCodeAt(end - 1)
+  if (code >= 0xd800 && code <= 0xdbff) {
+    return str.slice(0, end - 1)
+  }
+  return str.slice(0, end)
+}
+
 /** Interacts with a local git repository via Bun shell commands. */
 export class GitService implements IGitService {
   private cwd: string
@@ -131,11 +189,7 @@ export class GitService implements IGitService {
   async getDiff(hash: string, maxChars: number = 12000): Promise<string> {
     const result =
       await Bun.$`git -C ${this.cwd} diff-tree --root -p --no-commit-id ${hash}`.quiet()
-    const diff = result.text()
-    if (diff.length > maxChars) {
-      return diff.slice(0, maxChars) + "\n... [truncated]"
-    }
-    return diff
+    return truncateDiff(result.text(), maxChars)
   }
 
   /**
@@ -241,10 +295,7 @@ export class GitService implements IGitService {
     // parts array: ['', hash1, diff1, hash2, diff2, ...]
     for (let i = 1; i < parts.length - 1; i += 2) {
       const hash = parts[i].trim()
-      let diff = parts[i + 1]
-      if (diff.length > maxChars) {
-        diff = diff.slice(0, maxChars) + "\n... [truncated]"
-      }
+      const diff = truncateDiff(parts[i + 1], maxChars)
       result.set(hash, diff)
     }
 

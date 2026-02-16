@@ -1,8 +1,127 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { GitService } from "@services/git"
+import { GitService, truncateDiff } from "@services/git"
 import { mkdtemp, rm } from "fs/promises"
 import { join } from "path"
 import { tmpdir } from "os"
+
+describe("truncateDiff", () => {
+  const fileSection = (name: string, lines: number) => {
+    const header = `diff --git a/${name} b/${name}\nindex abc..def 100644\n--- a/${name}\n+++ b/${name}\n`
+    const content = Array.from(
+      { length: lines },
+      (_, i) => `+line ${i + 1}\n`,
+    ).join("")
+    return header + content
+  }
+
+  test("returns diff unchanged when under budget", () => {
+    const diff = fileSection("small.ts", 3)
+    expect(truncateDiff(diff, 10000)).toBe(diff)
+  })
+
+  test("truncates single-file diff with marker", () => {
+    const diff = fileSection("big.ts", 100)
+    const result = truncateDiff(diff, 200)
+    expect(result.length).toBeLessThanOrEqual(220)
+    expect(result).toContain("[truncated]")
+    expect(result).toContain("diff --git a/big.ts")
+  })
+
+  test("preserves all file headers when multiple files are truncated", () => {
+    const diff =
+      fileSection("a.ts", 50) +
+      fileSection("b.ts", 50) +
+      fileSection("c.ts", 50)
+    const result = truncateDiff(diff, 400)
+    expect(result).toContain("diff --git a/a.ts")
+    expect(result).toContain("diff --git a/b.ts")
+    expect(result).toContain("diff --git a/c.ts")
+  })
+
+  test("small files keep full content while large files are truncated", () => {
+    const small = fileSection("small.ts", 2) // ~100 chars
+    const large = fileSection("large.ts", 200) // ~2400 chars
+    const diff = small + large
+    const result = truncateDiff(diff, 500)
+
+    // Small file should be fully present
+    expect(result).toContain("+line 1")
+    expect(result).toContain("+line 2")
+    // Large file header should be present
+    expect(result).toContain("diff --git a/large.ts")
+    // Large file should be truncated
+    expect(result).toContain("[truncated]")
+    expect(result.length).toBeLessThanOrEqual(520)
+  })
+
+  test("distributes budget evenly among oversized files", () => {
+    const diff =
+      fileSection("a.ts", 100) +
+      fileSection("b.ts", 100) +
+      fileSection("c.ts", 100)
+    const result = truncateDiff(diff, 600)
+
+    // All three files should have some content (not just first file)
+    expect(result).toContain("diff --git a/a.ts")
+    expect(result).toContain("diff --git a/b.ts")
+    expect(result).toContain("diff --git a/c.ts")
+    expect(result.length).toBeLessThanOrEqual(620)
+  })
+
+  test("handles empty diff", () => {
+    expect(truncateDiff("", 100)).toBe("")
+  })
+
+  test("handles diff with no file sections", () => {
+    const text = "some text without diff headers"
+    const result = truncateDiff(text, 10)
+    expect(result).toContain("[truncated]")
+    expect(result.length).toBeLessThanOrEqual(30)
+  })
+
+  test("does not split surrogate pairs when truncating", () => {
+    // 🎉 is U+1F389, encoded as surrogate pair \uD83C\uDF89
+    const emoji = "🎉"
+    expect(emoji.length).toBe(2) // surrogate pair = 2 UTF-16 code units
+    const header =
+      "diff --git a/test.ts b/test.ts\n--- a/test.ts\n+++ b/test.ts\n"
+    // Place the emoji so the truncation point falls between the surrogates
+    const content = "x".repeat(50) + emoji + "y".repeat(50)
+    const diff = header + content
+    // Truncate right after the high surrogate would be included
+    const cutPoint = header.length + 51 // includes 50 x's + high surrogate
+    const result = truncateDiff(diff, cutPoint)
+    // Result should NOT contain an orphaned high surrogate
+    for (let i = 0; i < result.length; i++) {
+      const code = result.charCodeAt(i)
+      if (code >= 0xd800 && code <= 0xdbff) {
+        // High surrogate must be followed by low surrogate
+        const next = result.charCodeAt(i + 1)
+        expect(next >= 0xdc00 && next <= 0xdfff).toBe(true)
+      }
+    }
+  })
+
+  test("gives oversized files more budget when small files free up space", () => {
+    // 3 tiny files (~80 chars each) + 1 huge file (~2400 chars)
+    // With budget of 1000: equal share = 250 per file
+    // Tiny files use ~80 each (240 total), leaving ~760 for the huge file
+    const diff =
+      fileSection("tiny1.ts", 1) +
+      fileSection("tiny2.ts", 1) +
+      fileSection("tiny3.ts", 1) +
+      fileSection("huge.ts", 200)
+    const result = truncateDiff(diff, 1000)
+
+    // Tiny files should be fully intact
+    expect(result).toContain("diff --git a/tiny1.ts")
+    expect(result).toContain("diff --git a/tiny2.ts")
+    expect(result).toContain("diff --git a/tiny3.ts")
+    // Huge file should have more content than a naive equal split would give
+    const hugeSection = result.split("diff --git a/huge.ts")[1] ?? ""
+    expect(hugeSection.length).toBeGreaterThan(250)
+  })
+})
 
 describe("GitService", () => {
   let tmpDir: string
