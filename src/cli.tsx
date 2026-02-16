@@ -291,6 +291,7 @@ program
     "4",
   )
   .action(async (hash, opts) => {
+    const format = resolveFormat(program.opts())
     const cwd = process.cwd()
     const git = new GitService(cwd)
 
@@ -326,26 +327,43 @@ program
       parseInt(opts.concurrency, 10),
     )
 
-    if (opts.sample) {
-      const outputPath =
-        opts.output ??
-        join(
-          resolve(cwd, ".gitmem"),
-          `check-${new Date().toISOString().replace(/[:.]/g, "")}.json`,
+    if (format === "json") {
+      if (opts.sample) {
+        const { results, summary } = await checker.checkSample(
+          parseInt(opts.sample, 10),
+          () => {},
         )
-      const instance = render(
-        <CheckCommand
-          checker={checker}
-          sampleSize={parseInt(opts.sample, 10)}
-          outputPath={outputPath}
-        />,
-      )
-      await instance.waitUntilExit()
-      instance.unmount()
+        formatOutput("json", { results, summary })
+      } else {
+        const result = await checker.checkOne(hash, () => {})
+        if (!result) {
+          console.error(`Error: commit ${hash} not found or not yet enriched`)
+          process.exit(1)
+        }
+        formatOutput("json", result)
+      }
     } else {
-      const instance = render(<CheckCommand checker={checker} hash={hash} />)
-      await instance.waitUntilExit()
-      instance.unmount()
+      if (opts.sample) {
+        const outputPath =
+          opts.output ??
+          join(
+            resolve(cwd, ".gitmem"),
+            `check-${new Date().toISOString().replace(/[:.]/g, "")}.json`,
+          )
+        const instance = render(
+          <CheckCommand
+            checker={checker}
+            sampleSize={parseInt(opts.sample, 10)}
+            outputPath={outputPath}
+          />,
+        )
+        await instance.waitUntilExit()
+        instance.unmount()
+      } else {
+        const instance = render(<CheckCommand checker={checker} hash={hash} />)
+        await instance.waitUntilExit()
+        instance.unmount()
+      }
     }
 
     db.close()
