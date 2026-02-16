@@ -8,6 +8,8 @@ interface QueryCommandProps {
   query: string
   /** FTS search results matching the query. */
   results: SearchResult[]
+  /** Active classification filter, if any. */
+  classificationFilter?: string
   /** Index coverage as a percentage (0-100). */
   coveragePct: number
 }
@@ -19,6 +21,7 @@ interface QueryCommandProps {
 export function QueryCommand({
   query,
   results,
+  classificationFilter,
   coveragePct,
 }: QueryCommandProps) {
   return (
@@ -30,6 +33,11 @@ export function QueryCommand({
       )}
 
       <Text bold>Query: {query}</Text>
+      {classificationFilter && (
+        <Text>
+          Filter: <Text color="magenta">{classificationFilter}</Text>
+        </Text>
+      )}
       <Text> </Text>
 
       {results.length === 0 ? (

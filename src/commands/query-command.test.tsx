@@ -63,4 +63,28 @@ describe("QueryCommand", () => {
 
     expect(output).toContain("No matching commits found")
   })
+
+  test("shows classification filter when provided", () => {
+    const { lastFrame } = render(
+      <QueryCommand
+        query="auth"
+        results={mockResults}
+        classificationFilter="bug-fix"
+        coveragePct={100}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("Filter:")
+    expect(output).toContain("bug-fix")
+  })
+
+  test("hides classification filter when not provided", () => {
+    const { lastFrame } = render(
+      <QueryCommand query="auth" results={mockResults} coveragePct={100} />,
+    )
+    const output = lastFrame()
+
+    expect(output).not.toContain("Filter:")
+  })
 })

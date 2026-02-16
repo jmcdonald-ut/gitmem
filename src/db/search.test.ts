@@ -121,4 +121,73 @@ describe("SearchService", () => {
     expect(results).toHaveLength(1)
     expect(results[0].classification).toBe("feature")
   })
+
+  test("search filters by classification", () => {
+    search.indexCommit(
+      "aaa",
+      "fix auth bug",
+      "bug-fix",
+      "Fixed authentication bypass",
+    )
+    search.indexCommit(
+      "bbb",
+      "auth refactor",
+      "refactor",
+      "Refactored authentication module",
+    )
+    search.indexCommit(
+      "ccc",
+      "auth feature",
+      "feature",
+      "Added OAuth authentication",
+    )
+
+    const results = search.search("auth", 20, "bug-fix")
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("aaa")
+    expect(results[0].classification).toBe("bug-fix")
+  })
+
+  test("search without classification returns all matches", () => {
+    search.indexCommit(
+      "aaa",
+      "fix auth bug",
+      "bug-fix",
+      "Fixed authentication bypass",
+    )
+    search.indexCommit(
+      "bbb",
+      "auth refactor",
+      "refactor",
+      "Refactored authentication module",
+    )
+
+    const results = search.search("auth", 20)
+    expect(results).toHaveLength(2)
+  })
+
+  test("search with classification returns empty when no matches", () => {
+    search.indexCommit(
+      "aaa",
+      "fix auth bug",
+      "bug-fix",
+      "Fixed authentication bypass",
+    )
+
+    const results = search.search("auth", 20, "feature")
+    expect(results).toHaveLength(0)
+  })
+
+  test("search with classification respects limit", () => {
+    for (let i = 0; i < 5; i++) {
+      search.indexCommit(
+        `hash${i}`,
+        `fix bug ${i}`,
+        "bug-fix",
+        `Fixed bug number ${i}`,
+      )
+    }
+    const results = search.search("bug", 2, "bug-fix")
+    expect(results).toHaveLength(2)
+  })
 })

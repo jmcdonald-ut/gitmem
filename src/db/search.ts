@@ -34,9 +34,26 @@ export class SearchService {
    * Searches the FTS index for commits matching the query.
    * @param query - FTS5 match expression.
    * @param limit - Maximum number of results to return.
+   * @param classification - Optional classification filter.
    * @returns Matching commits ordered by relevance rank.
    */
-  search(query: string, limit: number = 20): SearchResult[] {
+  search(
+    query: string,
+    limit: number = 20,
+    classification?: string,
+  ): SearchResult[] {
+    if (classification) {
+      return this.db
+        .query<SearchResult, [string, string, number]>(
+          `SELECT hash, message, classification, summary, rank
+         FROM commits_fts
+         WHERE commits_fts MATCH ?
+           AND classification = ?
+         ORDER BY rank
+         LIMIT ?`,
+        )
+        .all(query, classification, limit)
+    }
     return this.db
       .query<SearchResult, [string, number]>(
         `SELECT hash, message, classification, summary, rank

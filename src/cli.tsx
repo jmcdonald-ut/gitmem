@@ -223,6 +223,10 @@ program
   .alias("q")
   .argument("<query>", "Search query")
   .option("-l, --limit <number>", "Max results", "20")
+  .option(
+    "--classification <type>",
+    "Filter by classification (bug-fix, feature, refactor, docs, chore, perf, test, style)",
+  )
   .description("Search the index (no LLM, retrieval only)")
   .action(async (query, opts) => {
     const format = resolveFormat(program.opts())
@@ -249,9 +253,21 @@ program
     const coveragePct =
       totalCommits > 0 ? Math.round((enrichedCommits / totalCommits) * 100) : 0
 
-    const results = search.search(query, parseInt(opts.limit, 10))
+    const classification: string | undefined = opts.classification
+    const results = search.search(
+      query,
+      parseInt(opts.limit, 10),
+      classification,
+    )
 
-    if (formatOutput(format, { query, results, coveragePct })) {
+    if (
+      formatOutput(format, {
+        query,
+        classification_filter: classification ?? null,
+        results,
+        coveragePct,
+      })
+    ) {
       db.close()
       return
     }
@@ -260,6 +276,7 @@ program
       <QueryCommand
         query={query}
         results={results}
+        classificationFilter={classification}
         coveragePct={coveragePct}
       />,
     )
