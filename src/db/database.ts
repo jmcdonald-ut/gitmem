@@ -17,6 +17,7 @@ export function createDatabase(path: string): Database {
   createSchema(db)
   if (needsMigration(db)) {
     if (path !== ":memory:" && existsSync(path)) {
+      db.run("PRAGMA wal_checkpoint(TRUNCATE)")
       copyFileSync(path, `${path}.backup`)
     }
     migrateSchema(db)
