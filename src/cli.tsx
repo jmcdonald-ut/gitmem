@@ -242,7 +242,6 @@ program
 
     const db = createDatabase(dbPath)
     const commits = new CommitRepository(db)
-    const aggregates = new AggregateRepository(db)
     const search = new SearchService(db)
     const branch = await git.getDefaultBranch()
     const totalCommits = await git.getTotalCommitCount(branch)
@@ -257,13 +256,10 @@ program
       return
     }
 
-    const hotspots = aggregates.getHotspots(5)
-
     const instance = render(
       <QueryCommand
         query={query}
         results={results}
-        hotspots={hotspots}
         coveragePct={coveragePct}
       />,
     )

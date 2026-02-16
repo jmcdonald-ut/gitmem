@@ -1,6 +1,6 @@
 import React from "react"
 import { Box, Text } from "ink"
-import type { SearchResult, FileStatsRow } from "@/types"
+import type { SearchResult } from "@/types"
 
 /** Props for the QueryCommand component. */
 interface QueryCommandProps {
@@ -8,20 +8,17 @@ interface QueryCommandProps {
   query: string
   /** FTS search results matching the query. */
   results: SearchResult[]
-  /** Top file hotspots by change frequency. */
-  hotspots: FileStatsRow[]
   /** Index coverage as a percentage (0-100). */
   coveragePct: number
 }
 
 /**
- * Ink component that displays search results, file hotspots, and
+ * Ink component that displays search results and
  * a coverage warning if the index is incomplete.
  */
 export function QueryCommand({
   query,
   results,
-  hotspots,
   coveragePct,
 }: QueryCommandProps) {
   return (
@@ -47,20 +44,6 @@ export function QueryCommand({
                 <Text color="yellow">[{r.classification}]</Text> {r.summary}
               </Text>
             </Box>
-          ))}
-        </>
-      )}
-
-      {hotspots.length > 0 && (
-        <>
-          <Text> </Text>
-          <Text bold>Top hotspots:</Text>
-          {hotspots.map((h) => (
-            <Text key={h.file_path} color="gray">
-              {"  "}
-              {h.file_path} ({h.total_changes} changes, {h.bug_fix_count} bug
-              fixes)
-            </Text>
           ))}
         </>
       )}
