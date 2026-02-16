@@ -36,6 +36,8 @@ const program = new Command()
   .name("gitmem")
   .description("Pre-analyzed git history index")
   .version("0.1.0")
+  .option("--format <format>", "Output format (text or json)", "text")
+  .option("--json", "Shorthand for --format json")
 
 program
   .command("index")

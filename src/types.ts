@@ -1,3 +1,6 @@
+/** Output format for CLI commands. */
+export type OutputFormat = "text" | "json"
+
 /** All valid commit classification types used by the LLM enrichment pipeline. */
 export const CLASSIFICATIONS = [
   "bug-fix",
