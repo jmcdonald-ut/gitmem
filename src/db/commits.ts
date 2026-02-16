@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite"
-import type { CommitInfo, CommitRow } from "@/types"
+import type { CommitInfo, CommitRow, CommitFile, CommitFileRow } from "@/types"
 
 /** Repository for reading and writing commit records in the SQLite database. */
 export class CommitRepository {
@@ -144,5 +144,44 @@ export class CommitRepository {
         .query<CommitRow, [string]>("SELECT * FROM commits WHERE hash = ?")
         .get(hash) ?? null
     )
+  }
+
+  /**
+   * Returns file change info for multiple commits, grouped by commit hash.
+   * @param hashes - The commit hashes to look up files for.
+   * @returns Map from commit hash to array of CommitFile objects.
+   */
+  getCommitFilesByHashes(hashes: string[]): Map<string, CommitFile[]> {
+    const result = new Map<string, CommitFile[]>()
+    if (hashes.length === 0) return result
+
+    // Initialize all hashes with empty arrays
+    for (const h of hashes) {
+      result.set(h, [])
+    }
+
+    // Query in chunks to stay within SQLite parameter limits
+    const CHUNK = 500
+    for (let i = 0; i < hashes.length; i += CHUNK) {
+      const chunk = hashes.slice(i, i + CHUNK)
+      const placeholders = chunk.map(() => "?").join(", ")
+      const rows = this.db
+        .query<CommitFileRow, string[]>(
+          `SELECT commit_hash, file_path, change_type, additions, deletions
+           FROM commit_files WHERE commit_hash IN (${placeholders})`,
+        )
+        .all(...chunk)
+
+      for (const row of rows) {
+        result.get(row.commit_hash)!.push({
+          filePath: row.file_path,
+          changeType: row.change_type,
+          additions: row.additions,
+          deletions: row.deletions,
+        })
+      }
+    }
+
+    return result
   }
 }

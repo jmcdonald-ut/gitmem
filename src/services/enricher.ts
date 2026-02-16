@@ -79,9 +79,10 @@ export class EnricherService {
     let enrichedThisRun = 0
 
     if (total > 0) {
-      // Pre-fetch all diffs in one batch call
+      // Pre-fetch all diffs and file lists in one batch call
       const unenrichedHashes = unenriched.map((c) => c.hash)
       const diffMap = await this.git.getDiffBatch(unenrichedHashes)
+      const filesMap = this.commits.getCommitFilesByHashes(unenrichedHashes)
 
       for (let i = 0; i < unenriched.length; i += this.concurrency) {
         if (signal?.aborted) break
@@ -106,7 +107,7 @@ export class EnricherService {
                   authorEmail: commit.author_email,
                   committedAt: commit.committed_at,
                   message: commit.message,
-                  files: [],
+                  files: filesMap.get(commit.hash) ?? [],
                 },
                 diff,
               ),
@@ -252,9 +253,9 @@ export class EnricherService {
       if (unenriched.length > 0) {
         const MAX_BATCH_SIZE = 10000
         const batches = this.chunkCommits(unenriched, MAX_BATCH_SIZE)
-        const diffMap = await this.git.getDiffBatch(
-          unenriched.map((c) => c.hash),
-        )
+        const unenrichedHashes = unenriched.map((c) => c.hash)
+        const diffMap = await this.git.getDiffBatch(unenrichedHashes)
+        const filesMap = this.commits.getCommitFilesByHashes(unenrichedHashes)
 
         for (const batch of batches) {
           const requests = batch.map((commit) => ({
@@ -265,7 +266,7 @@ export class EnricherService {
               authorEmail: commit.author_email,
               committedAt: commit.committed_at,
               message: commit.message,
-              files: [],
+              files: filesMap.get(commit.hash) ?? [],
             },
             diff: diffMap.get(commit.hash) ?? "",
           }))

@@ -199,4 +199,53 @@ describe("CommitRepository", () => {
     const results = repo.getRandomEnrichedCommits(5)
     expect(results).toHaveLength(0)
   })
+
+  test("getCommitFilesByHashes returns files grouped by hash", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa", {
+        files: [
+          {
+            filePath: "src/main.ts",
+            changeType: "M",
+            additions: 10,
+            deletions: 5,
+          },
+          {
+            filePath: "src/utils.ts",
+            changeType: "A",
+            additions: 20,
+            deletions: 0,
+          },
+        ],
+      }),
+      makeCommit("bbb", {
+        files: [
+          {
+            filePath: "README.md",
+            changeType: "M",
+            additions: 3,
+            deletions: 1,
+          },
+        ],
+      }),
+    ])
+
+    const filesMap = repo.getCommitFilesByHashes(["aaa", "bbb"])
+    expect(filesMap.get("aaa")).toHaveLength(2)
+    expect(filesMap.get("aaa")![0].filePath).toBe("src/main.ts")
+    expect(filesMap.get("aaa")![1].filePath).toBe("src/utils.ts")
+    expect(filesMap.get("bbb")).toHaveLength(1)
+    expect(filesMap.get("bbb")![0].filePath).toBe("README.md")
+  })
+
+  test("getCommitFilesByHashes returns empty arrays for commits with no files", () => {
+    repo.insertRawCommits([makeCommit("aaa", { files: [] })])
+    const filesMap = repo.getCommitFilesByHashes(["aaa"])
+    expect(filesMap.get("aaa")).toHaveLength(0)
+  })
+
+  test("getCommitFilesByHashes handles empty input", () => {
+    const filesMap = repo.getCommitFilesByHashes([])
+    expect(filesMap.size).toBe(0)
+  })
 })
