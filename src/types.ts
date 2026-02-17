@@ -16,6 +16,46 @@ export const CLASSIFICATIONS = [
 /** A commit classification label assigned during LLM enrichment. */
 export type Classification = (typeof CLASSIFICATIONS)[number]
 
+/** The key holding a count of commits with a specific classification. */
+export type ClassificationCountKey =
+  | "bug_fix_count"
+  | "feature_count"
+  | "refactor_count"
+  | "docs_count"
+  | "chore_count"
+  | "perf_count"
+  | "test_count"
+  | "style_count"
+
+/** Colors associated with each commit classification. */
+export const CLASSIFICATION_COLORS: { [key in Classification]: string } = {
+  "bug-fix": "red",
+  feature: "green",
+  refactor: "yellow",
+  docs: "blue",
+  chore: "gray",
+  perf: "magenta",
+  test: "cyan",
+  style: "white",
+}
+
+/**
+ * Mapping of classification keys to their display labels.
+ */
+export const CLASSIFICATION_KEYS: {
+  key: ClassificationCountKey
+  label: Classification
+}[] = [
+  { key: "bug_fix_count", label: "bug-fix" },
+  { key: "feature_count", label: "feature" },
+  { key: "refactor_count", label: "refactor" },
+  { key: "docs_count", label: "docs" },
+  { key: "chore_count", label: "chore" },
+  { key: "perf_count", label: "perf" },
+  { key: "test_count", label: "test" },
+  { key: "style_count", label: "style" },
+]
+
 /** Parsed git commit metadata and associated file changes. */
 export interface CommitInfo {
   /** Full SHA-1 commit hash. */
@@ -173,7 +213,7 @@ export interface CouplingPairGlobalRow {
 /** A recent enriched commit associated with a file or directory. */
 export interface RecentCommit {
   hash: string
-  classification: string
+  classification: Classification
   summary: string
   committed_at: string
 }

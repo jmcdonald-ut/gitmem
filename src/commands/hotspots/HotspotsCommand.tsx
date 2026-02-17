@@ -1,6 +1,7 @@
 import React from "react"
 import { Box, Text } from "ink"
 import type { FileStatsRow } from "@/types"
+import { CLASSIFICATION_COLORS, CLASSIFICATION_KEYS } from "@/types"
 
 /** Props for the HotspotsCommand component. */
 interface HotspotsCommandProps {
@@ -11,28 +12,6 @@ interface HotspotsCommandProps {
   /** Active path prefix filter, if any. */
   pathPrefix?: string
 }
-
-const TAG_COLORS: Record<string, string> = {
-  "bug-fix": "red",
-  feature: "green",
-  refactor: "yellow",
-  docs: "blue",
-  chore: "gray",
-  perf: "magenta",
-  test: "cyan",
-  style: "white",
-}
-
-const CLASSIFICATION_KEYS: { key: keyof FileStatsRow; label: string }[] = [
-  { key: "bug_fix_count", label: "bug-fix" },
-  { key: "feature_count", label: "feature" },
-  { key: "refactor_count", label: "refactor" },
-  { key: "docs_count", label: "docs" },
-  { key: "chore_count", label: "chore" },
-  { key: "perf_count", label: "perf" },
-  { key: "test_count", label: "test" },
-  { key: "style_count", label: "style" },
-]
 
 /**
  * Ink component that displays file hotspots with
@@ -101,7 +80,7 @@ export function HotspotsCommand({
                 )}
                 {tags.map((t) => (
                   <Text key={t.label}>
-                    <Text color={TAG_COLORS[t.label]}>
+                    <Text color={CLASSIFICATION_COLORS[t.label]}>
                       [{t.label}: {file[t.key] as number}]
                     </Text>{" "}
                   </Text>

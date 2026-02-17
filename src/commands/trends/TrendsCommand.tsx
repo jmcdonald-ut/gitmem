@@ -1,6 +1,7 @@
 import React from "react"
 import { Box, Text } from "ink"
 import type { TrendPeriod, TrendSummary } from "@/types"
+import { CLASSIFICATION_COLORS, CLASSIFICATION_KEYS } from "@/types"
 
 /** Props for the TrendsCommand component. */
 interface TrendsCommandProps {
@@ -15,28 +16,6 @@ interface TrendsCommandProps {
   /** Computed trend summary, or null if insufficient data. */
   trend: TrendSummary | null
 }
-
-const TAG_COLORS: Record<string, string> = {
-  "bug-fix": "red",
-  feature: "green",
-  refactor: "yellow",
-  docs: "blue",
-  chore: "gray",
-  perf: "magenta",
-  test: "cyan",
-  style: "white",
-}
-
-const CLASSIFICATION_KEYS: { key: keyof TrendPeriod; label: string }[] = [
-  { key: "bug_fix_count", label: "bug-fix" },
-  { key: "feature_count", label: "feature" },
-  { key: "refactor_count", label: "refactor" },
-  { key: "docs_count", label: "docs" },
-  { key: "chore_count", label: "chore" },
-  { key: "perf_count", label: "perf" },
-  { key: "test_count", label: "test" },
-  { key: "style_count", label: "style" },
-]
 
 const DIRECTION_DISPLAY: Record<string, { arrow: string; color: string }> = {
   increasing: { arrow: "\u2191", color: "green" },
@@ -124,7 +103,7 @@ export function TrendsCommand({
               {nonZero.length > 0 ? "   " : ""}
               {nonZero.map((c, i) => (
                 <Text key={c.label}>
-                  <Text color={TAG_COLORS[c.label]}>
+                  <Text color={CLASSIFICATION_COLORS[c.label]}>
                     {c.label}: {p[c.key] as number}
                   </Text>
                   {i < nonZero.length - 1 ? "  " : ""}

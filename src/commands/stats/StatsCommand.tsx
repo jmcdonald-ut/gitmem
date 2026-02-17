@@ -1,6 +1,7 @@
 import React from "react"
 import { Box, Text } from "ink"
 import type { FileStatsRow, FileContributorRow, RecentCommit } from "@/types"
+import { CLASSIFICATION_COLORS, CLASSIFICATION_KEYS } from "@/types"
 
 /** Props for the StatsCommand component. */
 interface StatsCommandProps {
@@ -19,28 +20,6 @@ interface StatsCommandProps {
   /** Top files by change count (directory only). */
   topFiles?: FileStatsRow[]
 }
-
-const TAG_COLORS: Record<string, string> = {
-  "bug-fix": "red",
-  feature: "green",
-  refactor: "yellow",
-  docs: "blue",
-  chore: "gray",
-  perf: "magenta",
-  test: "cyan",
-  style: "white",
-}
-
-const CLASSIFICATION_KEYS: { key: keyof FileStatsRow; label: string }[] = [
-  { key: "bug_fix_count", label: "bug-fix" },
-  { key: "feature_count", label: "feature" },
-  { key: "refactor_count", label: "refactor" },
-  { key: "docs_count", label: "docs" },
-  { key: "chore_count", label: "chore" },
-  { key: "perf_count", label: "perf" },
-  { key: "test_count", label: "test" },
-  { key: "style_count", label: "style" },
-]
 
 /**
  * Ink component that displays detailed stats for a file or directory,
@@ -125,7 +104,7 @@ export function StatsCommand({
             <Text>
               {nonZeroClassifications.map((c, i) => (
                 <Text key={c.label}>
-                  <Text color={TAG_COLORS[c.label]}>
+                  <Text color={CLASSIFICATION_COLORS[c.label]}>
                     {c.label}: {stats[c.key] as number}
                   </Text>
                   {i < nonZeroClassifications.length - 1 ? "  " : ""}
@@ -167,7 +146,9 @@ export function StatsCommand({
                 <Box key={c.hash} marginLeft={2}>
                   <Text>
                     <Text color="gray">{c.hash.slice(0, 7)}</Text>{" "}
-                    <Text color={TAG_COLORS[c.classification] ?? "white"}>
+                    <Text
+                      color={CLASSIFICATION_COLORS[c.classification] ?? "white"}
+                    >
                       [{c.classification}]
                     </Text>{" "}
                     {c.summary}
