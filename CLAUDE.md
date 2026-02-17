@@ -43,6 +43,7 @@ src/
     utils/
       command-context.ts   # Shared runCommand() setup (git, db, format, API key)
       test-utils.ts        # Test helpers (waitForFrame)
+      parse-int.ts         # Safe positive-integer parser for CLI options
   db/                  # SQLite repositories and schema
     database.ts        # Schema creation, WAL + FK setup
     commits.ts         # Commit CRUD (CommitRepository)
@@ -57,7 +58,6 @@ src/
     enricher.ts        # Orchestrates the 5-phase pipeline (EnricherService)
     measurer.ts        # Orchestrates complexity measurement for commit files
     complexity.ts      # Indentation-based complexity metrics
-    aggregator.ts      # Computes per-file stats, coupling, contributors
     checker.ts         # Orchestrates enrichment quality evaluation
     judge.ts           # Anthropic API for commit evaluation (JudgeService)
     judge-shared.ts    # Shared judge prompt, message builder, response parser
