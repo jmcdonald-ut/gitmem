@@ -55,6 +55,7 @@ describe("CheckerService", () => {
         return Promise.resolve(map)
       }),
       getTotalCommitCount: mock(() => Promise.resolve(0)),
+      getFileContentsBatch: mock(() => Promise.resolve(new Map())),
     }
 
     mockJudge = {

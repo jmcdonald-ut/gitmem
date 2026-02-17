@@ -118,8 +118,10 @@ describe("BatchLLMService", () => {
       },
     ])
 
-    const call = client.messages.batches.create.mock.calls[0]
-    const requests = (call[0] as { requests: { custom_id: string }[] }).requests
+    const call = client.messages.batches.create.mock.calls[0] as unknown as [
+      { requests: { custom_id: string }[] },
+    ]
+    const requests = call[0].requests
     expect(requests[0].custom_id).toBe("abc123")
     expect(requests[1].custom_id).toBe("def456")
   })

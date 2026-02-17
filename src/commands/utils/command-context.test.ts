@@ -11,7 +11,11 @@ import { Database } from "bun:sqlite"
 import { mkdtemp, rm, realpath } from "fs/promises"
 import { join } from "path"
 import { tmpdir } from "os"
-import { runCommand, getDbPath } from "@commands/utils/command-context"
+import {
+  runCommand,
+  getDbPath,
+  type CommandContext,
+} from "@commands/utils/command-context"
 import { createDatabase } from "@db/database"
 
 describe("getDbPath", () => {
@@ -124,7 +128,8 @@ describe("runCommand", () => {
     await runCommand({}, { needsApiKey: false, dbMustExist: false }, handler)
 
     expect(handler).toHaveBeenCalledTimes(1)
-    const ctx = handler.mock.calls[0][0]
+    const calls = handler.mock.calls as unknown as [[CommandContext]]
+    const ctx = calls[0][0]
     expect(ctx.db).toBeDefined()
     expect(ctx.dbPath).toContain("index.db")
   })
@@ -167,7 +172,8 @@ describe("runCommand", () => {
 
     await runCommand({ json: true }, {}, handler)
 
-    expect(handler.mock.calls[0][0].format).toBe("json")
+    const calls = handler.mock.calls as unknown as [[CommandContext]]
+    expect(calls[0][0].format).toBe("json")
   })
 
   test("skips git check when needsGit is false", async () => {
@@ -189,7 +195,8 @@ describe("runCommand", () => {
 
     expect(handler).toHaveBeenCalledTimes(1)
     // db should be undefined-ish (not initialized)
-    const ctx = handler.mock.calls[0][0]
+    const calls = handler.mock.calls as unknown as [[CommandContext]]
+    const ctx = calls[0][0]
     expect(ctx.dbPath).toBe("")
   })
 })

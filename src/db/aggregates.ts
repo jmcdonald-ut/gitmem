@@ -333,7 +333,7 @@ export class AggregateRepository {
    */
   getDirectoryStats(prefix: string): FileStatsRow | null {
     const row = this.db
-      .query<FileStatsRow, [string]>(
+      .query<FileStatsRow, [string, string]>(
         `SELECT
            ? as file_path,
            COALESCE(SUM(total_changes), 0) as total_changes,
