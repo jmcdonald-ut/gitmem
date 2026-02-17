@@ -2,6 +2,7 @@ import { Command } from "commander"
 import React from "react"
 import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
+import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { AggregateRepository } from "@db/aggregates"
 import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
@@ -45,7 +46,7 @@ export const hotspotsCommand = new Command("hotspots")
     "total",
   )
   .option("--path <prefix>", "Filter by directory prefix")
-  .option("-l, --limit <number>", "Max results", "10")
+  .option("-l, --limit <number>", "Max results", parsePositiveInt, 10)
   .action(async (opts, cmd) => {
     if (!VALID_SORT_FIELDS.includes(opts.sort)) {
       console.error(
@@ -58,7 +59,7 @@ export const hotspotsCommand = new Command("hotspots")
       const aggregates = new AggregateRepository(db)
 
       const hotspots = aggregates.getHotspots({
-        limit: parseInt(opts.limit, 10),
+        limit: opts.limit,
         sort: opts.sort,
         pathPrefix: opts.path,
       })

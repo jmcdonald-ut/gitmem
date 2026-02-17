@@ -2,6 +2,7 @@ import { Command } from "commander"
 import React from "react"
 import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
+import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { AggregateRepository } from "@db/aggregates"
 import { CommitRepository } from "@db/commits"
@@ -21,14 +22,14 @@ Examples:
 
 export const statsCommand = new Command("stats")
   .argument("<path>", "File or directory path to inspect")
-  .option("-l, --limit <number>", "Limit sub-lists", "5")
+  .option("-l, --limit <number>", "Limit sub-lists", parsePositiveInt, 5)
   .description("Show detailed change statistics for a file or directory")
   .addHelpText("after", HELP_TEXT)
   .action(async (path, opts, cmd) => {
     await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
       const aggregates = new AggregateRepository(db)
       const commits = new CommitRepository(db)
-      const limit = parseInt(opts.limit, 10)
+      const limit = opts.limit
 
       const fileStats = aggregates.getFileStats(path)
       if (fileStats) {

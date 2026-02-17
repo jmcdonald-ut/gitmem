@@ -3,6 +3,7 @@ import React from "react"
 import { render } from "ink"
 import { resolve, join } from "path"
 import { runCommand } from "@commands/utils/command-context"
+import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { CommitRepository } from "@db/commits"
 import { JudgeService } from "@services/judge"
@@ -33,6 +34,7 @@ export const checkCommand = new Command("check")
   .option(
     "-s, --sample <number>",
     "Number of random enriched commits to evaluate",
+    parsePositiveInt,
   )
   .option(
     "-m, --model <model>",
@@ -43,7 +45,8 @@ export const checkCommand = new Command("check")
   .option(
     "-c, --concurrency <number>",
     "Number of parallel judge requests",
-    "4",
+    parsePositiveInt,
+    4,
   )
   .action(async (hash, opts, cmd) => {
     if (!hash && !opts.sample) {
@@ -61,13 +64,13 @@ export const checkCommand = new Command("check")
           git,
           judge,
           commits,
-          parseInt(opts.concurrency, 10),
+          opts.concurrency,
         )
 
         if (format === "json") {
           if (opts.sample) {
             const { results, summary } = await checker.checkSample(
-              parseInt(opts.sample, 10),
+              opts.sample,
               () => {},
             )
             formatOutput("json", { results, summary })
@@ -92,7 +95,7 @@ export const checkCommand = new Command("check")
             const instance = render(
               <CheckCommand
                 checker={checker}
-                sampleSize={parseInt(opts.sample, 10)}
+                sampleSize={opts.sample}
                 outputPath={outputPath}
               />,
             )

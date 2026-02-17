@@ -2,6 +2,7 @@ import { Command } from "commander"
 import React from "react"
 import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
+import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { CommitRepository } from "@db/commits"
 import { SearchService } from "@db/search"
@@ -23,7 +24,7 @@ Examples:
 export const queryCommand = new Command("query")
   .alias("q")
   .argument("<query>", "Search query")
-  .option("-l, --limit <number>", "Max results", "20")
+  .option("-l, --limit <number>", "Max results", parsePositiveInt, 20)
   .option(
     "--classification <type>",
     "Filter by classification (bug-fix, feature, refactor, docs, chore, perf, test, style)",
@@ -43,11 +44,7 @@ export const queryCommand = new Command("query")
           : 0
 
       const classification: string | undefined = opts.classification
-      const results = search.search(
-        query,
-        parseInt(opts.limit, 10),
-        classification,
-      )
+      const results = search.search(query, opts.limit, classification)
 
       if (
         formatOutput(format, {

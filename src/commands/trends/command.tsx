@@ -2,6 +2,7 @@ import { Command } from "commander"
 import React from "react"
 import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
+import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import {
   AggregateRepository,
@@ -34,7 +35,12 @@ export const trendsCommand = new Command("trends")
     "Time window: weekly, monthly, quarterly",
     "monthly",
   )
-  .option("-l, --limit <number>", "Number of most recent periods", "12")
+  .option(
+    "-l, --limit <number>",
+    "Number of most recent periods",
+    parsePositiveInt,
+    12,
+  )
   .action(async (path, opts, cmd) => {
     if (!VALID_WINDOWS.includes(opts.window)) {
       console.error(
@@ -45,7 +51,7 @@ export const trendsCommand = new Command("trends")
 
     await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
       const aggregates = new AggregateRepository(db)
-      const limit = parseInt(opts.limit, 10)
+      const limit = opts.limit
       const windowSql = WINDOW_FORMATS[opts.window]
 
       const fileStats = aggregates.getFileStats(path)

@@ -2,6 +2,7 @@ import { Command } from "commander"
 import React from "react"
 import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
+import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { AggregateRepository } from "@db/aggregates"
 import { CouplingCommand } from "@commands/coupling/CouplingCommand"
@@ -25,11 +26,11 @@ export const couplingCommand = new Command("coupling")
   .argument("[path]", "File or directory path")
   .description("Show files that frequently change together")
   .addHelpText("after", HELP_TEXT)
-  .option("-l, --limit <number>", "Max results", "10")
+  .option("-l, --limit <number>", "Max results", parsePositiveInt, 10)
   .action(async (path, opts, cmd) => {
     await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
       const aggregates = new AggregateRepository(db)
-      const limit = parseInt(opts.limit, 10)
+      const limit = opts.limit
 
       if (!path) {
         const pairs = aggregates.getTopCoupledPairs(limit)

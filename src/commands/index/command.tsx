@@ -2,6 +2,7 @@ import { Command } from "commander"
 import React from "react"
 import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
+import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { CommitRepository } from "@db/commits"
 import { AggregateRepository } from "@db/aggregates"
@@ -38,7 +39,12 @@ export const indexCommand = new Command("index")
     "LLM model to use",
     "claude-haiku-4-5-20251001",
   )
-  .option("-c, --concurrency <number>", "Number of parallel LLM requests", "8")
+  .option(
+    "-c, --concurrency <number>",
+    "Number of parallel LLM requests",
+    parsePositiveInt,
+    8,
+  )
   .option(
     "-b, --batch",
     "Use Anthropic Message Batches API (50% cost reduction)",
@@ -61,7 +67,7 @@ export const indexCommand = new Command("index")
           search,
           measurer,
           opts.model,
-          parseInt(opts.concurrency, 10),
+          opts.concurrency,
         )
 
         db.prepare(
