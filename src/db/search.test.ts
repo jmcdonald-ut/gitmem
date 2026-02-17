@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import { createDatabase } from "@db/database"
 import { CommitRepository } from "@db/commits"
-import { SearchService } from "@db/search"
+import { SearchService, InvalidQueryError } from "@db/search"
 import { Database } from "bun:sqlite"
 
 describe("SearchService", () => {
@@ -262,5 +262,30 @@ describe("SearchService", () => {
     }
     const results = search.search("bug", 2, "bug-fix")
     expect(results).toHaveLength(2)
+  })
+
+  test("search throws InvalidQueryError on unbalanced parentheses", () => {
+    expect(() => search.search("auth(")).toThrow(InvalidQueryError)
+    expect(() => search.search("auth(")).toThrow(/Invalid search query/)
+  })
+
+  test("search throws InvalidQueryError on malformed column filter", () => {
+    expect(() => search.search("nosuchcol:value")).toThrow(InvalidQueryError)
+  })
+
+  test("search throws InvalidQueryError with classification filter too", () => {
+    expect(() => search.search("auth(", 20, "bug-fix")).toThrow(
+      InvalidQueryError,
+    )
+  })
+
+  test("InvalidQueryError contains the original query text", () => {
+    try {
+      search.search('test"')
+      throw new Error("should have thrown")
+    } catch (error) {
+      expect(error).toBeInstanceOf(InvalidQueryError)
+      expect((error as InvalidQueryError).message).toContain('test"')
+    }
   })
 })

@@ -5,7 +5,7 @@ import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { CommitRepository } from "@db/commits"
-import { SearchService } from "@db/search"
+import { SearchService, InvalidQueryError } from "@db/search"
 import { QueryCommand } from "@commands/query/QueryCommand"
 
 const HELP_TEXT = `
@@ -44,7 +44,19 @@ export const queryCommand = new Command("query")
           : 0
 
       const classification: string | undefined = opts.classification
-      const results = search.search(query, opts.limit, classification)
+      let results
+      try {
+        results = search.search(query, opts.limit, classification)
+      } catch (error) {
+        if (error instanceof InvalidQueryError) {
+          console.error(`Error: ${error.message}`)
+          console.error(
+            'Hint: use quotes for phrases, e.g. gitmem query "memory leak"',
+          )
+          process.exit(1)
+        }
+        throw error
+      }
 
       if (
         formatOutput(format, {

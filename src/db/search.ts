@@ -1,6 +1,18 @@
 import { Database } from "bun:sqlite"
 import type { SearchResult } from "@/types"
 
+/** Error thrown when a user-provided FTS5 query has invalid syntax. */
+export class InvalidQueryError extends Error {
+  constructor(query: string, cause: unknown) {
+    const message =
+      cause instanceof Error && cause.message.includes("fts5")
+        ? cause.message.replace(/^.*fts5: /, "")
+        : "invalid query syntax"
+    super(`Invalid search query "${query}": ${message}`)
+    this.name = "InvalidQueryError"
+  }
+}
+
 /** Manages the FTS5 full-text search index over enriched commits. */
 export class SearchService {
   private db: Database
@@ -42,27 +54,31 @@ export class SearchService {
     limit: number = 20,
     classification?: string,
   ): SearchResult[] {
-    if (classification) {
+    try {
+      if (classification) {
+        return this.db
+          .query<SearchResult, [string, string, number]>(
+            `SELECT hash, message, classification, summary, rank
+           FROM commits_fts
+           WHERE commits_fts MATCH ?
+             AND classification = ?
+           ORDER BY rank
+           LIMIT ?`,
+          )
+          .all(query, classification, limit)
+      }
       return this.db
-        .query<SearchResult, [string, string, number]>(
+        .query<SearchResult, [string, number]>(
           `SELECT hash, message, classification, summary, rank
          FROM commits_fts
          WHERE commits_fts MATCH ?
-           AND classification = ?
          ORDER BY rank
          LIMIT ?`,
         )
-        .all(query, classification, limit)
+        .all(query, limit)
+    } catch (error) {
+      throw new InvalidQueryError(query, error)
     }
-    return this.db
-      .query<SearchResult, [string, number]>(
-        `SELECT hash, message, classification, summary, rank
-       FROM commits_fts
-       WHERE commits_fts MATCH ?
-       ORDER BY rank
-       LIMIT ?`,
-      )
-      .all(query, limit)
   }
 
   /**
