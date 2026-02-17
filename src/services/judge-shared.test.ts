@@ -153,22 +153,24 @@ describe("parseEvalResponse", () => {
     expect(result.classificationVerdict.pass).toBe(true)
   })
 
-  test("defaults to pass on invalid JSON", () => {
+  test("defaults to fail on invalid JSON", () => {
     const result = parseEvalResponse("not json at all")
-    expect(result.classificationVerdict.pass).toBe(true)
-    expect(result.classificationVerdict.reasoning).toBe("No reasoning provided")
-    expect(result.accuracyVerdict.pass).toBe(true)
-    expect(result.completenessVerdict.pass).toBe(true)
+    expect(result.classificationVerdict.pass).toBe(false)
+    expect(result.classificationVerdict.reasoning).toBe(
+      "Malformed judge response",
+    )
+    expect(result.accuracyVerdict.pass).toBe(false)
+    expect(result.completenessVerdict.pass).toBe(false)
   })
 
-  test("defaults to pass on missing fields", () => {
+  test("defaults to fail on missing fields", () => {
     const result = parseEvalResponse("{}")
-    expect(result.classificationVerdict.pass).toBe(true)
-    expect(result.accuracyVerdict.pass).toBe(true)
-    expect(result.completenessVerdict.pass).toBe(true)
+    expect(result.classificationVerdict.pass).toBe(false)
+    expect(result.accuracyVerdict.pass).toBe(false)
+    expect(result.completenessVerdict.pass).toBe(false)
   })
 
-  test("defaults non-boolean pass to true", () => {
+  test("defaults non-boolean pass to false", () => {
     const result = parseEvalResponse(
       JSON.stringify({
         classification: { pass: "yes", reasoning: "OK" },
@@ -176,7 +178,7 @@ describe("parseEvalResponse", () => {
         completeness: { pass: true, reasoning: "OK" },
       }),
     )
-    expect(result.classificationVerdict.pass).toBe(true)
+    expect(result.classificationVerdict.pass).toBe(false)
   })
 
   test("defaults non-string reasoning", () => {

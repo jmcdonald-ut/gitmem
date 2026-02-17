@@ -73,7 +73,7 @@ Summary: ${summary}`
 
 /**
  * Parses the judge JSON response into evaluation verdicts,
- * stripping any markdown fences. Defaults to pass on malformed responses.
+ * stripping any markdown fences. Defaults to fail on malformed responses.
  * @param text - Raw text response from the judge.
  * @returns The three evaluation verdicts.
  */
@@ -82,9 +82,9 @@ export function parseEvalResponse(text: string): {
   accuracyVerdict: EvalVerdict
   completenessVerdict: EvalVerdict
 } {
-  const defaultVerdict: EvalVerdict = {
-    pass: true,
-    reasoning: "No reasoning provided",
+  const failVerdict: EvalVerdict = {
+    pass: false,
+    reasoning: "Malformed judge response",
   }
 
   try {
@@ -109,10 +109,11 @@ export function parseEvalResponse(text: string): {
       completenessVerdict: parseVerdict(parsed.completeness),
     }
   } catch {
+    console.warn("Warning: malformed judge response, defaulting to fail:", text)
     return {
-      classificationVerdict: { ...defaultVerdict },
-      accuracyVerdict: { ...defaultVerdict },
-      completenessVerdict: { ...defaultVerdict },
+      classificationVerdict: { ...failVerdict },
+      accuracyVerdict: { ...failVerdict },
+      completenessVerdict: { ...failVerdict },
     }
   }
 }
@@ -120,13 +121,23 @@ export function parseEvalResponse(text: string): {
 function parseVerdict(raw: unknown): EvalVerdict {
   if (raw && typeof raw === "object" && "pass" in raw) {
     const obj = raw as Record<string, unknown>
+    if (typeof obj.pass !== "boolean") {
+      console.warn(
+        "Warning: judge verdict has non-boolean pass value, defaulting to fail:",
+        obj.pass,
+      )
+    }
     return {
-      pass: typeof obj.pass === "boolean" ? obj.pass : true,
+      pass: typeof obj.pass === "boolean" ? obj.pass : false,
       reasoning:
         typeof obj.reasoning === "string"
           ? obj.reasoning
           : "No reasoning provided",
     }
   }
-  return { pass: true, reasoning: "No reasoning provided" }
+  console.warn(
+    "Warning: judge verdict missing or malformed, defaulting to fail:",
+    raw,
+  )
+  return { pass: false, reasoning: "Malformed judge response" }
 }

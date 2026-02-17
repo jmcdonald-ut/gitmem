@@ -66,7 +66,7 @@ describe("JudgeService", () => {
     expect(result.completenessVerdict.reasoning).toBe("Missing details")
   })
 
-  test("evaluateCommit defaults malformed response to pass", async () => {
+  test("evaluateCommit defaults malformed response to fail", async () => {
     const service = new JudgeService("test-key")
     setClient(
       service,
@@ -84,9 +84,9 @@ describe("JudgeService", () => {
       "Added feature",
     )
 
-    expect(result.classificationVerdict.pass).toBe(true)
-    expect(result.accuracyVerdict.pass).toBe(true)
-    expect(result.completenessVerdict.pass).toBe(true)
+    expect(result.classificationVerdict.pass).toBe(false)
+    expect(result.accuracyVerdict.pass).toBe(false)
+    expect(result.completenessVerdict.pass).toBe(false)
   })
 
   test("evaluateCommit propagates API errors", async () => {
