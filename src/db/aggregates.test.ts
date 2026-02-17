@@ -758,6 +758,190 @@ describe("AggregateRepository", () => {
     expect(periods).toHaveLength(0)
   })
 
+  test("rebuildFileStatsIncremental produces same results as full rebuild", () => {
+    seedData()
+    aggregates.rebuildFileStatsIncremental(["aaa", "bbb", "ccc"])
+
+    const main = aggregates.getFileStats("src/main.ts")
+    expect(main).not.toBeNull()
+    expect(main!.total_changes).toBe(3)
+    expect(main!.bug_fix_count).toBe(1)
+    expect(main!.feature_count).toBe(2)
+    expect(main!.first_seen).toBe("2024-01-01T00:00:00Z")
+    expect(main!.last_changed).toBe("2024-03-01T00:00:00Z")
+    expect(main!.total_additions).toBe(125)
+    expect(main!.total_deletions).toBe(8)
+
+    const utils = aggregates.getFileStats("src/utils.ts")
+    expect(utils!.total_changes).toBe(2)
+
+    const newFile = aggregates.getFileStats("src/new.ts")
+    expect(newFile!.total_changes).toBe(1)
+  })
+
+  test("rebuildFileStatsIncremental updates only affected files", () => {
+    seedData()
+    // Full rebuild first
+    aggregates.rebuildFileStats()
+
+    // Add a 4th commit touching only src/main.ts
+    commits.insertRawCommits([
+      {
+        hash: "ddd",
+        authorName: "Carol",
+        authorEmail: "carol@example.com",
+        committedAt: "2024-04-01T00:00:00Z",
+        message: "refactor main",
+        files: [
+          {
+            filePath: "src/main.ts",
+            changeType: "M",
+            additions: 10,
+            deletions: 2,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("ddd", "refactor", "Refactored main", "haiku-4.5")
+
+    // Incremental update with just the new hash
+    aggregates.rebuildFileStatsIncremental(["ddd"])
+
+    // main.ts should be updated
+    const main = aggregates.getFileStats("src/main.ts")
+    expect(main!.total_changes).toBe(4)
+    expect(main!.refactor_count).toBe(1)
+    expect(main!.last_changed).toBe("2024-04-01T00:00:00Z")
+    expect(main!.total_additions).toBe(135)
+
+    // utils.ts and new.ts should be unchanged from full rebuild
+    const utils = aggregates.getFileStats("src/utils.ts")
+    expect(utils!.total_changes).toBe(2)
+    const newFile = aggregates.getFileStats("src/new.ts")
+    expect(newFile!.total_changes).toBe(1)
+  })
+
+  test("rebuildFileContributorsIncremental produces same results as full rebuild", () => {
+    seedData()
+    aggregates.rebuildFileContributorsIncremental(["aaa", "bbb", "ccc"])
+
+    const contributors = aggregates.getTopContributors("src/main.ts")
+    expect(contributors).toHaveLength(2)
+    expect(contributors[0].author_name).toBe("Alice")
+    expect(contributors[0].commit_count).toBe(2)
+    expect(contributors[1].author_name).toBe("Bob")
+    expect(contributors[1].commit_count).toBe(1)
+  })
+
+  test("rebuildFileContributorsIncremental updates only affected files", () => {
+    seedData()
+    aggregates.rebuildFileContributors()
+
+    commits.insertRawCommits([
+      {
+        hash: "ddd",
+        authorName: "Carol",
+        authorEmail: "carol@example.com",
+        committedAt: "2024-04-01T00:00:00Z",
+        message: "carol change",
+        files: [
+          {
+            filePath: "src/main.ts",
+            changeType: "M",
+            additions: 5,
+            deletions: 1,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("ddd", "feature", "Carol's change", "haiku-4.5")
+
+    aggregates.rebuildFileContributorsIncremental(["ddd"])
+
+    const contributors = aggregates.getTopContributors("src/main.ts")
+    expect(contributors).toHaveLength(3)
+    const carol = contributors.find((c) => c.author_name === "Carol")
+    expect(carol).toBeDefined()
+    expect(carol!.commit_count).toBe(1)
+
+    // utils.ts contributors should be unchanged
+    const utilsContribs = aggregates.getTopContributors("src/utils.ts")
+    expect(utilsContribs).toHaveLength(2)
+  })
+
+  test("rebuildFileCouplingIncremental produces same results as full rebuild", () => {
+    seedData()
+    aggregates.rebuildFileCouplingIncremental(["aaa", "bbb", "ccc"])
+
+    const coupled = aggregates.getCoupledFiles("src/main.ts")
+    const mainUtils = coupled.find(
+      (c) =>
+        (c.file_a === "src/main.ts" && c.file_b === "src/utils.ts") ||
+        (c.file_a === "src/utils.ts" && c.file_b === "src/main.ts"),
+    )
+    expect(mainUtils).toBeDefined()
+    expect(mainUtils!.co_change_count).toBe(2)
+  })
+
+  test("rebuildFileCouplingIncremental updates affected pairs", () => {
+    seedData()
+    aggregates.rebuildFileCoupling()
+
+    // Add a 4th commit touching main.ts and new.ts (creating a new coupling pair)
+    commits.insertRawCommits([
+      {
+        hash: "ddd",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-04-01T00:00:00Z",
+        message: "cross change",
+        files: [
+          {
+            filePath: "src/main.ts",
+            changeType: "M",
+            additions: 5,
+            deletions: 1,
+          },
+          {
+            filePath: "src/new.ts",
+            changeType: "M",
+            additions: 3,
+            deletions: 0,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("ddd", "feature", "Cross change", "haiku-4.5")
+
+    aggregates.rebuildFileCouplingIncremental(["ddd"])
+
+    // main.ts + new.ts should now have 2 co-changes (ccc + ddd)
+    const coupled = aggregates.getCoupledFiles("src/main.ts")
+    const mainNew = coupled.find(
+      (c) =>
+        (c.file_a === "src/main.ts" && c.file_b === "src/new.ts") ||
+        (c.file_a === "src/new.ts" && c.file_b === "src/main.ts"),
+    )
+    expect(mainNew).toBeDefined()
+    expect(mainNew!.co_change_count).toBe(2)
+
+    // main.ts + utils.ts should still have 2 co-changes
+    const mainUtils = coupled.find(
+      (c) =>
+        (c.file_a === "src/main.ts" && c.file_b === "src/utils.ts") ||
+        (c.file_a === "src/utils.ts" && c.file_b === "src/main.ts"),
+    )
+    expect(mainUtils).toBeDefined()
+    expect(mainUtils!.co_change_count).toBe(2)
+  })
+
+  test("rebuildFileStatsIncremental with empty hashes is a no-op", () => {
+    seedData()
+    aggregates.rebuildFileStatsIncremental([])
+    // No file_stats should exist
+    expect(aggregates.getFileStats("src/main.ts")).toBeNull()
+  })
+
   test("getTrendsForFile includes additions and deletions", () => {
     seedData()
     const window = WINDOW_FORMATS["monthly"]

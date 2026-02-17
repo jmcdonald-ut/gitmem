@@ -178,6 +178,79 @@ describe("SearchService", () => {
     expect(results).toHaveLength(0)
   })
 
+  test("indexNewCommits adds only specified commits to FTS", () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "fix login bug",
+        files: [],
+      },
+      {
+        hash: "bbb",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-02T00:00:00Z",
+        message: "add dashboard feature",
+        files: [],
+      },
+      {
+        hash: "ccc",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-03T00:00:00Z",
+        message: "refactor utils",
+        files: [],
+      },
+    ])
+    commits.updateEnrichment("aaa", "bug-fix", "Fixed login bug", "haiku-4.5")
+    commits.updateEnrichment("bbb", "feature", "Added dashboard", "haiku-4.5")
+    commits.updateEnrichment("ccc", "refactor", "Refactored utils", "haiku-4.5")
+
+    // Only index aaa and bbb
+    search.indexNewCommits(["aaa", "bbb"])
+
+    const loginResults = search.search("login")
+    expect(loginResults).toHaveLength(1)
+    expect(loginResults[0].hash).toBe("aaa")
+
+    const dashResults = search.search("dashboard")
+    expect(dashResults).toHaveLength(1)
+    expect(dashResults[0].hash).toBe("bbb")
+
+    // ccc should not be in FTS
+    const utilsResults = search.search("refactor utils")
+    expect(utilsResults).toHaveLength(0)
+  })
+
+  test("indexNewCommits skips unenriched commits", () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "unenriched commit",
+        files: [],
+      },
+    ])
+
+    // Don't enrich it, then try to index
+    search.indexNewCommits(["aaa"])
+
+    const results = search.search("unenriched")
+    expect(results).toHaveLength(0)
+  })
+
+  test("indexNewCommits with empty hashes is a no-op", () => {
+    search.indexNewCommits([])
+    // Should not throw and FTS should be empty
+    const results = search.search("anything")
+    expect(results).toHaveLength(0)
+  })
+
   test("search with classification respects limit", () => {
     for (let i = 0; i < 5; i++) {
       search.indexCommit(

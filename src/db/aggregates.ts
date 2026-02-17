@@ -112,6 +112,28 @@ export class AggregateRepository {
     this.db = db
   }
 
+  /**
+   * Returns distinct file paths affected by the given commit hashes.
+   * Chunks by 500 hashes to stay within SQLite parameter limits.
+   */
+  private getAffectedFilePaths(commitHashes: string[]): string[] {
+    if (commitHashes.length === 0) return []
+    const paths = new Set<string>()
+    const CHUNK = 500
+    for (let i = 0; i < commitHashes.length; i += CHUNK) {
+      const chunk = commitHashes.slice(i, i + CHUNK)
+      const placeholders = chunk.map(() => "?").join(", ")
+      const rows = this.db
+        .query<
+          { file_path: string },
+          string[]
+        >(`SELECT DISTINCT file_path FROM commit_files WHERE commit_hash IN (${placeholders})`)
+        .all(...chunk)
+      for (const row of rows) paths.add(row.file_path)
+    }
+    return [...paths]
+  }
+
   /** Rebuilds the file_stats table by aggregating all enriched commit data per file. */
   rebuildFileStats(): void {
     this.db.run("DELETE FROM file_stats")
@@ -199,6 +221,137 @@ export class AggregateRepository {
       GROUP BY a.file_path, b.file_path
       HAVING co_change_count >= 2
     `)
+  }
+
+  /**
+   * Incrementally rebuilds file_stats for files affected by the given commit hashes.
+   * Uses INSERT OR REPLACE to upsert only affected rows.
+   */
+  rebuildFileStatsIncremental(commitHashes: string[]): void {
+    const paths = this.getAffectedFilePaths(commitHashes)
+    if (paths.length === 0) return
+    const CHUNK = 500
+    for (let i = 0; i < paths.length; i += CHUNK) {
+      const chunk = paths.slice(i, i + CHUNK)
+      const placeholders = chunk.map(() => "?").join(", ")
+      this.db
+        .query(
+          `INSERT OR REPLACE INTO file_stats (
+            file_path, total_changes,
+            bug_fix_count, feature_count, refactor_count, docs_count,
+            chore_count, perf_count, test_count, style_count,
+            first_seen, last_changed,
+            total_additions, total_deletions,
+            current_loc, current_complexity, avg_complexity, max_complexity
+          )
+          SELECT
+            cf.file_path,
+            COUNT(DISTINCT cf.commit_hash) as total_changes,
+            COUNT(DISTINCT CASE WHEN c.classification = 'bug-fix' THEN cf.commit_hash END) as bug_fix_count,
+            COUNT(DISTINCT CASE WHEN c.classification = 'feature' THEN cf.commit_hash END) as feature_count,
+            COUNT(DISTINCT CASE WHEN c.classification = 'refactor' THEN cf.commit_hash END) as refactor_count,
+            COUNT(DISTINCT CASE WHEN c.classification = 'docs' THEN cf.commit_hash END) as docs_count,
+            COUNT(DISTINCT CASE WHEN c.classification = 'chore' THEN cf.commit_hash END) as chore_count,
+            COUNT(DISTINCT CASE WHEN c.classification = 'perf' THEN cf.commit_hash END) as perf_count,
+            COUNT(DISTINCT CASE WHEN c.classification = 'test' THEN cf.commit_hash END) as test_count,
+            COUNT(DISTINCT CASE WHEN c.classification = 'style' THEN cf.commit_hash END) as style_count,
+            MIN(c.committed_at) as first_seen,
+            MAX(c.committed_at) as last_changed,
+            COALESCE(SUM(cf.additions), 0) as total_additions,
+            COALESCE(SUM(cf.deletions), 0) as total_deletions,
+            (SELECT cf2.lines_of_code FROM commit_files cf2
+             JOIN commits c2 ON c2.hash = cf2.commit_hash
+             WHERE cf2.file_path = cf.file_path AND cf2.lines_of_code > 0
+             ORDER BY c2.committed_at DESC LIMIT 1) as current_loc,
+            (SELECT cf2.indent_complexity FROM commit_files cf2
+             JOIN commits c2 ON c2.hash = cf2.commit_hash
+             WHERE cf2.file_path = cf.file_path AND cf2.indent_complexity > 0
+             ORDER BY c2.committed_at DESC LIMIT 1) as current_complexity,
+            AVG(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as avg_complexity,
+            MAX(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as max_complexity
+          FROM commit_files cf
+          JOIN commits c ON c.hash = cf.commit_hash
+          WHERE c.enriched_at IS NOT NULL AND cf.file_path IN (${placeholders})
+          GROUP BY cf.file_path`,
+        )
+        .run(...chunk)
+    }
+  }
+
+  /**
+   * Incrementally rebuilds file_contributors for files affected by the given commit hashes.
+   * Uses INSERT OR REPLACE to upsert only affected rows.
+   */
+  rebuildFileContributorsIncremental(commitHashes: string[]): void {
+    const paths = this.getAffectedFilePaths(commitHashes)
+    if (paths.length === 0) return
+    const CHUNK = 500
+    for (let i = 0; i < paths.length; i += CHUNK) {
+      const chunk = paths.slice(i, i + CHUNK)
+      const placeholders = chunk.map(() => "?").join(", ")
+      this.db
+        .query(
+          `INSERT OR REPLACE INTO file_contributors (file_path, author_name, author_email, commit_count)
+          SELECT
+            cf.file_path,
+            c.author_name,
+            c.author_email,
+            COUNT(DISTINCT cf.commit_hash) as commit_count
+          FROM commit_files cf
+          JOIN commits c ON c.hash = cf.commit_hash
+          WHERE cf.file_path IN (${placeholders})
+          GROUP BY cf.file_path, c.author_email`,
+        )
+        .run(...chunk)
+    }
+  }
+
+  /**
+   * Incrementally rebuilds file_coupling for files affected by the given commit hashes.
+   * Falls back to full rebuild if more than 5000 files are affected.
+   */
+  rebuildFileCouplingIncremental(commitHashes: string[]): void {
+    const paths = this.getAffectedFilePaths(commitHashes)
+    if (paths.length === 0) return
+    if (paths.length > 5000) {
+      this.rebuildFileCoupling()
+      return
+    }
+    const CHUNK = 500
+    // Delete existing coupling rows involving affected files
+    for (let i = 0; i < paths.length; i += CHUNK) {
+      const chunk = paths.slice(i, i + CHUNK)
+      const placeholders = chunk.map(() => "?").join(", ")
+      this.db
+        .query(
+          `DELETE FROM file_coupling WHERE file_a IN (${placeholders}) OR file_b IN (${placeholders})`,
+        )
+        .run(...chunk, ...chunk)
+    }
+    // Re-insert coupling for pairs where at least one file is affected
+    for (let i = 0; i < paths.length; i += CHUNK) {
+      const chunk = paths.slice(i, i + CHUNK)
+      const placeholders = chunk.map(() => "?").join(", ")
+      this.db
+        .query(
+          `INSERT OR REPLACE INTO file_coupling (file_a, file_b, co_change_count)
+          SELECT
+            a.file_path as file_a,
+            b.file_path as file_b,
+            COUNT(DISTINCT a.commit_hash) as co_change_count
+          FROM commit_files a
+          JOIN commit_files b ON a.commit_hash = b.commit_hash AND a.file_path < b.file_path
+          WHERE (a.file_path IN (${placeholders}) OR b.file_path IN (${placeholders}))
+            AND a.commit_hash NOT IN (
+              SELECT commit_hash FROM commit_files
+              GROUP BY commit_hash
+              HAVING COUNT(*) > ${AggregateRepository.MAX_COUPLING_FILES_PER_COMMIT}
+            )
+          GROUP BY a.file_path, b.file_path
+          HAVING co_change_count >= 2`,
+        )
+        .run(...chunk, ...chunk)
+    }
   }
 
   /**

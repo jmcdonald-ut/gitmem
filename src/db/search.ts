@@ -65,6 +65,28 @@ export class SearchService {
       .all(query, limit)
   }
 
+  /**
+   * Indexes only the specified commits into the FTS index.
+   * Assumes these commits are newly enriched and not yet in FTS.
+   * @param hashes - Commit hashes to add to the index.
+   */
+  indexNewCommits(hashes: string[]): void {
+    if (hashes.length === 0) return
+    const CHUNK = 500
+    for (let i = 0; i < hashes.length; i += CHUNK) {
+      const chunk = hashes.slice(i, i + CHUNK)
+      const placeholders = chunk.map(() => "?").join(", ")
+      this.db
+        .query(
+          `INSERT INTO commits_fts (hash, message, classification, summary)
+          SELECT hash, message, classification, summary
+          FROM commits
+          WHERE hash IN (${placeholders}) AND enriched_at IS NOT NULL`,
+        )
+        .run(...chunk)
+    }
+  }
+
   /** Drops and rebuilds the entire FTS index from all enriched commits. */
   rebuildIndex(): void {
     this.db.run("DELETE FROM commits_fts")

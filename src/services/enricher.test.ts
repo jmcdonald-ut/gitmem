@@ -240,11 +240,14 @@ describe("EnricherService", () => {
     expect(result.enrichedThisRun).toBe(2)
   })
 
-  test("run rebuilds aggregates and search index", async () => {
-    const rebuildStatsSpy = spyOn(aggregates, "rebuildFileStats")
-    const rebuildContribSpy = spyOn(aggregates, "rebuildFileContributors")
-    const rebuildCouplingSpy = spyOn(aggregates, "rebuildFileCoupling")
-    const rebuildSearchSpy = spyOn(search, "rebuildIndex")
+  test("run uses incremental aggregates and search index", async () => {
+    const incrStatsSpy = spyOn(aggregates, "rebuildFileStatsIncremental")
+    const incrContribSpy = spyOn(
+      aggregates,
+      "rebuildFileContributorsIncremental",
+    )
+    const incrCouplingSpy = spyOn(aggregates, "rebuildFileCouplingIncremental")
+    const incrSearchSpy = spyOn(search, "indexNewCommits")
 
     const enricher = new EnricherService(
       mockGit,
@@ -255,10 +258,10 @@ describe("EnricherService", () => {
     )
     await enricher.run(() => {})
 
-    expect(rebuildStatsSpy).toHaveBeenCalledTimes(1)
-    expect(rebuildContribSpy).toHaveBeenCalledTimes(1)
-    expect(rebuildCouplingSpy).toHaveBeenCalledTimes(1)
-    expect(rebuildSearchSpy).toHaveBeenCalledTimes(1)
+    expect(incrStatsSpy).toHaveBeenCalledTimes(1)
+    expect(incrContribSpy).toHaveBeenCalledTimes(1)
+    expect(incrCouplingSpy).toHaveBeenCalledTimes(1)
+    expect(incrSearchSpy).toHaveBeenCalledTimes(1)
   })
 
   test("run with no new commits skips aggregation and indexing", async () => {
@@ -267,8 +270,8 @@ describe("EnricherService", () => {
       getCommitHashes: mock(() => Promise.resolve([])),
     }
 
-    const rebuildStatsSpy = spyOn(aggregates, "rebuildFileStats")
-    const rebuildSearchSpy = spyOn(search, "rebuildIndex")
+    const incrStatsSpy = spyOn(aggregates, "rebuildFileStatsIncremental")
+    const incrSearchSpy = spyOn(search, "indexNewCommits")
 
     const enricher = new EnricherService(
       emptyGit,
@@ -282,8 +285,8 @@ describe("EnricherService", () => {
     expect(result.discoveredThisRun).toBe(0)
     expect(result.enrichedThisRun).toBe(0)
     expect(result.totalCommits).toBe(0)
-    expect(rebuildStatsSpy).not.toHaveBeenCalled()
-    expect(rebuildSearchSpy).not.toHaveBeenCalled()
+    expect(incrStatsSpy).not.toHaveBeenCalled()
+    expect(incrSearchSpy).not.toHaveBeenCalled()
   })
 
   test("run uses getDiffBatch for pre-fetching diffs", async () => {

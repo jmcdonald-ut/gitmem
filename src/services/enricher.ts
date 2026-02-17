@@ -88,6 +88,7 @@ export class EnricherService {
     const unenriched = this.commits.getUnenrichedCommits()
     const total = unenriched.length
     let enrichedThisRun = 0
+    const enrichedHashes: string[] = []
 
     if (total > 0) {
       // Pre-fetch all diffs and file lists in one batch call
@@ -144,6 +145,7 @@ export class EnricherService {
               this.model,
             )
             enrichedThisRun++
+            enrichedHashes.push(commit.hash)
           } else {
             console.error(`Failed to enrich commit: ${outcome.reason}`)
           }
@@ -151,16 +153,17 @@ export class EnricherService {
       }
     }
 
-    if (enrichedThisRun > 0 || newHashes.length > 0) {
-      // Phase 3: Rebuild aggregates
+    const allAffectedHashes = [...new Set([...enrichedHashes, ...newHashes])]
+    if (allAffectedHashes.length > 0) {
+      // Phase 3: Rebuild aggregates (incremental)
       onProgress({ phase: "aggregating", current: 0, total: 0 })
-      this.aggregates.rebuildFileStats()
-      this.aggregates.rebuildFileContributors()
-      this.aggregates.rebuildFileCoupling()
+      this.aggregates.rebuildFileStatsIncremental(allAffectedHashes)
+      this.aggregates.rebuildFileContributorsIncremental(allAffectedHashes)
+      this.aggregates.rebuildFileCouplingIncremental(allAffectedHashes)
 
-      // Phase 4: Rebuild FTS index
+      // Phase 4: Rebuild FTS index (incremental)
       onProgress({ phase: "indexing", current: 0, total: 0 })
-      this.search.rebuildIndex()
+      this.search.indexNewCommits(enrichedHashes)
     }
 
     const totalEnriched = this.commits.getEnrichedCommitCount()
@@ -215,6 +218,7 @@ export class EnricherService {
     }
 
     let enrichedThisRun = 0
+    const enrichedHashes: string[] = []
 
     // Check for pending batch
     const pendingBatch = batchJobs.getPendingBatch()
@@ -260,6 +264,7 @@ export class EnricherService {
           this.commits.updateEnrichmentBatch(updates, this.model)
         }
         enrichedThisRun = updates.length
+        enrichedHashes.push(...updates.map((u) => u.hash))
       } else {
         // Still in progress — report and return
         const totalEnriched = this.commits.getEnrichedCommitCount()
@@ -305,6 +310,7 @@ export class EnricherService {
               this.model,
             )
             enrichedThisRun++
+            enrichedHashes.push(commit.hash)
           } else {
             needsLLM.push(commit)
           }
@@ -358,16 +364,17 @@ export class EnricherService {
       }
     }
 
-    if (enrichedThisRun > 0 || newHashes.length > 0) {
-      // Phase 3: Rebuild aggregates
+    const allAffectedHashes = [...new Set([...enrichedHashes, ...newHashes])]
+    if (allAffectedHashes.length > 0) {
+      // Phase 3: Rebuild aggregates (incremental)
       onProgress({ phase: "aggregating", current: 0, total: 0 })
-      this.aggregates.rebuildFileStats()
-      this.aggregates.rebuildFileContributors()
-      this.aggregates.rebuildFileCoupling()
+      this.aggregates.rebuildFileStatsIncremental(allAffectedHashes)
+      this.aggregates.rebuildFileContributorsIncremental(allAffectedHashes)
+      this.aggregates.rebuildFileCouplingIncremental(allAffectedHashes)
 
-      // Phase 4: Rebuild FTS index
+      // Phase 4: Rebuild FTS index (incremental)
       onProgress({ phase: "indexing", current: 0, total: 0 })
-      this.search.rebuildIndex()
+      this.search.indexNewCommits(enrichedHashes)
     }
 
     const totalEnriched = this.commits.getEnrichedCommitCount()
