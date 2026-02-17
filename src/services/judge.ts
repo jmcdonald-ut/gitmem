@@ -10,26 +10,18 @@ import {
 export class JudgeService implements IJudgeService {
   private client: Anthropic
   private model: string
-  private retryDelayMs: number
 
   /**
    * @param apiKey - Anthropic API key.
    * @param model - Model identifier to use for evaluation requests.
-   * @param retryDelayMs - Base delay in ms for exponential backoff (default 1000).
    */
-  constructor(
-    apiKey: string,
-    model: string = "claude-sonnet-4-5-20250929",
-    retryDelayMs: number = 1000,
-  ) {
+  constructor(apiKey: string, model: string = "claude-sonnet-4-5-20250929") {
     this.client = new Anthropic({ apiKey })
     this.model = model
-    this.retryDelayMs = retryDelayMs
   }
 
   /**
    * Sends a commit's metadata, diff, and enrichment to the judge for evaluation.
-   * Retries up to 3 times with exponential backoff on failure.
    * @param commit - The commit metadata.
    * @param diff - The unified diff content.
    * @param classification - The original enrichment classification.
@@ -53,28 +45,15 @@ export class JudgeService implements IJudgeService {
       summary,
     )
 
-    let lastError: Error | null = null
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const response = await this.client.messages.create({
-          model: this.model,
-          max_tokens: 1024,
-          system: JUDGE_SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userMessage }],
-        })
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: 1024,
+      system: JUDGE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userMessage }],
+    })
 
-        const text =
-          response.content[0].type === "text" ? response.content[0].text : ""
-        return parseEvalResponse(text)
-      } catch (error) {
-        lastError = error as Error
-        if (attempt < 2) {
-          await new Promise((r) =>
-            setTimeout(r, this.retryDelayMs * Math.pow(2, attempt)),
-          )
-        }
-      }
-    }
-    throw lastError!
+    const text =
+      response.content[0].type === "text" ? response.content[0].text : ""
+    return parseEvalResponse(text)
   }
 }

@@ -28,7 +28,7 @@ const commit = {
 
 describe("JudgeService", () => {
   test("evaluateCommit parses valid response", async () => {
-    const service = new JudgeService("test-key", undefined, 0)
+    const service = new JudgeService("test-key")
     setClient(
       service,
       mockClient(() =>
@@ -67,7 +67,7 @@ describe("JudgeService", () => {
   })
 
   test("evaluateCommit defaults malformed response to pass", async () => {
-    const service = new JudgeService("test-key", undefined, 0)
+    const service = new JudgeService("test-key")
     setClient(
       service,
       mockClient(() =>
@@ -89,55 +89,20 @@ describe("JudgeService", () => {
     expect(result.completenessVerdict.pass).toBe(true)
   })
 
-  test("evaluateCommit retries on failure", async () => {
-    const service = new JudgeService("test-key", undefined, 0)
-    let callCount = 0
+  test("evaluateCommit propagates API errors", async () => {
+    const service = new JudgeService("test-key")
     setClient(
       service,
-      mockClient(() => {
-        callCount++
-        if (callCount < 3) {
-          return Promise.reject(new Error("API error"))
-        }
-        return Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                classification: { pass: true, reasoning: "OK" },
-                accuracy: { pass: true, reasoning: "OK" },
-                completeness: { pass: true, reasoning: "OK" },
-              }),
-            },
-          ],
-        })
-      }),
-    )
-
-    const result = await service.evaluateCommit(
-      commit,
-      "diff",
-      "feature",
-      "Added feature",
-    )
-    expect(callCount).toBe(3)
-    expect(result.classificationVerdict.pass).toBe(true)
-  })
-
-  test("evaluateCommit throws after max retries", async () => {
-    const service = new JudgeService("test-key", undefined, 0)
-    setClient(
-      service,
-      mockClient(() => Promise.reject(new Error("Persistent failure"))),
+      mockClient(() => Promise.reject(new Error("API error"))),
     )
 
     await expect(
       service.evaluateCommit(commit, "diff", "feature", "summary"),
-    ).rejects.toThrow("Persistent failure")
+    ).rejects.toThrow("API error")
   })
 
   test("evaluateCommit strips markdown fences from response", async () => {
-    const service = new JudgeService("test-key", undefined, 0)
+    const service = new JudgeService("test-key")
     setClient(
       service,
       mockClient(() =>

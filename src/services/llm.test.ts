@@ -25,7 +25,7 @@ const commit = {
 
 describe("LLMService", () => {
   test("enrichCommit parses valid response", async () => {
-    const service = new LLMService("test-key", undefined, 0)
+    const service = new LLMService("test-key")
     setClient(
       service,
       mockClient(() =>
@@ -47,7 +47,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit defaults unknown classification to chore", async () => {
-    const service = new LLMService("test-key", undefined, 0)
+    const service = new LLMService("test-key")
     setClient(
       service,
       mockClient(() =>
@@ -66,46 +66,18 @@ describe("LLMService", () => {
     expect(result.classification).toBe("chore")
   })
 
-  test("enrichCommit retries on failure", async () => {
-    const service = new LLMService("test-key", undefined, 0)
-    let callCount = 0
+  test("enrichCommit propagates API errors", async () => {
+    const service = new LLMService("test-key")
     setClient(
       service,
-      mockClient(() => {
-        callCount++
-        if (callCount < 3) {
-          return Promise.reject(new Error("API error"))
-        }
-        return Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: '{"classification": "feature", "summary": "Added feature"}',
-            },
-          ],
-        })
-      }),
+      mockClient(() => Promise.reject(new Error("API error"))),
     )
 
-    const result = await service.enrichCommit(commit, "")
-    expect(callCount).toBe(3)
-    expect(result.classification).toBe("feature")
-  })
-
-  test("enrichCommit throws after max retries", async () => {
-    const service = new LLMService("test-key", undefined, 0)
-    setClient(
-      service,
-      mockClient(() => Promise.reject(new Error("Persistent failure"))),
-    )
-
-    await expect(service.enrichCommit(commit, "")).rejects.toThrow(
-      "Persistent failure",
-    )
+    await expect(service.enrichCommit(commit, "")).rejects.toThrow("API error")
   })
 
   test("enrichCommit strips markdown fences from response", async () => {
-    const service = new LLMService("test-key", undefined, 0)
+    const service = new LLMService("test-key")
     setClient(
       service,
       mockClient(() =>
@@ -126,7 +98,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit strips fences without language tag", async () => {
-    const service = new LLMService("test-key", undefined, 0)
+    const service = new LLMService("test-key")
     setClient(
       service,
       mockClient(() =>
@@ -147,7 +119,7 @@ describe("LLMService", () => {
   })
 
   test("enrichCommit handles missing summary", async () => {
-    const service = new LLMService("test-key", undefined, 0)
+    const service = new LLMService("test-key")
     setClient(
       service,
       mockClient(() =>
