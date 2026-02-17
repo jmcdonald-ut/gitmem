@@ -19,8 +19,9 @@ gitmem is an AI-powered git history index. It enriches commits with Claude API c
 ## Commands
 
 ```bash
-bun test              # Run tests (100% coverage thresholds enforced)
+bun test              # Run tests (90% coverage threshold enforced)
 bun run lint          # ESLint
+bun run typecheck     # TypeScript type checking (tsc --noEmit)
 bun run format        # Prettier
 bun run format:check  # Prettier check
 bun run build         # Compile to standalone binary at build/gitmem
@@ -32,6 +33,8 @@ bun run build         # Compile to standalone binary at build/gitmem
 src/
   cli.tsx              # Entry point — registers commands via addCommand()
   types.ts             # All shared types, interfaces, and constants
+  schema.ts            # Database schema documentation
+  output.ts            # CLI output format resolution
   commands/            # One directory per CLI command
     <name>/
       command.tsx      # Commander definition, options, help text, action handler
@@ -51,19 +54,25 @@ src/
     llm.ts             # Anthropic API for single commit enrichment (LLMService)
     llm-shared.ts      # Shared prompt, message builder, response parser
     batch-llm.ts       # Anthropic Message Batches API (BatchLLMService)
-    enricher.ts        # Orchestrates the 4-phase pipeline (EnricherService)
+    enricher.ts        # Orchestrates the 5-phase pipeline (EnricherService)
+    measurer.ts        # Orchestrates complexity measurement for commit files
+    complexity.ts      # Indentation-based complexity metrics
     aggregator.ts      # Computes per-file stats, coupling, contributors
+    checker.ts         # Orchestrates enrichment quality evaluation
+    judge.ts           # Anthropic API for commit evaluation (JudgeService)
+    judge-shared.ts    # Shared judge prompt, message builder, response parser
 ```
 
 ## Architecture
 
-The indexing pipeline has 4 phases:
+The indexing pipeline has 5 phases:
 1. **Discover** - Extract commit metadata from git (bulk via `getCommitInfoBatch`)
-2. **Enrich** - Classify each commit via Claude API (parallel sliding window or batch API)
-3. **Aggregate** - Compute per-file analytics: hotspots, contributors, file coupling
-4. **Index** - Rebuild SQLite FTS5 full-text search index
+2. **Measure** - Compute indentation-based complexity metrics for changed files
+3. **Enrich** - Classify each commit via Claude API (parallel sliding window or batch API)
+4. **Aggregate** - Compute per-file analytics: hotspots, contributors, file coupling
+5. **Index** - Rebuild SQLite FTS5 full-text search index
 
-Data is stored in `.gitmem/index.db`. Services use dependency injection via interfaces (`IGitService`, `ILLMService`).
+Data is stored in `.gitmem/index.db`. Services use dependency injection via interfaces (`IGitService`, `ILLMService`, `IJudgeService`).
 
 ## Code conventions
 
@@ -71,7 +80,7 @@ Data is stored in `.gitmem/index.db`. Services use dependency injection via inte
 - Path aliases: `@/` = `src/`, `@db/` = `src/db/`, `@services/` = `src/services/`, `@commands/` = `src/commands/`
 - Tests are co-located: `foo.ts` has `foo.test.ts` in the same directory
 - Tests use in-memory SQLite (`:memory:`) and factory functions like `makeCommit()`
-- 100% test coverage thresholds (line, function, statement) enforced via `bunfig.toml`
+- 90% test coverage threshold enforced via `bunfig.toml`
 - Classes for repositories and services, interfaces prefixed with `I` for dependency injection
 - Commit classifications: `bug-fix`, `feature`, `refactor`, `docs`, `chore`, `perf`, `test`, `style`
 

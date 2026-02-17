@@ -56,10 +56,11 @@ gitmem index
 ## Development
 
 ```bash
-bun test         # Run tests
-bun run lint     # ESLint
-bun run format   # Prettier
-bun run build    # Compile to standalone binary at build/gitmem
+bun test             # Run tests
+bun run lint         # ESLint
+bun run typecheck    # TypeScript type checking
+bun run format       # Prettier
+bun run build        # Compile to standalone binary at build/gitmem
 ```
 
 ## Usage
