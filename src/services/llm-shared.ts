@@ -28,6 +28,12 @@ Edge case rules:
 - CHANGELOG and release note updates are "chore", not "docs". These are release process artifacts, not user documentation.
 - Adding or configuring dev tooling (linters, git hooks, formatters, CI pipelines) is "chore", not "feature".
 - Moving code for efficiency (e.g. hoisting an assignment out of a loop) is "perf", not "style".
+- Removing deprecated code or making breaking API changes is "chore", not "refactor". True refactors preserve external behavior.
+- Adding locale/translation files for an existing feature is "chore", not "feature". The feature already exists; adding a translation is maintenance.
+- Updating existing locale/translation text is "style", not "docs". Locale files are runtime UI strings, not documentation.
+- Regenerating test fixtures or snapshots without changing test logic is "chore", not "test".
+- Fixing broken links, broken builds, or broken configs is "bug-fix" regardless of which file type contains the fix.
+- Classify by the purpose of the change, not the file type. A config file change that fixes a broken doc site is "bug-fix", not "docs" or "chore".
 
 Summary guidelines:
 - Base your summary on the actual diff content, not just the commit message.
@@ -44,9 +50,16 @@ Summary guidelines:
  * @returns The formatted user message string.
  */
 export function buildUserMessage(commit: CommitInfo, diff: string): string {
+  const fileList = commit.files
+    .map(
+      (f) => `${f.changeType} ${f.filePath} (+${f.additions} -${f.deletions})`,
+    )
+    .join("\n  ")
+
   return `Commit message: ${commit.message}
 
-Files changed: ${commit.files.map((f) => f.filePath).join(", ")}
+Files changed:
+  ${fileList}
 
 Diff:
 ${diff}`

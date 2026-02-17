@@ -44,9 +44,10 @@ describe("buildUserMessage", () => {
     expect(msg).toContain("Commit message: fix auth bug")
   })
 
-  test("includes file paths", () => {
+  test("includes file paths with change types and line counts", () => {
     const msg = buildUserMessage(commit, "diff here")
-    expect(msg).toContain("src/auth.ts, src/utils.ts")
+    expect(msg).toContain("M src/auth.ts (+5 -2)")
+    expect(msg).toContain("M src/utils.ts (+1 -0)")
   })
 
   test("includes diff content", () => {
@@ -57,7 +58,7 @@ describe("buildUserMessage", () => {
   test("handles empty files list", () => {
     const emptyCommit: CommitInfo = { ...commit, files: [] }
     const msg = buildUserMessage(emptyCommit, "diff")
-    expect(msg).toContain("Files changed: ")
+    expect(msg).toContain("Files changed:")
   })
 })
 
