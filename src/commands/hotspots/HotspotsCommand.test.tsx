@@ -19,6 +19,10 @@ const makeRow = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({
   last_changed: "2024-06-01T00:00:00Z",
   total_additions: 500,
   total_deletions: 100,
+  current_loc: null,
+  current_complexity: null,
+  avg_complexity: null,
+  max_complexity: null,
   ...overrides,
 })
 
