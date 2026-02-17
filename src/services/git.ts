@@ -58,6 +58,45 @@ function safeSlice(str: string, end: number): string {
   return str.slice(0, end)
 }
 
+/**
+ * Parses `git diff-tree --name-status` output into a map of filePath → changeType.
+ * Each line has the format: `<status>\t<filePath>`
+ */
+function parseNameStatus(text: string): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const line of text.split("\n")) {
+    if (!line || !line.includes("\t")) continue
+    const tab = line.indexOf("\t")
+    map.set(line.slice(tab + 1), line.slice(0, tab))
+  }
+  return map
+}
+
+/**
+ * Parses `git diff-tree --stdin --name-status` output into a nested map
+ * of commitHash → filePath → changeType. Commit hashes appear on their own
+ * line as 40-char hex strings.
+ */
+function parseNameStatusByCommit(
+  text: string,
+): Map<string, Map<string, string>> {
+  const result = new Map<string, Map<string, string>>()
+  let currentHash: string | null = null
+  for (const line of text.split("\n")) {
+    if (line.length === 0) continue
+    if (/^[0-9a-f]{40}$/.test(line)) {
+      currentHash = line
+      if (!result.has(line)) result.set(line, new Map())
+      continue
+    }
+    if (currentHash && line.includes("\t")) {
+      const tab = line.indexOf("\t")
+      result.get(currentHash)!.set(line.slice(tab + 1), line.slice(0, tab))
+    }
+  }
+  return result
+}
+
 /** Interacts with a local git repository via Bun shell commands. */
 export class GitService implements IGitService {
   private cwd: string
@@ -158,10 +197,14 @@ export class GitService implements IGitService {
    * @param hash - The full SHA-1 commit hash.
    */
   private async getCommitFiles(hash: string): Promise<CommitFile[]> {
-    const result =
-      await Bun.$`git -C ${this.cwd} diff-tree --root --no-commit-id -r --numstat --diff-filter=ACDMRT ${hash}`.quiet()
-    const text = result.text().trim()
+    const [numstatResult, statusResult] = await Promise.all([
+      Bun.$`git -C ${this.cwd} diff-tree --root --no-commit-id -r --numstat --diff-filter=ACDMRT ${hash}`.quiet(),
+      Bun.$`git -C ${this.cwd} diff-tree --root --no-commit-id -r --name-status --diff-filter=ACDMRT ${hash}`.quiet(),
+    ])
+    const text = numstatResult.text().trim()
     if (!text) return []
+
+    const changeTypes = parseNameStatus(statusResult.text())
 
     return text
       .split("\n")
@@ -174,7 +217,7 @@ export class GitService implements IGitService {
 
         return {
           filePath,
-          changeType: "M",
+          changeType: changeTypes.get(filePath) ?? "M",
           additions,
           deletions,
         }
@@ -233,12 +276,17 @@ export class GitService implements IGitService {
       }
     }
 
-    // Fetch file stats via stdin to avoid ARG_MAX
+    // Fetch file stats and change types via stdin to avoid ARG_MAX
     const stdinHashes = hashes.join("\n")
-    const numstatResult =
-      await Bun.$`echo ${stdinHashes} | git -C ${this.cwd} diff-tree --stdin --root -r --numstat`.quiet()
-    const numstatText = numstatResult.text()
+    const [numstatResult, statusResult] = await Promise.all([
+      Bun.$`echo ${stdinHashes} | git -C ${this.cwd} diff-tree --stdin --root -r --numstat`.quiet(),
+      Bun.$`echo ${stdinHashes} | git -C ${this.cwd} diff-tree --stdin --root -r --name-status`.quiet(),
+    ])
 
+    // Build per-commit change type maps from name-status output
+    const changeTypeMap = parseNameStatusByCommit(statusResult.text())
+
+    const numstatText = numstatResult.text()
     let currentHash: string | null = null
     for (const line of numstatText.split("\n")) {
       if (line.length === 0) continue
@@ -256,7 +304,7 @@ export class GitService implements IGitService {
         if (commit) {
           commit.files.push({
             filePath,
-            changeType: "M",
+            changeType: changeTypeMap.get(currentHash)?.get(filePath) ?? "M",
             additions,
             deletions,
           })
