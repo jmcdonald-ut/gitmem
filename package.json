@@ -6,7 +6,7 @@
     "gitmem": "./src/cli.tsx"
   },
   "scripts": {
-    "build": "bun build src/cli.tsx --compile --outfile build/gitmem && find . -maxdepth 1 -name '*.bun-build' -delete",
+    "build": "bun build --production --compile src/cli.tsx --format=esm --bytecode --minify --outfile build/gitmem",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "format": "prettier --write 'src/**/*.{ts,tsx}'",
