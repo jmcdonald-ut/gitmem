@@ -172,6 +172,14 @@ export class AggregateRepository {
     `)
   }
 
+  /**
+   * Maximum files per commit for coupling analysis.
+   * Commits touching more files than this are excluded — they're typically
+   * bulk operations (mass renames, formatting) that produce noise, not signal.
+   * Also prevents the O(F^2) self-join from exploding on large commits.
+   */
+  static readonly MAX_COUPLING_FILES_PER_COMMIT = 200
+
   /** Rebuilds the file_coupling table with co-change counts for file pairs (minimum 2 co-changes). */
   rebuildFileCoupling(): void {
     this.db.run("DELETE FROM file_coupling")
@@ -183,6 +191,11 @@ export class AggregateRepository {
         COUNT(DISTINCT a.commit_hash) as co_change_count
       FROM commit_files a
       JOIN commit_files b ON a.commit_hash = b.commit_hash AND a.file_path < b.file_path
+      WHERE a.commit_hash NOT IN (
+        SELECT commit_hash FROM commit_files
+        GROUP BY commit_hash
+        HAVING COUNT(*) > ${AggregateRepository.MAX_COUPLING_FILES_PER_COMMIT}
+      )
       GROUP BY a.file_path, b.file_path
       HAVING co_change_count >= 2
     `)

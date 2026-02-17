@@ -206,6 +206,90 @@ describe("AggregateRepository", () => {
     expect(coupled).toHaveLength(0)
   })
 
+  test("rebuildFileCoupling excludes commits with too many files", () => {
+    // Create two commits where files co-change:
+    // - "small1" and "small2" each touch fileA + fileB (2 files, under cap)
+    // - "huge" touches fileA + fileB + MAX_COUPLING_FILES_PER_COMMIT more files (2 over cap)
+    const smallCommits: CommitInfo[] = [
+      {
+        hash: "small1",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "small 1",
+        files: [
+          {
+            filePath: "fileA.ts",
+            changeType: "M",
+            additions: 1,
+            deletions: 0,
+          },
+          {
+            filePath: "fileB.ts",
+            changeType: "M",
+            additions: 1,
+            deletions: 0,
+          },
+        ],
+      },
+      {
+        hash: "small2",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-02-01T00:00:00Z",
+        message: "small 2",
+        files: [
+          {
+            filePath: "fileA.ts",
+            changeType: "M",
+            additions: 1,
+            deletions: 0,
+          },
+          {
+            filePath: "fileB.ts",
+            changeType: "M",
+            additions: 1,
+            deletions: 0,
+          },
+        ],
+      },
+    ]
+    commits.insertRawCommits(smallCommits)
+    commits.updateEnrichment("small1", "feature", "test", "haiku-4.5")
+    commits.updateEnrichment("small2", "feature", "test", "haiku-4.5")
+
+    // Create a huge commit that exceeds the cap
+    const cap = AggregateRepository.MAX_COUPLING_FILES_PER_COMMIT
+    const hugeFiles = Array.from({ length: cap + 2 }, (_, i) => ({
+      filePath: `bulk/file${i}.ts`,
+      changeType: "A" as const,
+      additions: 1,
+      deletions: 0,
+    }))
+    commits.insertRawCommits([
+      {
+        hash: "huge",
+        authorName: "Bot",
+        authorEmail: "bot@example.com",
+        committedAt: "2024-03-01T00:00:00Z",
+        message: "mass rename",
+        files: hugeFiles,
+      },
+    ])
+    commits.updateEnrichment("huge", "chore", "mass rename", "haiku-4.5")
+
+    aggregates.rebuildFileCoupling()
+
+    // Small commits should produce coupling for fileA + fileB
+    const coupled = aggregates.getCoupledFiles("fileA.ts")
+    expect(coupled).toHaveLength(1)
+    expect(coupled[0].co_change_count).toBe(2)
+
+    // Huge commit files should NOT appear in coupling at all
+    const bulkCoupled = aggregates.getCoupledFiles("bulk/file0.ts")
+    expect(bulkCoupled).toHaveLength(0)
+  })
+
   test("getHotspots sorts by classification", () => {
     seedData()
     aggregates.rebuildFileStats()
