@@ -14,6 +14,7 @@ export function createDatabase(path: string): Database {
   db.run("PRAGMA synchronous = NORMAL")
   db.run("PRAGMA cache_size = -64000")
   db.run("PRAGMA temp_store = MEMORY")
+  db.run("PRAGMA busy_timeout = 5000")
   createSchema(db)
   if (needsMigration(db)) {
     if (path !== ":memory:" && existsSync(path)) {

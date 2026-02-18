@@ -78,6 +78,15 @@ describe("createDatabase", () => {
     db.close()
   })
 
+  test("sets busy_timeout pragma", () => {
+    const db = createDatabase(":memory:")
+    const result = db
+      .query<{ timeout: number }, []>("PRAGMA busy_timeout")
+      .get()
+    expect(result!.timeout).toBe(5000)
+    db.close()
+  })
+
   test("migrates old schema to add complexity columns", () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "gitmem-test-"))
     const tmpPath = join(tmpDir, "migrate-test.db")

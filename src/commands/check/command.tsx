@@ -56,7 +56,7 @@ export const checkCommand = new Command("check")
 
     await runCommand(
       cmd.parent!.opts(),
-      { needsApiKey: true },
+      { needsApiKey: true, needsLock: true },
       async ({ format, cwd, git, apiKey, db }) => {
         const commits = new CommitRepository(db)
         const judge = new JudgeService(apiKey, opts.model)

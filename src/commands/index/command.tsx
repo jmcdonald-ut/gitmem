@@ -52,7 +52,7 @@ export const indexCommand = new Command("index")
   .action(async (opts, cmd) => {
     await runCommand(
       cmd.parent!.opts(),
-      { needsApiKey: true, dbMustExist: false },
+      { needsApiKey: true, dbMustExist: false, needsLock: true },
       async ({ format, git, apiKey, db }) => {
         const commits = new CommitRepository(db)
         const aggregates = new AggregateRepository(db)
