@@ -1,10 +1,7 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import { createDatabase } from "@db/database"
 import { CommitRepository } from "@db/commits"
-import {
-  AggregateRepository,
-  computeTrend,
-} from "@db/aggregates"
+import { AggregateRepository, computeTrend } from "@db/aggregates"
 import type { CommitInfo, TrendPeriod } from "@/types"
 import { Database } from "bun:sqlite"
 
@@ -1044,6 +1041,7 @@ describe("AggregateRepository", () => {
   test("getTrendsForFile throws on invalid window key", () => {
     seedData()
     expect(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       aggregates.getTrendsForFile("src/main.ts", "invalid" as any, 12),
     ).toThrow('Invalid window "invalid"')
   })
@@ -1051,6 +1049,7 @@ describe("AggregateRepository", () => {
   test("getTrendsForDirectory throws on invalid window key", () => {
     seedData()
     expect(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       aggregates.getTrendsForDirectory("src/", "invalid" as any, 12),
     ).toThrow('Invalid window "invalid"')
   })

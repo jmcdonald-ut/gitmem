@@ -39,13 +39,19 @@ function getLockPath(): string {
 function acquireLock(): string {
   const lockPath = getLockPath()
   try {
-    const fd = openSync(lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY)
+    const fd = openSync(
+      lockPath,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+    )
     const content = `${process.pid}\n`
     writeFileSync(fd, content)
     closeSync(fd)
     return lockPath
-  } catch (err: any) {
-    if (err.code === "EEXIST") {
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err as NodeJS.ErrnoException).code === "EEXIST"
+    ) {
       console.error(
         "Error: another gitmem process is running (lock file exists: .gitmem/index.lock)",
       )

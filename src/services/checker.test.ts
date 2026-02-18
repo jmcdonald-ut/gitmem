@@ -434,6 +434,7 @@ describe("CheckerService", () => {
     const diffMap = new Map<string, string>([["aaa", "diff"]])
     // Access private method via bracket notation
     await expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (checker as any).evaluateOne(commits.getCommit("aaa")!, diffMap),
     ).rejects.toThrow("Commit aaa missing classification/summary")
   })

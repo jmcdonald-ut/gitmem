@@ -171,9 +171,7 @@ export class CheckerService {
     diffMap: Map<string, string>,
   ): Promise<EvalResult> {
     if (!commit.classification || !commit.summary) {
-      throw new Error(
-        `Commit ${commit.hash} missing classification/summary`,
-      )
+      throw new Error(`Commit ${commit.hash} missing classification/summary`)
     }
 
     const diff = diffMap.get(commit.hash) ?? ""

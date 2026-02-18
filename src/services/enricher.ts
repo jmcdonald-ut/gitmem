@@ -366,10 +366,7 @@ export class EnricherService {
       const needsLLM: CommitRow[] = []
       for (const commit of unenriched) {
         const diff = diffMap.get(commit.hash) ?? ""
-        const mergeResult = this.tryMergeCommitEnrichment(
-          commit.message,
-          diff,
-        )
+        const mergeResult = this.tryMergeCommitEnrichment(commit.message, diff)
         if (mergeResult) {
           this.commits.updateEnrichment(
             commit.hash,
