@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import type { CommitInfo, EnrichmentResult, ILLMService } from "@/types"
 import {
   SYSTEM_PROMPT,
+  ENRICHMENT_OUTPUT_CONFIG,
   buildUserMessage,
   parseEnrichmentResponse,
 } from "@services/llm-shared"
@@ -37,6 +38,7 @@ export class LLMService implements ILLMService {
       max_tokens: 512,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
+      output_config: ENRICHMENT_OUTPUT_CONFIG,
     })
 
     const text =

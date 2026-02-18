@@ -46,26 +46,6 @@ describe("LLMService", () => {
     expect(result.summary).toBe("Fixed null pointer in auth flow")
   })
 
-  test("enrichCommit defaults unknown classification to chore", async () => {
-    const service = new LLMService("test-key")
-    setClient(
-      service,
-      mockClient(() =>
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: '{"classification": "unknown-type", "summary": "Did something"}',
-            },
-          ],
-        }),
-      ),
-    )
-
-    const result = await service.enrichCommit(commit, "")
-    expect(result.classification).toBe("chore")
-  })
-
   test("enrichCommit propagates API errors", async () => {
     const service = new LLMService("test-key")
     setClient(
@@ -76,65 +56,28 @@ describe("LLMService", () => {
     await expect(service.enrichCommit(commit, "")).rejects.toThrow("API error")
   })
 
-  test("enrichCommit strips markdown fences from response", async () => {
+  test("enrichCommit passes output_config in API call", async () => {
     const service = new LLMService("test-key")
-    setClient(
-      service,
-      mockClient(() =>
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: '```json\n{"classification": "bug-fix", "summary": "Fixed a bug"}\n```',
-            },
-          ],
-        }),
-      ),
+    const client = mockClient(() =>
+      Promise.resolve({
+        content: [
+          {
+            type: "text",
+            text: '{"classification": "feature", "summary": "Added feature"}',
+          },
+        ],
+      }),
     )
+    setClient(service, client)
 
-    const result = await service.enrichCommit(commit, "")
-    expect(result.classification).toBe("bug-fix")
-    expect(result.summary).toBe("Fixed a bug")
-  })
+    await service.enrichCommit(commit, "diff")
 
-  test("enrichCommit strips fences without language tag", async () => {
-    const service = new LLMService("test-key")
-    setClient(
-      service,
-      mockClient(() =>
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: '```\n{"classification": "feature", "summary": "New feature"}\n```',
-            },
-          ],
-        }),
-      ),
-    )
-
-    const result = await service.enrichCommit(commit, "")
-    expect(result.classification).toBe("feature")
-    expect(result.summary).toBe("New feature")
-  })
-
-  test("enrichCommit handles missing summary", async () => {
-    const service = new LLMService("test-key")
-    setClient(
-      service,
-      mockClient(() =>
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: '{"classification": "chore", "summary": 123}',
-            },
-          ],
-        }),
-      ),
-    )
-
-    const result = await service.enrichCommit(commit, "")
-    expect(result.summary).toBe("No summary")
+    const call = client.messages.create.mock.calls[0] as unknown as [
+      { output_config: unknown },
+    ]
+    expect(call[0].output_config).toBeDefined()
+    expect(
+      (call[0].output_config as { format: { type: string } }).format.type,
+    ).toBe("json_schema")
   })
 })

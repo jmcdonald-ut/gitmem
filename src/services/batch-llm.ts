@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import type { CommitInfo, EnrichmentResult } from "@/types"
 import {
   SYSTEM_PROMPT,
+  ENRICHMENT_OUTPUT_CONFIG,
   buildUserMessage,
   parseEnrichmentResponse,
 } from "@services/llm-shared"
@@ -48,6 +49,7 @@ export class BatchLLMService {
           messages: [
             { role: "user", content: buildUserMessage(req.commit, req.diff) },
           ],
+          output_config: ENRICHMENT_OUTPUT_CONFIG,
         },
       })),
     })

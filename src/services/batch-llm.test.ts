@@ -126,6 +126,25 @@ describe("BatchLLMService", () => {
     expect(requests[1].custom_id).toBe("def456")
   })
 
+  test("submitBatch includes output_config in each request params", async () => {
+    const service = new BatchLLMService("test-key")
+    const client = mockClient({
+      create: () => Promise.resolve({ id: "msgbatch_test" }),
+    })
+    setClient(service, client)
+
+    await service.submitBatch([{ hash: "abc123", commit, diff: "diff" }])
+
+    const call = client.messages.batches.create.mock.calls[0] as unknown as [
+      { requests: { params: { output_config: unknown } }[] },
+    ]
+    const params = call[0].requests[0].params
+    expect(params.output_config).toBeDefined()
+    expect(
+      (params.output_config as { format: { type: string } }).format.type,
+    ).toBe("json_schema")
+  })
+
   test("getBatchStatus returns processing info", async () => {
     const service = new BatchLLMService("test-key")
     const client = mockClient({

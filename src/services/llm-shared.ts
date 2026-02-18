@@ -1,11 +1,19 @@
-import type { CommitInfo, EnrichmentResult, Classification } from "@/types"
+import { z } from "zod"
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod"
+import type { CommitInfo, EnrichmentResult } from "@/types"
 import { CLASSIFICATIONS } from "@/types"
+
+export const EnrichmentSchema = z.object({
+  classification: z.enum(CLASSIFICATIONS),
+  summary: z.string(),
+})
+
+export const ENRICHMENT_OUTPUT_CONFIG = {
+  format: zodOutputFormat(EnrichmentSchema),
+}
 
 /** System prompt used for all LLM commit enrichment requests. */
 export const SYSTEM_PROMPT = `You are a git commit analyzer. Given a commit message, file list, and diff, classify the commit and provide a brief summary.
-
-Respond with valid JSON only, no markdown fences. Use this exact format:
-{"classification": "<type>", "summary": "<1-2 sentence summary>"}
 
 Classification must be one of: ${CLASSIFICATIONS.join(", ")}
 
@@ -43,43 +51,82 @@ Summary guidelines:
 - Describe what changed, not why. Do not infer motivation, performance impact, or version changes unless explicitly visible in the diff.
 - Never claim something was "fixed", "improved", or "optimized" unless the diff evidence supports it.`
 
+const MAX_INPUT_TOKENS = 175_000
+const CHARS_PER_TOKEN = 4
+
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / CHARS_PER_TOKEN)
+}
+
 /**
  * Builds the user message sent to the LLM for commit enrichment.
+ * Truncates the diff and/or file list if the estimated token count exceeds the limit.
  * @param commit - The commit metadata.
  * @param diff - The unified diff content.
  * @returns The formatted user message string.
  */
 export function buildUserMessage(commit: CommitInfo, diff: string): string {
-  const fileList = commit.files
-    .map(
-      (f) => `${f.changeType} ${f.filePath} (+${f.additions} -${f.deletions})`,
+  const fileEntries = commit.files.map(
+    (f) => `${f.changeType} ${f.filePath} (+${f.additions} -${f.deletions})`,
+  )
+  let fileList = fileEntries.join("\n  ")
+  let truncatedDiff = diff
+
+  const buildMessage = (fl: string, d: string) =>
+    `Commit message: ${commit.message}\n\nFiles changed:\n  ${fl}\n\nDiff:\n${d}`
+
+  const totalEstimate = estimateTokens(
+    SYSTEM_PROMPT + buildMessage(fileList, truncatedDiff),
+  )
+
+  if (totalEstimate > MAX_INPUT_TOKENS) {
+    // First: truncate the diff
+    const diffSuffix = "\n[diff truncated]"
+    const overhead = estimateTokens(
+      SYSTEM_PROMPT + buildMessage(fileList, diffSuffix),
     )
-    .join("\n  ")
+    const availableForDiff = Math.max(0, MAX_INPUT_TOKENS - overhead)
+    const maxDiffChars = availableForDiff * CHARS_PER_TOKEN
+    if (diff.length > maxDiffChars) {
+      truncatedDiff = diff.slice(0, maxDiffChars) + diffSuffix
+    }
 
-  return `Commit message: ${commit.message}
+    // Second: if the file list alone exceeds the budget, omit diff and truncate files
+    const fileListOnlyEstimate = estimateTokens(
+      SYSTEM_PROMPT + buildMessage(fileList, ""),
+    )
+    if (fileListOnlyEstimate > MAX_INPUT_TOKENS) {
+      truncatedDiff = "[diff omitted — message too large]"
+      const overheadNoDiff = estimateTokens(
+        SYSTEM_PROMPT + buildMessage("", truncatedDiff),
+      )
+      const availableForFiles = Math.max(0, MAX_INPUT_TOKENS - overheadNoDiff)
+      const maxFileChars = availableForFiles * CHARS_PER_TOKEN
+      let accumulated = ""
+      let kept = 0
+      for (const entry of fileEntries) {
+        const next = kept === 0 ? entry : accumulated + "\n  " + entry
+        if (next.length > maxFileChars) break
+        accumulated = next
+        kept++
+      }
+      const omitted = fileEntries.length - kept
+      fileList =
+        omitted > 0
+          ? accumulated + `\n  ... and ${omitted} more files`
+          : accumulated
+    }
+  }
 
-Files changed:
-  ${fileList}
-
-Diff:
-${diff}`
+  return buildMessage(fileList, truncatedDiff)
 }
 
 /**
- * Parses the LLM JSON response into an EnrichmentResult,
- * stripping any markdown fences and validating the classification.
+ * Parses the LLM JSON response into an EnrichmentResult.
+ * With structured outputs, the API guarantees valid JSON matching the schema.
  * @param text - Raw text response from the LLM.
  * @returns The parsed enrichment result.
  */
 export function parseEnrichmentResponse(text: string): EnrichmentResult {
-  const stripped = text
-    .replace(/^```(?:json)?\s*\n?/i, "")
-    .replace(/\n?```\s*$/, "")
-  const parsed = JSON.parse(stripped)
-  const classification = CLASSIFICATIONS.includes(parsed.classification)
-    ? (parsed.classification as Classification)
-    : "chore"
-  const summary =
-    typeof parsed.summary === "string" ? parsed.summary : "No summary"
-  return { classification, summary }
+  return JSON.parse(text) as EnrichmentResult
 }
