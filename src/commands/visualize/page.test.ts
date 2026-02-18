@@ -88,4 +88,28 @@ describe("generatePage", () => {
     const html = generatePage(hierarchy, "repo")
     expect(html).toContain('"name":"a.ts"')
   })
+
+  test("escapes </script> in embedded JSON to prevent injection", () => {
+    const hierarchy: HierarchyResult = {
+      root: {
+        name: "",
+        path: "",
+        indexed: true,
+        children: [
+          {
+            name: "</script><script>alert(1)</script>",
+            path: "</script><script>alert(1)</script>",
+            indexed: true,
+            loc: 10,
+          },
+        ],
+      },
+      totalTracked: 1,
+      totalIndexed: 1,
+      unindexedCount: 0,
+    }
+    const html = generatePage(hierarchy, "repo")
+    expect(html).not.toContain("</script><script>alert(1)</script>")
+    expect(html).toContain("<\\/script>")
+  })
 })

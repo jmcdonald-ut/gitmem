@@ -206,6 +206,7 @@ export const visualizeCommand = new Command("visualize")
         const html = generatePage(hierarchy, repoName)
 
         const server = Bun.serve({
+          hostname: "127.0.0.1",
           port: opts.port,
           fetch: createFetchHandler(html, commits, aggregates, exclude),
         })
@@ -218,10 +219,12 @@ export const visualizeCommand = new Command("visualize")
         }
 
         await new Promise<void>((resolve) => {
-          process.once("SIGINT", () => {
+          const shutdown = () => {
             server.stop()
             resolve()
-          })
+          }
+          process.once("SIGINT", shutdown)
+          process.once("SIGTERM", shutdown)
         })
       },
     )
