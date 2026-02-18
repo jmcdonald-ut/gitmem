@@ -254,7 +254,7 @@ body {
 <body>
 <div class="layout">
   <div class="header">
-    <h1>${escapeHtml(repoName)}</h1>
+    <h1>gitmem</h1>
     <div class="breadcrumb" id="breadcrumb"></div>
     ${hierarchy.unindexedCount > 0 ? `<div class="banner">${hierarchy.unindexedCount} files not yet indexed</div>` : ""}
   </div>
@@ -270,6 +270,7 @@ body {
 <script>
 (function() {
   const hierarchyData = ${dataJson};
+  const repoName = ${JSON.stringify(repoName)};
   const root = hierarchyData.root;
   const vizEl = document.getElementById("viz");
   const tooltipEl = document.getElementById("tooltip");
@@ -402,6 +403,7 @@ body {
 
   zoomView([h.x, h.y, h.r * 2]);
   fetchDetails("");
+  updateBreadcrumb("");
 
   svg.on("click", () => {
     if (focus !== h) zoomTo(focus.parent || h);
@@ -425,12 +427,13 @@ body {
   });
 
   function updateBreadcrumb(path) {
+    let html = '<span data-path="">' + repoName + '</span>';
     if (!path) {
-      breadcrumbEl.innerHTML = "";
+      breadcrumbEl.innerHTML = html;
+      bindBreadcrumbClicks();
       return;
     }
     const parts = path.replace(/\\/$/, "").split("/");
-    let html = '<span data-path="">root</span>';
     let accumulated = "";
     for (let i = 0; i < parts.length; i++) {
       accumulated += parts[i] + (i < parts.length - 1 ? "/" : "");
@@ -438,6 +441,10 @@ body {
       html += ' / <span data-path="' + displayPath + '">' + parts[i] + '</span>';
     }
     breadcrumbEl.innerHTML = html;
+    bindBreadcrumbClicks();
+  }
+
+  function bindBreadcrumbClicks() {
     breadcrumbEl.querySelectorAll("span").forEach(span => {
       span.addEventListener("click", () => {
         const p = span.dataset.path;
