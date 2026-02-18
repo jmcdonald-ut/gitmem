@@ -60,6 +60,26 @@ describe("JUDGE_SYSTEM_PROMPT", () => {
     )
   })
 
+  test("contains trust-diff-over-message rule", () => {
+    expect(JUDGE_SYSTEM_PROMPT).toContain(
+      "Always trust the diff over the commit message",
+    )
+  })
+
+  test("contains scratch files guidance", () => {
+    expect(JUDGE_SYSTEM_PROMPT).toContain("Scratch files")
+  })
+
+  test("contains scoped broken-link rule with docs exception", () => {
+    expect(JUDGE_SYSTEM_PROMPT).toContain(
+      "documentation content itself is the deliverable being corrected",
+    )
+  })
+
+  test("contains evaluator calibration instruction", () => {
+    expect(JUDGE_SYSTEM_PROMPT).toContain("reasonable fit")
+  })
+
   test("does not contain JSON format instructions (handled by structured outputs)", () => {
     expect(JUDGE_SYSTEM_PROMPT).not.toContain("Respond with valid JSON only")
     expect(JUDGE_SYSTEM_PROMPT).not.toContain("markdown fences")
