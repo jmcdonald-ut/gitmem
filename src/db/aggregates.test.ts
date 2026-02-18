@@ -934,6 +934,106 @@ describe("AggregateRepository", () => {
     expect(mainUtils!.co_change_count).toBe(2)
   })
 
+  test("rebuildFileStats picks most recent non-zero loc and complexity", () => {
+    commits.insertRawCommits([
+      {
+        hash: "old",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "old commit",
+        files: [
+          {
+            filePath: "src/app.ts",
+            changeType: "A",
+            additions: 50,
+            deletions: 0,
+          },
+        ],
+      },
+      {
+        hash: "new",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-06-01T00:00:00Z",
+        message: "new commit",
+        files: [
+          {
+            filePath: "src/app.ts",
+            changeType: "M",
+            additions: 10,
+            deletions: 5,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("old", "feature", "old", "haiku-4.5")
+    commits.updateEnrichment("new", "feature", "new", "haiku-4.5")
+    // Old commit has loc=100, complexity=20; new commit has loc=200, complexity=40
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 100, indent_complexity = 20 WHERE commit_hash = 'old' AND file_path = 'src/app.ts'",
+    )
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 200, indent_complexity = 40 WHERE commit_hash = 'new' AND file_path = 'src/app.ts'",
+    )
+
+    aggregates.rebuildFileStats()
+    const stats = aggregates.getFileStats("src/app.ts")
+    expect(stats).not.toBeNull()
+    // Should pick the newer commit's values
+    expect(stats!.current_loc).toBe(200)
+    expect(stats!.current_complexity).toBe(40)
+  })
+
+  test("rebuildFileStatsIncremental picks most recent non-zero loc and complexity", () => {
+    commits.insertRawCommits([
+      {
+        hash: "old",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "old commit",
+        files: [
+          {
+            filePath: "src/app.ts",
+            changeType: "A",
+            additions: 50,
+            deletions: 0,
+          },
+        ],
+      },
+      {
+        hash: "new",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-06-01T00:00:00Z",
+        message: "new commit",
+        files: [
+          {
+            filePath: "src/app.ts",
+            changeType: "M",
+            additions: 10,
+            deletions: 5,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("old", "feature", "old", "haiku-4.5")
+    commits.updateEnrichment("new", "feature", "new", "haiku-4.5")
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 100, indent_complexity = 20 WHERE commit_hash = 'old' AND file_path = 'src/app.ts'",
+    )
+    db.run(
+      "UPDATE commit_files SET lines_of_code = 200, indent_complexity = 40 WHERE commit_hash = 'new' AND file_path = 'src/app.ts'",
+    )
+
+    aggregates.rebuildFileStatsIncremental(["old", "new"])
+    const stats = aggregates.getFileStats("src/app.ts")
+    expect(stats).not.toBeNull()
+    expect(stats!.current_loc).toBe(200)
+    expect(stats!.current_complexity).toBe(40)
+  })
+
   test("rebuildFileStatsIncremental with empty hashes is a no-op", () => {
     seedData()
     aggregates.rebuildFileStatsIncremental([])

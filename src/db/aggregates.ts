@@ -141,6 +141,20 @@ export class AggregateRepository {
   rebuildFileStats(): void {
     this.db.run("DELETE FROM file_stats")
     this.db.run(`
+      WITH latest_loc AS (
+        SELECT cf2.file_path, cf2.lines_of_code,
+          ROW_NUMBER() OVER (PARTITION BY cf2.file_path ORDER BY c2.committed_at DESC) as rn
+        FROM commit_files cf2
+        JOIN commits c2 ON c2.hash = cf2.commit_hash
+        WHERE cf2.lines_of_code > 0
+      ),
+      latest_complexity AS (
+        SELECT cf2.file_path, cf2.indent_complexity,
+          ROW_NUMBER() OVER (PARTITION BY cf2.file_path ORDER BY c2.committed_at DESC) as rn
+        FROM commit_files cf2
+        JOIN commits c2 ON c2.hash = cf2.commit_hash
+        WHERE cf2.indent_complexity > 0
+      )
       INSERT INTO file_stats (
         file_path, total_changes,
         bug_fix_count, feature_count, refactor_count, docs_count,
@@ -164,18 +178,14 @@ export class AggregateRepository {
         MAX(c.committed_at) as last_changed,
         COALESCE(SUM(cf.additions), 0) as total_additions,
         COALESCE(SUM(cf.deletions), 0) as total_deletions,
-        (SELECT cf2.lines_of_code FROM commit_files cf2
-         JOIN commits c2 ON c2.hash = cf2.commit_hash
-         WHERE cf2.file_path = cf.file_path AND cf2.lines_of_code > 0
-         ORDER BY c2.committed_at DESC LIMIT 1) as current_loc,
-        (SELECT cf2.indent_complexity FROM commit_files cf2
-         JOIN commits c2 ON c2.hash = cf2.commit_hash
-         WHERE cf2.file_path = cf.file_path AND cf2.indent_complexity > 0
-         ORDER BY c2.committed_at DESC LIMIT 1) as current_complexity,
+        ll.lines_of_code as current_loc,
+        lc.indent_complexity as current_complexity,
         AVG(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as avg_complexity,
         MAX(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as max_complexity
       FROM commit_files cf
       JOIN commits c ON c.hash = cf.commit_hash
+      LEFT JOIN latest_loc ll ON ll.file_path = cf.file_path AND ll.rn = 1
+      LEFT JOIN latest_complexity lc ON lc.file_path = cf.file_path AND lc.rn = 1
       WHERE c.enriched_at IS NOT NULL
       GROUP BY cf.file_path
     `)
@@ -257,7 +267,21 @@ export class AggregateRepository {
       const placeholders = chunk.map(() => "?").join(", ")
       this.db
         .query(
-          `INSERT OR REPLACE INTO file_stats (
+          `WITH latest_loc AS (
+            SELECT cf2.file_path, cf2.lines_of_code,
+              ROW_NUMBER() OVER (PARTITION BY cf2.file_path ORDER BY c2.committed_at DESC) as rn
+            FROM commit_files cf2
+            JOIN commits c2 ON c2.hash = cf2.commit_hash
+            WHERE cf2.lines_of_code > 0 AND cf2.file_path IN (${placeholders})
+          ),
+          latest_complexity AS (
+            SELECT cf2.file_path, cf2.indent_complexity,
+              ROW_NUMBER() OVER (PARTITION BY cf2.file_path ORDER BY c2.committed_at DESC) as rn
+            FROM commit_files cf2
+            JOIN commits c2 ON c2.hash = cf2.commit_hash
+            WHERE cf2.indent_complexity > 0 AND cf2.file_path IN (${placeholders})
+          )
+          INSERT OR REPLACE INTO file_stats (
             file_path, total_changes,
             bug_fix_count, feature_count, refactor_count, docs_count,
             chore_count, perf_count, test_count, style_count,
@@ -280,22 +304,18 @@ export class AggregateRepository {
             MAX(c.committed_at) as last_changed,
             COALESCE(SUM(cf.additions), 0) as total_additions,
             COALESCE(SUM(cf.deletions), 0) as total_deletions,
-            (SELECT cf2.lines_of_code FROM commit_files cf2
-             JOIN commits c2 ON c2.hash = cf2.commit_hash
-             WHERE cf2.file_path = cf.file_path AND cf2.lines_of_code > 0
-             ORDER BY c2.committed_at DESC LIMIT 1) as current_loc,
-            (SELECT cf2.indent_complexity FROM commit_files cf2
-             JOIN commits c2 ON c2.hash = cf2.commit_hash
-             WHERE cf2.file_path = cf.file_path AND cf2.indent_complexity > 0
-             ORDER BY c2.committed_at DESC LIMIT 1) as current_complexity,
+            ll.lines_of_code as current_loc,
+            lc.indent_complexity as current_complexity,
             AVG(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as avg_complexity,
             MAX(CASE WHEN cf.indent_complexity > 0 THEN cf.indent_complexity END) as max_complexity
           FROM commit_files cf
           JOIN commits c ON c.hash = cf.commit_hash
+          LEFT JOIN latest_loc ll ON ll.file_path = cf.file_path AND ll.rn = 1
+          LEFT JOIN latest_complexity lc ON lc.file_path = cf.file_path AND lc.rn = 1
           WHERE c.enriched_at IS NOT NULL AND cf.file_path IN (${placeholders})
           GROUP BY cf.file_path`,
         )
-        .run(...chunk)
+        .run(...chunk, ...chunk, ...chunk)
     }
   }
 
