@@ -205,25 +205,43 @@ export class AggregateRepository {
    */
   static readonly MAX_COUPLING_FILES_PER_COMMIT = 200
 
+  /** Creates a temp table of commit hashes that exceed the coupling file cap. */
+  private createExcludedCouplingCommits(): void {
+    this.db.run("DROP TABLE IF EXISTS _excluded_coupling_commits")
+    this.db.run(`
+      CREATE TEMP TABLE _excluded_coupling_commits AS
+      SELECT commit_hash FROM commit_files
+      GROUP BY commit_hash
+      HAVING COUNT(*) > ${AggregateRepository.MAX_COUPLING_FILES_PER_COMMIT}
+    `)
+  }
+
+  /** Drops the temp table of excluded coupling commits. */
+  private dropExcludedCouplingCommits(): void {
+    this.db.run("DROP TABLE IF EXISTS _excluded_coupling_commits")
+  }
+
   /** Rebuilds the file_coupling table with co-change counts for file pairs (minimum 2 co-changes). */
   rebuildFileCoupling(): void {
     this.db.run("DELETE FROM file_coupling")
-    this.db.run(`
-      INSERT INTO file_coupling (file_a, file_b, co_change_count)
-      SELECT
-        a.file_path as file_a,
-        b.file_path as file_b,
-        COUNT(DISTINCT a.commit_hash) as co_change_count
-      FROM commit_files a
-      JOIN commit_files b ON a.commit_hash = b.commit_hash AND a.file_path < b.file_path
-      WHERE a.commit_hash NOT IN (
-        SELECT commit_hash FROM commit_files
-        GROUP BY commit_hash
-        HAVING COUNT(*) > ${AggregateRepository.MAX_COUPLING_FILES_PER_COMMIT}
-      )
-      GROUP BY a.file_path, b.file_path
-      HAVING co_change_count >= 2
-    `)
+    this.createExcludedCouplingCommits()
+    try {
+      this.db.run(`
+        INSERT INTO file_coupling (file_a, file_b, co_change_count)
+        SELECT
+          a.file_path as file_a,
+          b.file_path as file_b,
+          COUNT(DISTINCT a.commit_hash) as co_change_count
+        FROM commit_files a
+        JOIN commit_files b ON a.commit_hash = b.commit_hash AND a.file_path < b.file_path
+        LEFT JOIN _excluded_coupling_commits ec ON a.commit_hash = ec.commit_hash
+        WHERE ec.commit_hash IS NULL
+        GROUP BY a.file_path, b.file_path
+        HAVING co_change_count >= 2
+      `)
+    } finally {
+      this.dropExcludedCouplingCommits()
+    }
   }
 
   /**
@@ -332,28 +350,30 @@ export class AggregateRepository {
         .run(...chunk, ...chunk)
     }
     // Re-insert coupling for pairs where at least one file is affected
-    for (let i = 0; i < paths.length; i += CHUNK) {
-      const chunk = paths.slice(i, i + CHUNK)
-      const placeholders = chunk.map(() => "?").join(", ")
-      this.db
-        .query(
-          `INSERT OR REPLACE INTO file_coupling (file_a, file_b, co_change_count)
-          SELECT
-            a.file_path as file_a,
-            b.file_path as file_b,
-            COUNT(DISTINCT a.commit_hash) as co_change_count
-          FROM commit_files a
-          JOIN commit_files b ON a.commit_hash = b.commit_hash AND a.file_path < b.file_path
-          WHERE (a.file_path IN (${placeholders}) OR b.file_path IN (${placeholders}))
-            AND a.commit_hash NOT IN (
-              SELECT commit_hash FROM commit_files
-              GROUP BY commit_hash
-              HAVING COUNT(*) > ${AggregateRepository.MAX_COUPLING_FILES_PER_COMMIT}
-            )
-          GROUP BY a.file_path, b.file_path
-          HAVING co_change_count >= 2`,
-        )
-        .run(...chunk, ...chunk)
+    this.createExcludedCouplingCommits()
+    try {
+      for (let i = 0; i < paths.length; i += CHUNK) {
+        const chunk = paths.slice(i, i + CHUNK)
+        const placeholders = chunk.map(() => "?").join(", ")
+        this.db
+          .query(
+            `INSERT OR REPLACE INTO file_coupling (file_a, file_b, co_change_count)
+            SELECT
+              a.file_path as file_a,
+              b.file_path as file_b,
+              COUNT(DISTINCT a.commit_hash) as co_change_count
+            FROM commit_files a
+            JOIN commit_files b ON a.commit_hash = b.commit_hash AND a.file_path < b.file_path
+            LEFT JOIN _excluded_coupling_commits ec ON a.commit_hash = ec.commit_hash
+            WHERE (a.file_path IN (${placeholders}) OR b.file_path IN (${placeholders}))
+              AND ec.commit_hash IS NULL
+            GROUP BY a.file_path, b.file_path
+            HAVING co_change_count >= 2`,
+          )
+          .run(...chunk, ...chunk)
+      }
+    } finally {
+      this.dropExcludedCouplingCommits()
     }
   }
 
