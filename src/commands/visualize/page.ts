@@ -4,7 +4,7 @@ export function generatePage(
   hierarchy: HierarchyResult,
   repoName: string,
 ): string {
-  const dataJson = JSON.stringify(hierarchy)
+  const dataJson = JSON.stringify(hierarchy).replace(/<\//g, "<\\/")
 
   return `<!DOCTYPE html>
 <html lang="en">
