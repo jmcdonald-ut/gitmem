@@ -200,182 +200,41 @@ export class EnricherService {
     batchId?: string
     batchStatus?: string
   }> {
-    // Phase 1: Discover commits
-    onProgress({ phase: "discovering", current: 0, total: 0 })
-    const branch = await this.git.getDefaultBranch()
-    const allHashes = await this.git.getCommitHashes(branch)
-    const indexedHashes = this.commits.getIndexedHashes()
-
-    const newHashes = allHashes.filter((h) => !indexedHashes.has(h))
-    if (newHashes.length > 0) {
-      const newCommits = await this.git.getCommitInfoBatch(newHashes)
-      this.commits.insertRawCommits(newCommits)
-    }
-
-    // Measure complexity
-    if (this.measurer) {
-      await this.measurer.measure(onProgress)
-    }
+    const { newHashes } = await this.discoverAndInsert(onProgress)
 
     let enrichedThisRun = 0
     const enrichedHashes: string[] = []
 
-    // Check for pending batch
     const pendingBatch = batchJobs.getPendingBatch()
 
     if (pendingBatch) {
-      // Poll status
-      const status = await batchLLM.getBatchStatus(pendingBatch.batch_id)
-      batchJobs.updateStatus(
-        pendingBatch.batch_id,
-        status.processingStatus,
-        status.requestCounts.succeeded,
-        status.requestCounts.errored +
-          status.requestCounts.canceled +
-          status.requestCounts.expired,
+      const result = await this.handlePendingBatch(
+        pendingBatch,
+        batchLLM,
+        batchJobs,
+        onProgress,
+        newHashes,
       )
-
-      if (status.processingStatus === "ended") {
-        // Import results
-        const results = await batchLLM.getBatchResults(pendingBatch.batch_id)
-        onProgress({
-          phase: "enriching",
-          current: 0,
-          total: results.length,
-          batchId: pendingBatch.batch_id,
-          batchStatus: "importing",
-        })
-
-        const updates: Array<{
-          hash: string
-          classification: string
-          summary: string
-        }> = []
-        for (const item of results) {
-          if (item.result) {
-            updates.push({
-              hash: item.hash,
-              classification: item.result.classification,
-              summary: item.result.summary,
-            })
-          }
-        }
-        if (updates.length > 0) {
-          this.commits.updateEnrichmentBatch(updates, this.model)
-        }
-        enrichedThisRun = updates.length
-        enrichedHashes.push(...updates.map((u) => u.hash))
-      } else {
-        // Still in progress — report and return
-        const totalEnriched = this.commits.getEnrichedCommitCount()
-        const totalCommits = this.commits.getTotalCommitCount()
-        onProgress({
-          phase: "enriching",
-          current: status.requestCounts.succeeded,
-          total: pendingBatch.request_count,
-          batchId: pendingBatch.batch_id,
-          batchStatus: status.processingStatus,
-        })
-        return {
-          discoveredThisRun: newHashes.length,
-          enrichedThisRun: 0,
-          totalEnriched,
-          totalCommits,
-          batchId: pendingBatch.batch_id,
-          batchStatus: status.processingStatus,
-        }
-      }
+      if (result.earlyReturn) return result.earlyReturn
+      enrichedThisRun = result.enrichedThisRun
+      enrichedHashes.push(...result.enrichedHashes)
     } else {
-      // No pending batch — submit if unenriched commits exist
-      const unenriched = this.commits.getUnenrichedCommits()
-      if (unenriched.length > 0) {
-        const MAX_BATCH_SIZE = 10000
-        const unenrichedHashes = unenriched.map((c) => c.hash)
-        const diffMap = await this.git.getDiffBatch(unenrichedHashes)
-        const filesMap = this.commits.getCommitFilesByHashes(unenrichedHashes)
-
-        // Handle merge commits locally without LLM
-        const needsLLM: CommitRow[] = []
-        for (const commit of unenriched) {
-          const diff = diffMap.get(commit.hash) ?? ""
-          const mergeResult = this.tryMergeCommitEnrichment(
-            commit.message,
-            diff,
-          )
-          if (mergeResult) {
-            this.commits.updateEnrichment(
-              commit.hash,
-              mergeResult.classification,
-              mergeResult.summary,
-              this.model,
-            )
-            enrichedThisRun++
-            enrichedHashes.push(commit.hash)
-          } else {
-            needsLLM.push(commit)
-          }
-        }
-
-        const batches = this.chunkCommits(needsLLM, MAX_BATCH_SIZE)
-
-        for (const batch of batches) {
-          const requests = batch.map((commit) => ({
-            hash: commit.hash,
-            commit: {
-              hash: commit.hash,
-              authorName: commit.author_name,
-              authorEmail: commit.author_email,
-              committedAt: commit.committed_at,
-              message: commit.message,
-              files: filesMap.get(commit.hash) ?? [],
-            },
-            diff: diffMap.get(commit.hash) ?? "",
-          }))
-
-          onProgress({
-            phase: "enriching",
-            current: 0,
-            total: requests.length,
-            batchStatus: "submitting",
-          })
-
-          const { batchId, requestCount } = await batchLLM.submitBatch(requests)
-          batchJobs.insert(batchId, requestCount, this.model)
-
-          const totalEnriched = this.commits.getEnrichedCommitCount()
-          const totalCommits = this.commits.getTotalCommitCount()
-          onProgress({
-            phase: "enriching",
-            current: 0,
-            total: requestCount,
-            batchId,
-            batchStatus: "submitted",
-          })
-
-          return {
-            discoveredThisRun: newHashes.length,
-            enrichedThisRun: 0,
-            totalEnriched,
-            totalCommits,
-            batchId,
-            batchStatus: "submitted",
-          }
-        }
-      }
+      const result = await this.submitNewBatch(
+        batchLLM,
+        batchJobs,
+        onProgress,
+        newHashes,
+      )
+      if (result.earlyReturn) return result.earlyReturn
+      enrichedThisRun = result.enrichedThisRun
+      enrichedHashes.push(...result.enrichedHashes)
     }
 
-    const allAffectedHashes = [...new Set([...enrichedHashes, ...newHashes])]
-    if (allAffectedHashes.length > 0) {
-      // Phase 3: Rebuild aggregates (incremental)
-      onProgress({ phase: "aggregating", current: 0, total: 0 })
-      this.aggregates.rebuildFileStatsIncremental(allAffectedHashes)
-      this.aggregates.rebuildFileContributorsIncremental(allAffectedHashes)
-      this.aggregates.rebuildFileCouplingIncremental(allAffectedHashes)
-
-      // Phase 4: Rebuild FTS index (incremental)
-      onProgress({ phase: "indexing", current: 0, total: 0 })
-      this.search.indexNewCommits(enrichedHashes)
-    }
+    this.rebuildAggregatesAndIndex(
+      [...new Set([...enrichedHashes, ...newHashes])],
+      enrichedHashes,
+      onProgress,
+    )
 
     const totalEnriched = this.commits.getEnrichedCommitCount()
     const totalCommits = this.commits.getTotalCommitCount()
@@ -387,6 +246,235 @@ export class EnricherService {
       enrichedThisRun,
       totalEnriched,
       totalCommits,
+    }
+  }
+
+  /** Discovers new commits from git and inserts them into the database. */
+  private async discoverAndInsert(
+    onProgress: (progress: IndexProgress) => void,
+  ): Promise<{ newHashes: string[] }> {
+    onProgress({ phase: "discovering", current: 0, total: 0 })
+    const branch = await this.git.getDefaultBranch()
+    const allHashes = await this.git.getCommitHashes(branch)
+    const indexedHashes = this.commits.getIndexedHashes()
+
+    const newHashes = allHashes.filter((h) => !indexedHashes.has(h))
+    if (newHashes.length > 0) {
+      const newCommits = await this.git.getCommitInfoBatch(newHashes)
+      this.commits.insertRawCommits(newCommits)
+    }
+
+    if (this.measurer) {
+      await this.measurer.measure(onProgress)
+    }
+
+    return { newHashes }
+  }
+
+  /** Polls a pending batch, imports results if ended, or returns early if still in progress. */
+  private async handlePendingBatch(
+    pendingBatch: { batch_id: string; request_count: number },
+    batchLLM: BatchLLMService,
+    batchJobs: BatchJobRepository,
+    onProgress: (progress: IndexProgress) => void,
+    newHashes: string[],
+  ): Promise<{
+    enrichedThisRun: number
+    enrichedHashes: string[]
+    earlyReturn?: {
+      discoveredThisRun: number
+      enrichedThisRun: number
+      totalEnriched: number
+      totalCommits: number
+      batchId: string
+      batchStatus: string
+    }
+  }> {
+    const status = await batchLLM.getBatchStatus(pendingBatch.batch_id)
+    batchJobs.updateStatus(
+      pendingBatch.batch_id,
+      status.processingStatus,
+      status.requestCounts.succeeded,
+      status.requestCounts.errored +
+        status.requestCounts.canceled +
+        status.requestCounts.expired,
+    )
+
+    if (status.processingStatus === "ended") {
+      const results = await batchLLM.getBatchResults(pendingBatch.batch_id)
+      onProgress({
+        phase: "enriching",
+        current: 0,
+        total: results.length,
+        batchId: pendingBatch.batch_id,
+        batchStatus: "importing",
+      })
+
+      const updates: Array<{
+        hash: string
+        classification: string
+        summary: string
+      }> = []
+      for (const item of results) {
+        if (item.result) {
+          updates.push({
+            hash: item.hash,
+            classification: item.result.classification,
+            summary: item.result.summary,
+          })
+        }
+      }
+      if (updates.length > 0) {
+        this.commits.updateEnrichmentBatch(updates, this.model)
+      }
+      return {
+        enrichedThisRun: updates.length,
+        enrichedHashes: updates.map((u) => u.hash),
+      }
+    }
+
+    // Still in progress — report and return early
+    const totalEnriched = this.commits.getEnrichedCommitCount()
+    const totalCommits = this.commits.getTotalCommitCount()
+    onProgress({
+      phase: "enriching",
+      current: status.requestCounts.succeeded,
+      total: pendingBatch.request_count,
+      batchId: pendingBatch.batch_id,
+      batchStatus: status.processingStatus,
+    })
+    return {
+      enrichedThisRun: 0,
+      enrichedHashes: [],
+      earlyReturn: {
+        discoveredThisRun: newHashes.length,
+        enrichedThisRun: 0,
+        totalEnriched,
+        totalCommits,
+        batchId: pendingBatch.batch_id,
+        batchStatus: status.processingStatus,
+      },
+    }
+  }
+
+  /** Submits a new batch if unenriched commits exist, handling merge commits locally. */
+  private async submitNewBatch(
+    batchLLM: BatchLLMService,
+    batchJobs: BatchJobRepository,
+    onProgress: (progress: IndexProgress) => void,
+    newHashes: string[],
+  ): Promise<{
+    enrichedThisRun: number
+    enrichedHashes: string[]
+    earlyReturn?: {
+      discoveredThisRun: number
+      enrichedThisRun: number
+      totalEnriched: number
+      totalCommits: number
+      batchId: string
+      batchStatus: string
+    }
+  }> {
+    let enrichedThisRun = 0
+    const enrichedHashes: string[] = []
+
+    const unenriched = this.commits.getUnenrichedCommits()
+    if (unenriched.length > 0) {
+      const MAX_BATCH_SIZE = 10000
+      const unenrichedHashes = unenriched.map((c) => c.hash)
+      const diffMap = await this.git.getDiffBatch(unenrichedHashes)
+      const filesMap = this.commits.getCommitFilesByHashes(unenrichedHashes)
+
+      // Handle merge commits locally without LLM
+      const needsLLM: CommitRow[] = []
+      for (const commit of unenriched) {
+        const diff = diffMap.get(commit.hash) ?? ""
+        const mergeResult = this.tryMergeCommitEnrichment(
+          commit.message,
+          diff,
+        )
+        if (mergeResult) {
+          this.commits.updateEnrichment(
+            commit.hash,
+            mergeResult.classification,
+            mergeResult.summary,
+            this.model,
+          )
+          enrichedThisRun++
+          enrichedHashes.push(commit.hash)
+        } else {
+          needsLLM.push(commit)
+        }
+      }
+
+      const batches = this.chunkCommits(needsLLM, MAX_BATCH_SIZE)
+
+      for (const batch of batches) {
+        const requests = batch.map((commit) => ({
+          hash: commit.hash,
+          commit: {
+            hash: commit.hash,
+            authorName: commit.author_name,
+            authorEmail: commit.author_email,
+            committedAt: commit.committed_at,
+            message: commit.message,
+            files: filesMap.get(commit.hash) ?? [],
+          },
+          diff: diffMap.get(commit.hash) ?? "",
+        }))
+
+        onProgress({
+          phase: "enriching",
+          current: 0,
+          total: requests.length,
+          batchStatus: "submitting",
+        })
+
+        const { batchId, requestCount } = await batchLLM.submitBatch(requests)
+        batchJobs.insert(batchId, requestCount, this.model)
+
+        const totalEnriched = this.commits.getEnrichedCommitCount()
+        const totalCommits = this.commits.getTotalCommitCount()
+        onProgress({
+          phase: "enriching",
+          current: 0,
+          total: requestCount,
+          batchId,
+          batchStatus: "submitted",
+        })
+
+        return {
+          enrichedThisRun: 0,
+          enrichedHashes,
+          earlyReturn: {
+            discoveredThisRun: newHashes.length,
+            enrichedThisRun: 0,
+            totalEnriched,
+            totalCommits,
+            batchId,
+            batchStatus: "submitted",
+          },
+        }
+      }
+    }
+
+    return { enrichedThisRun, enrichedHashes }
+  }
+
+  /** Rebuilds aggregates and the FTS index for affected commit hashes. */
+  private rebuildAggregatesAndIndex(
+    affectedHashes: string[],
+    enrichedHashes: string[],
+    onProgress: (progress: IndexProgress) => void,
+  ): void {
+    if (affectedHashes.length > 0) {
+      onProgress({ phase: "aggregating", current: 0, total: 0 })
+      this.aggregates.rebuildFileStatsIncremental(affectedHashes)
+      this.aggregates.rebuildFileContributorsIncremental(affectedHashes)
+      this.aggregates.rebuildFileCouplingIncremental(affectedHashes)
+
+      onProgress({ phase: "indexing", current: 0, total: 0 })
+      this.search.indexNewCommits(enrichedHashes)
     }
   }
 
