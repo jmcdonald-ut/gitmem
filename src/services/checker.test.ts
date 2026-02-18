@@ -525,4 +525,170 @@ describe("CheckerService", () => {
     expect(phases).toContain("evaluating")
     expect(phases).toContain("done")
   })
+
+  test("checkOne auto-passes merge commit with empty diff", async () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "Merge branch 'feature' into main",
+        files: [],
+      },
+    ])
+    commits.updateEnrichment(
+      "aaa",
+      "chore",
+      "Merge commit: Merge branch 'feature' into main",
+      "haiku",
+    )
+
+    const mergeGit: IGitService = {
+      ...mockGit,
+      getCommitInfo: mock((hash: string) =>
+        Promise.resolve({
+          hash,
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "Merge branch 'feature' into main",
+          files: [],
+        }),
+      ),
+      getDiff: mock(() => Promise.resolve("")),
+    }
+
+    const checker = new CheckerService(mergeGit, mockJudge, commits)
+    const result = await checker.checkOne("aaa", () => {})
+
+    expect(result).not.toBeNull()
+    expect(result!.classificationVerdict.pass).toBe(true)
+    expect(result!.classificationVerdict.reasoning).toContain(
+      "template-enriched",
+    )
+    expect(mockJudge.evaluateCommit).not.toHaveBeenCalled()
+  })
+
+  test("checkOne still evaluates merge commit with non-empty diff", async () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "Merge branch 'feature' into main",
+        files: [],
+      },
+    ])
+    commits.updateEnrichment("aaa", "feature", "Added feature", "haiku")
+
+    const mergeGit: IGitService = {
+      ...mockGit,
+      getCommitInfo: mock((hash: string) =>
+        Promise.resolve({
+          hash,
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "Merge branch 'feature' into main",
+          files: [
+            {
+              filePath: "src/main.ts",
+              changeType: "M",
+              additions: 10,
+              deletions: 5,
+            },
+          ],
+        }),
+      ),
+      getDiff: mock(() => Promise.resolve("diff content")),
+    }
+
+    const checker = new CheckerService(mergeGit, mockJudge, commits)
+    const result = await checker.checkOne("aaa", () => {})
+
+    expect(result).not.toBeNull()
+    expect(mockJudge.evaluateCommit).toHaveBeenCalled()
+  })
+
+  test("checkSample excludes merge commits with empty diffs", async () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "Merge branch 'feature' into main",
+        files: [],
+      },
+      {
+        hash: "bbb",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "commit bbb",
+        files: [],
+      },
+    ])
+    commits.updateEnrichment(
+      "aaa",
+      "chore",
+      "Merge commit: Merge branch 'feature' into main",
+      "haiku",
+    )
+    commits.updateEnrichment("bbb", "feature", "summary b", "haiku")
+
+    const mergeGit: IGitService = {
+      ...mockGit,
+      getDiffBatch: mock((hashes: string[]) => {
+        const map = new Map<string, string>()
+        for (const h of hashes) map.set(h, h === "aaa" ? "" : "diff content")
+        return Promise.resolve(map)
+      }),
+    }
+
+    const checker = new CheckerService(mergeGit, mockJudge, commits)
+    const { results, summary } = await checker.checkSample(2, () => {})
+
+    // Only "bbb" should be evaluated — "aaa" is a merge commit with empty diff
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("bbb")
+    expect(summary.total).toBe(1)
+  })
+
+  test("checkSample handles all-merge-commit sample", async () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "Merge branch 'feature' into main",
+        files: [],
+      },
+    ])
+    commits.updateEnrichment(
+      "aaa",
+      "chore",
+      "Merge commit: Merge branch 'feature' into main",
+      "haiku",
+    )
+
+    const mergeGit: IGitService = {
+      ...mockGit,
+      getDiffBatch: mock((hashes: string[]) => {
+        const map = new Map<string, string>()
+        for (const h of hashes) map.set(h, "")
+        return Promise.resolve(map)
+      }),
+    }
+
+    const checker = new CheckerService(mergeGit, mockJudge, commits)
+    const { results, summary } = await checker.checkSample(1, () => {})
+
+    expect(results).toHaveLength(0)
+    expect(summary.total).toBe(0)
+    expect(mockJudge.evaluateCommit).not.toHaveBeenCalled()
+  })
 })

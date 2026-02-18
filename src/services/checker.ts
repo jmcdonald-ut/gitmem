@@ -64,6 +64,20 @@ export class CheckerService {
     const commitInfo = await this.git.getCommitInfo(resolvedHash)
     const diff = await this.git.getDiff(resolvedHash)
 
+    if (this.isMergeCommitWithEmptyDiff(commit.message, diff)) {
+      onProgress({ phase: "done", current: 1, total: 1 })
+      const reasoning =
+        "Merge commit with empty diff — template-enriched during indexing, skipped evaluation."
+      return {
+        hash: resolvedHash,
+        classification: commit.classification,
+        summary: commit.summary,
+        classificationVerdict: { pass: true, reasoning },
+        accuracyVerdict: { pass: true, reasoning },
+        completenessVerdict: { pass: true, reasoning },
+      }
+    }
+
     const verdicts = await this.judge.evaluateCommit(
       commitInfo,
       diff,
@@ -97,11 +111,10 @@ export class CheckerService {
     onProgress: (progress: CheckProgress) => void,
   ): Promise<{ results: EvalResult[]; summary: EvalSummary }> {
     const sample = this.commits.getRandomEnrichedCommits(sampleSize)
-    const total = sample.length
     const results: EvalResult[] = []
     let evaluated = 0
 
-    if (total === 0) {
+    if (sample.length === 0) {
       onProgress({ phase: "done", current: 0, total: 0 })
       return {
         results: [],
@@ -118,8 +131,29 @@ export class CheckerService {
     const hashes = sample.map((c) => c.hash)
     const diffMap = await this.git.getDiffBatch(hashes)
 
-    for (let i = 0; i < sample.length; i += this.concurrency) {
-      const window = sample.slice(i, i + this.concurrency)
+    // Filter out merge commits with empty diffs — these were template-enriched
+    // during indexing and evaluating them provides no signal about LLM quality.
+    const evaluatable = sample.filter(
+      (c) =>
+        !this.isMergeCommitWithEmptyDiff(c.message, diffMap.get(c.hash) ?? ""),
+    )
+    const total = evaluatable.length
+
+    if (total === 0) {
+      onProgress({ phase: "done", current: 0, total: 0 })
+      return {
+        results: [],
+        summary: {
+          total: 0,
+          classificationCorrect: 0,
+          summaryAccurate: 0,
+          summaryComplete: 0,
+        },
+      }
+    }
+
+    for (let i = 0; i < evaluatable.length; i += this.concurrency) {
+      const window = evaluatable.slice(i, i + this.concurrency)
       onProgress({
         phase: "evaluating",
         current: evaluated + 1,
@@ -170,6 +204,14 @@ export class CheckerService {
     throw new Error(
       `Ambiguous hash prefix "${hash}" matches ${matches.length} commits: ${matchList}. Please provide more characters.`,
     )
+  }
+
+  /**
+   * Detects merge commits with empty diffs that were template-enriched
+   * during indexing (not evaluated by LLM).
+   */
+  private isMergeCommitWithEmptyDiff(message: string, diff: string): boolean {
+    return message.startsWith("Merge") && diff.trim() === ""
   }
 
   private async evaluateOne(
