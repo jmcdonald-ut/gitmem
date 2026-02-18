@@ -508,12 +508,12 @@ body {
       bindBreadcrumbClicks();
       return;
     }
+    const isDir = path.endsWith("/");
     const parts = path.replace(/\\/$/, "").split("/");
-    let accumulated = "";
     for (let i = 0; i < parts.length; i++) {
-      accumulated += parts[i] + (i < parts.length - 1 ? "/" : "");
-      const displayPath = accumulated + (i < parts.length - 1 ? "/" : "");
-      html += ' / <span data-path="' + esc(displayPath) + '">' + esc(parts[i]) + '</span>';
+      const isLast = i === parts.length - 1;
+      const segmentPath = parts.slice(0, i + 1).join("/") + (!isLast || isDir ? "/" : "");
+      html += ' / <span data-path="' + esc(segmentPath) + '">' + esc(parts[i]) + '</span>';
     }
     breadcrumbEl.innerHTML = html;
     bindBreadcrumbClicks();
