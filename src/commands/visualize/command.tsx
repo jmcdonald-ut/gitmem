@@ -226,7 +226,10 @@ export const visualizeCommand = new Command("visualize")
         const allStats = aggregates.getAllFileStats(exclude)
         const statsMap = new Map(allStats.map((s) => [s.file_path, s]))
 
-        const hierarchy = buildHierarchy(trackedFiles, statsMap)
+        const filesForHierarchy = opts.includeDeleted
+          ? [...new Set([...trackedFiles, ...allStats.map((s) => s.file_path)])]
+          : trackedFiles
+        const hierarchy = buildHierarchy(filesForHierarchy, statsMap)
         const repoName = basename(cwd)
         const html = generatePage(hierarchy, repoName)
         const detailsTrackedFiles = opts.includeDeleted
