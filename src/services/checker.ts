@@ -170,20 +170,26 @@ export class CheckerService {
     commit: CommitRow,
     diffMap: Map<string, string>,
   ): Promise<EvalResult> {
+    if (!commit.classification || !commit.summary) {
+      throw new Error(
+        `Commit ${commit.hash} missing classification/summary`,
+      )
+    }
+
     const diff = diffMap.get(commit.hash) ?? ""
     const commitInfo = await this.git.getCommitInfo(commit.hash)
 
     const verdicts = await this.judge.evaluateCommit(
       commitInfo,
       diff,
-      commit.classification!,
-      commit.summary!,
+      commit.classification,
+      commit.summary,
     )
 
     return {
       hash: commit.hash,
-      classification: commit.classification!,
-      summary: commit.summary!,
+      classification: commit.classification,
+      summary: commit.summary,
       ...verdicts,
     }
   }

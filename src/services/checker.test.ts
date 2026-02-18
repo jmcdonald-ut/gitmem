@@ -417,6 +417,27 @@ describe("CheckerService", () => {
     expect(summary.summaryComplete).toBe(1)
   })
 
+  test("evaluateOne throws when commit lacks classification/summary", async () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "commit aaa",
+        files: [],
+      },
+    ])
+    // Do NOT enrich — classification and summary are null
+
+    const checker = new CheckerService(mockGit, mockJudge, commits)
+    const diffMap = new Map<string, string>([["aaa", "diff"]])
+    // Access private method via bracket notation
+    await expect(
+      (checker as any).evaluateOne(commits.getCommit("aaa")!, diffMap),
+    ).rejects.toThrow("Commit aaa missing classification/summary")
+  })
+
   test("checkSample reports progress", async () => {
     commits.insertRawCommits([
       {
