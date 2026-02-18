@@ -15,7 +15,7 @@ import {
   type FileCategory,
 } from "@services/file-filter"
 
-function parsePort(value: string): number {
+export function parsePort(value: string): number {
   const n = parseInt(value, 10)
   if (isNaN(n) || n < 0 || n > 65535) {
     throw new Error("port must be between 0 and 65535")
@@ -23,7 +23,7 @@ function parsePort(value: string): number {
   return n
 }
 
-function handleDetails(
+export function handleDetails(
   url: URL,
   commits: CommitRepository,
   aggregates: AggregateRepository,
