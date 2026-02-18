@@ -3,7 +3,6 @@ import { createDatabase } from "@db/database"
 import { CommitRepository } from "@db/commits"
 import {
   AggregateRepository,
-  WINDOW_FORMATS,
   computeTrend,
 } from "@db/aggregates"
 import type { CommitInfo, TrendPeriod } from "@/types"
@@ -677,7 +676,7 @@ describe("AggregateRepository", () => {
 
   test("getTrendsForFile returns correct period breakdown", () => {
     seedData()
-    const window = WINDOW_FORMATS["monthly"]
+    const window = "monthly" as const
     const periods = aggregates.getTrendsForFile("src/main.ts", window, 12)
 
     expect(periods).toHaveLength(3)
@@ -695,7 +694,7 @@ describe("AggregateRepository", () => {
 
   test("getTrendsForFile respects limit", () => {
     seedData()
-    const window = WINDOW_FORMATS["monthly"]
+    const window = "monthly" as const
     const periods = aggregates.getTrendsForFile("src/main.ts", window, 2)
 
     expect(periods).toHaveLength(2)
@@ -722,21 +721,21 @@ describe("AggregateRepository", () => {
       },
     ])
 
-    const window = WINDOW_FORMATS["monthly"]
+    const window = "monthly" as const
     const periods = aggregates.getTrendsForFile("src/foo.ts", window, 12)
     expect(periods).toHaveLength(0)
   })
 
   test("getTrendsForFile returns empty for unknown file", () => {
     seedData()
-    const window = WINDOW_FORMATS["monthly"]
+    const window = "monthly" as const
     const periods = aggregates.getTrendsForFile("nonexistent.ts", window, 12)
     expect(periods).toHaveLength(0)
   })
 
   test("getTrendsForDirectory aggregates across files in prefix", () => {
     seedData()
-    const window = WINDOW_FORMATS["monthly"]
+    const window = "monthly" as const
     const periods = aggregates.getTrendsForDirectory("src/", window, 12)
 
     expect(periods).toHaveLength(3)
@@ -753,7 +752,7 @@ describe("AggregateRepository", () => {
 
   test("getTrendsForDirectory returns empty for no matches", () => {
     seedData()
-    const window = WINDOW_FORMATS["monthly"]
+    const window = "monthly" as const
     const periods = aggregates.getTrendsForDirectory("nonexistent/", window, 12)
     expect(periods).toHaveLength(0)
   })
@@ -942,9 +941,23 @@ describe("AggregateRepository", () => {
     expect(aggregates.getFileStats("src/main.ts")).toBeNull()
   })
 
+  test("getTrendsForFile throws on invalid window key", () => {
+    seedData()
+    expect(() =>
+      aggregates.getTrendsForFile("src/main.ts", "invalid" as any, 12),
+    ).toThrow('Invalid window "invalid"')
+  })
+
+  test("getTrendsForDirectory throws on invalid window key", () => {
+    seedData()
+    expect(() =>
+      aggregates.getTrendsForDirectory("src/", "invalid" as any, 12),
+    ).toThrow('Invalid window "invalid"')
+  })
+
   test("getTrendsForFile includes additions and deletions", () => {
     seedData()
-    const window = WINDOW_FORMATS["monthly"]
+    const window = "monthly" as const
     const periods = aggregates.getTrendsForFile("src/main.ts", window, 12)
 
     // 2024-03: ccc adds 20, deletes 5

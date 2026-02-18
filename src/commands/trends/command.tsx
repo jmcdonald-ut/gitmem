@@ -4,11 +4,8 @@ import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
-import {
-  AggregateRepository,
-  computeTrend,
-  WINDOW_FORMATS,
-} from "@db/aggregates"
+import type { WindowKey } from "@db/aggregates"
+import { AggregateRepository, computeTrend } from "@db/aggregates"
 import { TrendsCommand } from "@commands/trends/TrendsCommand"
 
 const VALID_WINDOWS = ["weekly", "monthly", "quarterly"]
@@ -52,7 +49,7 @@ export const trendsCommand = new Command("trends")
     await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
       const aggregates = new AggregateRepository(db)
       const limit = opts.limit
-      const windowSql = WINDOW_FORMATS[opts.window]
+      const window = opts.window as WindowKey
 
       const fileStats = aggregates.getFileStats(path)
       let type: "file" | "directory"
@@ -60,7 +57,7 @@ export const trendsCommand = new Command("trends")
 
       if (fileStats) {
         type = "file"
-        periods = aggregates.getTrendsForFile(path, windowSql, limit)
+        periods = aggregates.getTrendsForFile(path, window, limit)
       } else {
         const prefix = path.endsWith("/") ? path : path + "/"
         const fileCount = aggregates.getDirectoryFileCount(prefix)
@@ -71,7 +68,7 @@ export const trendsCommand = new Command("trends")
         }
 
         type = "directory"
-        periods = aggregates.getTrendsForDirectory(prefix, windowSql, limit)
+        periods = aggregates.getTrendsForDirectory(prefix, window, limit)
         path = prefix
       }
 

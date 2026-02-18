@@ -9,8 +9,11 @@ import type {
   TrendSummary,
 } from "@/types"
 
+/** Valid time window keys for trend queries. */
+export type WindowKey = "weekly" | "monthly" | "quarterly"
+
 /** SQL strftime expressions for grouping commits into time windows. */
-export const WINDOW_FORMATS: Record<string, string> = {
+export const WINDOW_FORMATS: Record<WindowKey, string> = {
   weekly: "strftime('%Y-W%W', c.committed_at)",
   monthly: "strftime('%Y-%m', c.committed_at)",
   quarterly:
@@ -611,19 +614,25 @@ export class AggregateRepository {
   /**
    * Returns change trends per time period for a single file.
    * @param filePath - Repository-relative file path.
-   * @param window - Time window SQL expression from WINDOW_FORMATS.
+   * @param window - Time window key: "weekly", "monthly", or "quarterly".
    * @param limit - Maximum number of most recent periods to return.
    * @returns Periods ordered by period label descending (most recent first).
    */
   getTrendsForFile(
     filePath: string,
-    window: string,
+    window: WindowKey,
     limit: number,
   ): TrendPeriod[] {
+    const windowSql = WINDOW_FORMATS[window]
+    if (!windowSql) {
+      throw new Error(
+        `Invalid window "${window}". Valid values: ${Object.keys(WINDOW_FORMATS).join(", ")}`,
+      )
+    }
     return this.db
       .query<TrendPeriod, [string, number]>(
         `SELECT
-           ${window} as period,
+           ${windowSql} as period,
            COUNT(DISTINCT cf.commit_hash) as total_changes,
            COUNT(DISTINCT CASE WHEN c.classification = 'bug-fix' THEN cf.commit_hash END) as bug_fix_count,
            COUNT(DISTINCT CASE WHEN c.classification = 'feature' THEN cf.commit_hash END) as feature_count,
@@ -651,19 +660,25 @@ export class AggregateRepository {
   /**
    * Returns change trends per time period for all files under a directory prefix.
    * @param prefix - Directory prefix (e.g. "src/services/").
-   * @param window - Time window SQL expression from WINDOW_FORMATS.
+   * @param window - Time window key: "weekly", "monthly", or "quarterly".
    * @param limit - Maximum number of most recent periods to return.
    * @returns Periods ordered by period label descending (most recent first).
    */
   getTrendsForDirectory(
     prefix: string,
-    window: string,
+    window: WindowKey,
     limit: number,
   ): TrendPeriod[] {
+    const windowSql = WINDOW_FORMATS[window]
+    if (!windowSql) {
+      throw new Error(
+        `Invalid window "${window}". Valid values: ${Object.keys(WINDOW_FORMATS).join(", ")}`,
+      )
+    }
     return this.db
       .query<TrendPeriod, [string, number]>(
         `SELECT
-           ${window} as period,
+           ${windowSql} as period,
            COUNT(DISTINCT cf.commit_hash) as total_changes,
            COUNT(DISTINCT CASE WHEN c.classification = 'bug-fix' THEN cf.commit_hash END) as bug_fix_count,
            COUNT(DISTINCT CASE WHEN c.classification = 'feature' THEN cf.commit_hash END) as feature_count,
