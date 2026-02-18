@@ -66,23 +66,7 @@ export class EnricherService {
     totalEnriched: number
     totalCommits: number
   }> {
-    // Phase 1: Discover commits
-    onProgress({ phase: "discovering", current: 0, total: 0 })
-    const branch = await this.git.getDefaultBranch()
-    const allHashes = await this.git.getCommitHashes(branch)
-    const indexedHashes = this.commits.getIndexedHashes()
-
-    // Insert raw commit data for unindexed commits
-    const newHashes = allHashes.filter((h) => !indexedHashes.has(h))
-    if (newHashes.length > 0) {
-      const newCommits = await this.git.getCommitInfoBatch(newHashes)
-      this.commits.insertRawCommits(newCommits)
-    }
-
-    // Phase 1.5: Measure complexity
-    if (this.measurer) {
-      await this.measurer.measure(onProgress)
-    }
+    const { newHashes } = await this.discoverAndInsert(onProgress)
 
     // Phase 2: Enrich unenriched commits with parallel sliding window
     const unenriched = this.commits.getUnenrichedCommits()
@@ -153,18 +137,11 @@ export class EnricherService {
       }
     }
 
-    const allAffectedHashes = [...new Set([...enrichedHashes, ...newHashes])]
-    if (allAffectedHashes.length > 0) {
-      // Phase 3: Rebuild aggregates (incremental)
-      onProgress({ phase: "aggregating", current: 0, total: 0 })
-      this.aggregates.rebuildFileStatsIncremental(allAffectedHashes)
-      this.aggregates.rebuildFileContributorsIncremental(allAffectedHashes)
-      this.aggregates.rebuildFileCouplingIncremental(allAffectedHashes)
-
-      // Phase 4: Rebuild FTS index (incremental)
-      onProgress({ phase: "indexing", current: 0, total: 0 })
-      this.search.indexNewCommits(enrichedHashes)
-    }
+    this.rebuildAggregatesAndIndex(
+      [...new Set([...enrichedHashes, ...newHashes])],
+      enrichedHashes,
+      onProgress,
+    )
 
     const totalEnriched = this.commits.getEnrichedCommitCount()
     const totalCommits = this.commits.getTotalCommitCount()
