@@ -106,6 +106,16 @@ export class GitService implements IGitService {
     this.cwd = cwd
   }
 
+  /** Returns all tracked file paths in the working tree. */
+  async getTrackedFiles(): Promise<string[]> {
+    const result = await Bun.$`git -C ${this.cwd} ls-files`.quiet()
+    return result
+      .text()
+      .trim()
+      .split("\n")
+      .filter((f) => f.length > 0)
+  }
+
   /** Checks whether the working directory is inside a git repository. */
   async isGitRepo(): Promise<boolean> {
     try {

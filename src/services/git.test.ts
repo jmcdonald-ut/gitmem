@@ -341,6 +341,22 @@ describe("GitService", () => {
     expect(diff).toContain("[truncated]")
   })
 
+  test("getTrackedFiles returns tracked file paths", async () => {
+    await makeCommit("a.txt", "a", "add a")
+    await Bun.$`printf "b" > ${join(tmpDir, "b.txt")}`.quiet()
+    await Bun.$`git -C ${tmpDir} add b.txt`.quiet()
+    await Bun.$`git -C ${tmpDir} commit -m "add b"`.quiet()
+
+    const files = await git.getTrackedFiles()
+    expect(files.sort()).toEqual(["a.txt", "b.txt"])
+  })
+
+  test("getTrackedFiles returns empty array for empty repo", async () => {
+    // Repo has been init'd but has no commits yet
+    const files = await git.getTrackedFiles()
+    expect(files).toEqual([])
+  })
+
   test("getCommitInfo handles additions and deletions", async () => {
     await makeCommit("file.txt", "line1\nline2\nline3\n", "initial")
     await Bun.$`printf "line1\nmodified\nline3\nnew\n" > ${join(tmpDir, "file.txt")}`.quiet()
