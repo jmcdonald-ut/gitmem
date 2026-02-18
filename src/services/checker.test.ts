@@ -395,7 +395,7 @@ describe("CheckerService", () => {
             classificationVerdict: {
               pass: false,
               reasoning: "Wrong",
-              suggestedClassification: "bug-fix" as const,
+              suggestedClassification: "refactor" as const,
             },
             accuracyVerdict: { pass: true, reasoning: "OK" },
             completenessVerdict: { pass: false, reasoning: "Missing" },
@@ -438,6 +438,71 @@ describe("CheckerService", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (checker as any).evaluateOne(commits.getCommit("aaa")!, diffMap),
     ).rejects.toThrow("Commit aaa missing classification/summary")
+  })
+
+  test("checkOne reconciles self-contradictory classification verdict", async () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "commit aaa",
+        files: [],
+      },
+    ])
+    commits.updateEnrichment("aaa", "feature", "Added feature", "haiku")
+
+    const contradictoryJudge: IJudgeService = {
+      evaluateCommit: mock(async () => ({
+        classificationVerdict: {
+          pass: false,
+          reasoning: "Should be feature",
+          suggestedClassification: "feature" as const,
+        },
+        accuracyVerdict: { pass: true, reasoning: "OK" },
+        completenessVerdict: { pass: true, reasoning: "OK" },
+      })),
+    }
+
+    const checker = new CheckerService(mockGit, contradictoryJudge, commits)
+    const result = await checker.checkOne("aaa", () => {})
+
+    expect(result).not.toBeNull()
+    expect(result!.classificationVerdict.pass).toBe(true)
+  })
+
+  test("checkSample reconciles self-contradictory classification verdict", async () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "commit aaa",
+        files: [],
+      },
+    ])
+    commits.updateEnrichment("aaa", "refactor", "Refactored code", "haiku")
+
+    const contradictoryJudge: IJudgeService = {
+      evaluateCommit: mock(async () => ({
+        classificationVerdict: {
+          pass: false,
+          reasoning: "Should be refactor",
+          suggestedClassification: "refactor" as const,
+        },
+        accuracyVerdict: { pass: true, reasoning: "OK" },
+        completenessVerdict: { pass: true, reasoning: "OK" },
+      })),
+    }
+
+    const checker = new CheckerService(mockGit, contradictoryJudge, commits)
+    const { results, summary } = await checker.checkSample(1, () => {})
+
+    expect(results).toHaveLength(1)
+    expect(results[0].classificationVerdict.pass).toBe(true)
+    expect(summary.classificationCorrect).toBe(1)
   })
 
   test("checkSample reports progress", async () => {

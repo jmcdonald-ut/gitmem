@@ -125,6 +125,24 @@ export function parseEvalResponse(text: string): {
   }
 }
 
+/**
+ * Detects and fixes self-contradictory classification verdicts where
+ * the judge says pass=false but suggests the same classification that
+ * was originally assigned.
+ */
+export function reconcileClassificationVerdict(
+  originalClassification: string,
+  verdict: EvalVerdict,
+): EvalVerdict {
+  if (
+    !verdict.pass &&
+    verdict.suggestedClassification === originalClassification
+  ) {
+    return { pass: true, reasoning: verdict.reasoning }
+  }
+  return verdict
+}
+
 function toVerdict(raw: {
   pass: boolean
   reasoning: string
