@@ -126,9 +126,10 @@ export interface FilterFlags {
 
 export function resolveExcludedCategories(opts: FilterFlags): FileCategory[] {
   if (opts.all) return []
-  const excluded = [...DEFAULT_EXCLUDED]
-  if (opts.includeTests) excluded.splice(excluded.indexOf("test"), 1)
-  if (opts.includeDocs) excluded.splice(excluded.indexOf("docs"), 1)
-  if (opts.includeGenerated) excluded.splice(excluded.indexOf("generated"), 1)
-  return excluded
+  return DEFAULT_EXCLUDED.filter((cat) => {
+    if (cat === "test" && opts.includeTests) return false
+    if (cat === "docs" && opts.includeDocs) return false
+    if (cat === "generated" && opts.includeGenerated) return false
+    return true
+  })
 }
