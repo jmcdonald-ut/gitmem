@@ -14,22 +14,22 @@ export function generatePage(
 <title>${escapeHtml(repoName)} — gitmem visualize</title>
 <style>
 :root {
-  --bg: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #21262d;
-  --border: #30363d;
-  --text: #e6edf3;
-  --text-muted: #8b949e;
-  --text-dim: #484f58;
-  --accent: #58a6ff;
-  --red: #da3633;
-  --green: #2ea043;
-  --yellow: #d4a72c;
-  --blue: #58a6ff;
-  --gray: #8b949e;
-  --purple: #bc8cff;
-  --cyan: #39d3c5;
-  --white: #f0f0f0;
+  --bg: #102A43;
+  --bg-secondary: #243B53;
+  --bg-tertiary: #334E68;
+  --border: #486581;
+  --text: #F0F4F8;
+  --text-muted: #9FB3C8;
+  --text-dim: #627D98;
+  --accent: #40C3F7;
+  --red: #EF4E4E;
+  --green: #3EBD93;
+  --yellow: #F7C948;
+  --blue: #47A3F3;
+  --gray: #9FB3C8;
+  --purple: #9446ED;
+  --cyan: #38BEC9;
+  --white: #F0F4F8;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -278,19 +278,19 @@ body {
   const breadcrumbEl = document.getElementById("breadcrumb");
 
   const COLORS = {
-    "bug-fix": "#da3633",
-    "feature": "#2ea043",
-    "refactor": "#d4a72c",
-    "docs": "#58a6ff",
-    "chore": "#8b949e",
-    "perf": "#bc8cff",
-    "test": "#39d3c5",
-    "style": "#f0f0f0"
+    "bug-fix": "#EF4E4E",
+    "feature": "#3EBD93",
+    "refactor": "#F7C948",
+    "docs": "#47A3F3",
+    "chore": "#9FB3C8",
+    "perf": "#9446ED",
+    "test": "#38BEC9",
+    "style": "#F0F4F8"
   };
 
   const scoreColor = d3.scaleLinear()
     .domain([0, 0.5, 1])
-    .range(["#2ea043", "#d4a72c", "#da3633"])
+    .range(["#3EBD93", "#F7C948", "#EF4E4E"])
     .interpolate(d3.interpolateRgb);
 
   const width = vizEl.clientWidth;
@@ -322,7 +322,7 @@ body {
     .join("circle")
     .attr("fill", d => {
       if (d.children) return "rgba(255,255,255,0.03)";
-      if (!d.data.indexed) return "#30363d";
+      if (!d.data.indexed) return "#486581";
       return scoreColor(d.data.score || 0);
     })
     .attr("stroke", d => d.children ? "rgba(255,255,255,0.08)" : "none")
@@ -370,7 +370,7 @@ body {
     .join("text")
     .attr("text-anchor", "middle")
     .attr("dy", "0.3em")
-    .attr("fill", "#e6edf3")
+    .attr("fill", "#F0F4F8")
     .attr("font-size", d => Math.min(d.r * 0.6, 12))
     .attr("pointer-events", "none")
     .text(d => d.data.name)
