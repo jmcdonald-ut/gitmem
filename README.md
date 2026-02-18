@@ -3,6 +3,7 @@
 # gitmem
 
 gitmem indexes your git history with LLM-powered commit classification, then surfaces patterns — hotspots, file coupling, change trends — at query time with no LLM calls. Built for humans and AI agents alike.
+
 </div>
 
 ```sh
@@ -16,6 +17,21 @@ gitmem coupling src/db.ts    # What changes alongside this file?
 gitmem trends src/services   # Is this area stabilizing or getting worse?
 gitmem query "auth"          # Search commit history
 ```
+
+`gitmem visualize` renders an interactive codebase explorer:
+
+<div align="center">
+<table>
+<tr>
+<td align="center"><img src="docs/screenshots/visualize-root.png" alt="gitmem visualize showing a circle-packing overview of the React repository with hotspots, coupled files, and trends" width="400" /></td>
+<td align="center"><img src="docs/screenshots/visualize-file.png" alt="gitmem visualize drilled into ReactFiberCommitWork.js showing classification breakdown, contributors, and coupled files" width="400" /></td>
+</tr>
+<tr>
+<td align="center"><sub>Repository overview — React codebase</sub></td>
+<td align="center"><sub>File drill-down — ReactFiberCommitWork.js</sub></td>
+</tr>
+</table>
+</div>
 
 ## Table of Contents
 
@@ -88,6 +104,7 @@ Commands:
   coupling|c [options] [path]  Show files that frequently change together
   trends|t [options] <path>    Show change velocity and classification mix over time
   schema                       Display database schema documentation
+  visualize|viz [options]      Open an interactive visualization of the repository
   help [command]               display help for command
 
 Getting started:
