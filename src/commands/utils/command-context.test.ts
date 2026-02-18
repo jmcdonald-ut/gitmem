@@ -199,4 +199,122 @@ describe("runCommand", () => {
     const ctx = calls[0][0]
     expect(ctx.dbPath).toBe("")
   })
+
+  test("passes API key to handler when needsApiKey is true", async () => {
+    const { $ } = await import("bun")
+    await $`git init ${tempDir}`.quiet()
+
+    const originalKey = process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY = "test-key-123"
+
+    try {
+      const handler = mock(async () => {})
+      await runCommand({}, { needsApiKey: true, needsDb: false }, handler)
+
+      expect(handler).toHaveBeenCalledTimes(1)
+      const calls = handler.mock.calls as unknown as [[CommandContext]]
+      expect(calls[0][0].apiKey).toBe("test-key-123")
+    } finally {
+      if (originalKey !== undefined) {
+        process.env.ANTHROPIC_API_KEY = originalKey
+      } else {
+        delete process.env.ANTHROPIC_API_KEY
+      }
+    }
+  })
+
+  test("acquires and releases lock when needsLock is true", async () => {
+    const { $ } = await import("bun")
+    const { existsSync } = await import("fs")
+    await $`git init ${tempDir}`.quiet()
+
+    const dbPath = join(tempDir, ".gitmem", "index.db")
+    const { mkdirSync } = await import("fs")
+    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
+    const tempDb = createDatabase(dbPath)
+    tempDb.close()
+
+    const lockPath = join(tempDir, ".gitmem", "index.lock")
+    let lockExistedDuringHandler = false
+
+    await runCommand({}, { needsApiKey: false, needsLock: true }, async () => {
+      lockExistedDuringHandler = existsSync(lockPath)
+    })
+
+    expect(lockExistedDuringHandler).toBe(true)
+    expect(existsSync(lockPath)).toBe(false)
+  })
+
+  test("releases lock when handler throws", async () => {
+    const { $ } = await import("bun")
+    const { existsSync } = await import("fs")
+    await $`git init ${tempDir}`.quiet()
+
+    const dbPath = join(tempDir, ".gitmem", "index.db")
+    const { mkdirSync } = await import("fs")
+    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
+    const tempDb = createDatabase(dbPath)
+    tempDb.close()
+
+    const lockPath = join(tempDir, ".gitmem", "index.lock")
+
+    await expect(
+      runCommand({}, { needsApiKey: false, needsLock: true }, async () => {
+        throw new Error("handler failed")
+      }),
+    ).rejects.toThrow("handler failed")
+
+    expect(existsSync(lockPath)).toBe(false)
+  })
+
+  test("rethrows non-EEXIST errors from lock acquisition", async () => {
+    const { $ } = await import("bun")
+    const { mkdirSync, chmodSync } = await import("fs")
+    await $`git init ${tempDir}`.quiet()
+
+    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
+    const dbPath = join(tempDir, ".gitmem", "index.db")
+    const tempDb = createDatabase(dbPath)
+    tempDb.close()
+
+    // Make directory read-only so openSync fails with EACCES, not EEXIST
+    chmodSync(join(tempDir, ".gitmem"), 0o555)
+
+    try {
+      await expect(
+        runCommand({}, { needsApiKey: false, needsLock: true }, async () => {}),
+      ).rejects.toThrow()
+
+      // Should NOT be our lock-exists message — it should be a raw EACCES
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("another gitmem process"),
+      )
+    } finally {
+      chmodSync(join(tempDir, ".gitmem"), 0o755)
+    }
+  })
+
+  test("exits with 1 when lock file already exists", async () => {
+    const { $ } = await import("bun")
+    const { writeFileSync, mkdirSync } = await import("fs")
+    await $`git init ${tempDir}`.quiet()
+
+    const dbPath = join(tempDir, ".gitmem", "index.db")
+    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
+    const tempDb = createDatabase(dbPath)
+    tempDb.close()
+
+    // Create the lock file before running
+    const lockPath = join(tempDir, ".gitmem", "index.lock")
+    writeFileSync(lockPath, "12345\n")
+
+    await expect(
+      runCommand({}, { needsApiKey: false, needsLock: true }, async () => {}),
+    ).rejects.toThrow("process.exit(1)")
+
+    expect(exitCode).toBe(1)
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Error: another gitmem process is running (lock file exists: .gitmem/index.lock)",
+    )
+  })
 })
