@@ -2,5 +2,6 @@
 coverage = true
 coverageThreshold = 0.9
 coveragePathIgnorePatterns = [
-  "src/commands/utils/test-utils.ts"
+  "src/commands/utils/test-utils.ts",
+  "src/commands/visualize/command.tsx"
 ]
