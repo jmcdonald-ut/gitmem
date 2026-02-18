@@ -51,6 +51,35 @@ describe("isExcluded", () => {
       expect(isExcluded("src/spec/foo.rb", ["test"])).toBe(true)
     })
 
+    test("matches fixtures/ directory", () => {
+      expect(isExcluded("fixtures/user.json", ["test"])).toBe(true)
+      expect(isExcluded("src/fixtures/data.json", ["test"])).toBe(true)
+    })
+
+    test("matches __fixtures__/ directory", () => {
+      expect(isExcluded("src/__fixtures__/mock-data.ts", ["test"])).toBe(true)
+    })
+
+    test("matches __mocks__/ directory", () => {
+      expect(isExcluded("src/__mocks__/api.ts", ["test"])).toBe(true)
+    })
+
+    test("matches __snapshots__/ directory", () => {
+      expect(isExcluded("src/__snapshots__/App.test.ts.snap", ["test"])).toBe(
+        true,
+      )
+    })
+
+    test("matches testdata/ directory (Go convention)", () => {
+      expect(isExcluded("testdata/input.txt", ["test"])).toBe(true)
+      expect(isExcluded("pkg/testdata/golden.json", ["test"])).toBe(true)
+    })
+
+    test("matches test-data/ directory", () => {
+      expect(isExcluded("test-data/sample.csv", ["test"])).toBe(true)
+      expect(isExcluded("src/test-data/mock.json", ["test"])).toBe(true)
+    })
+
     test("does not match non-test files", () => {
       expect(isExcluded("src/main.ts", ["test"])).toBe(false)
       expect(isExcluded("src/testing.ts", ["test"])).toBe(false)
@@ -157,9 +186,15 @@ describe("getExclusionPatterns", () => {
     expect(patterns).toContain("%\\_test.%")
     expect(patterns).toContain("%\\_spec.%")
     expect(patterns).toContain("%/__tests__/%")
+    expect(patterns).toContain("%/__fixtures__/%")
+    expect(patterns).toContain("%/__mocks__/%")
+    expect(patterns).toContain("%/__snapshots__/%")
     expect(patterns).toContain("%/test/%")
     expect(patterns).toContain("%/tests/%")
     expect(patterns).toContain("%/spec/%")
+    expect(patterns).toContain("%/fixtures/%")
+    expect(patterns).toContain("%/testdata/%")
+    expect(patterns).toContain("%/test-data/%")
   })
 
   test("returns docs patterns", () => {

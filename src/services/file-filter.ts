@@ -2,7 +2,18 @@ export type FileCategory = "test" | "docs" | "generated"
 
 export const DEFAULT_EXCLUDED: FileCategory[] = ["test", "docs", "generated"]
 
-const TEST_DIR_PATTERNS = ["__tests__/", "test/", "tests/", "spec/"]
+const TEST_DIR_PATTERNS = [
+  "__tests__/",
+  "__fixtures__/",
+  "__mocks__/",
+  "__snapshots__/",
+  "test/",
+  "tests/",
+  "spec/",
+  "fixtures/",
+  "testdata/",
+  "test-data/",
+]
 
 const DOCS_DIR_PATTERNS = ["docs/"]
 
@@ -80,9 +91,15 @@ export function getExclusionPatterns(categories: FileCategory[]): string[] {
       "%\\_test.%",
       "%\\_spec.%",
       "%/__tests__/%",
+      "%/__fixtures__/%",
+      "%/__mocks__/%",
+      "%/__snapshots__/%",
       "%/test/%",
       "%/tests/%",
       "%/spec/%",
+      "%/fixtures/%",
+      "%/testdata/%",
+      "%/test-data/%",
     )
   }
 
