@@ -3,6 +3,7 @@ import {
   JUDGE_SYSTEM_PROMPT,
   buildJudgeUserMessage,
   parseEvalResponse,
+  EvalResponseSchema,
 } from "@services/judge-shared"
 import type { CommitInfo } from "@/types"
 
@@ -57,6 +58,42 @@ describe("JUDGE_SYSTEM_PROMPT", () => {
     expect(JUDGE_SYSTEM_PROMPT).toContain(
       "do not fail completeness for lack of detail that cannot be inferred",
     )
+  })
+
+  test("does not contain JSON format instructions (handled by structured outputs)", () => {
+    expect(JUDGE_SYSTEM_PROMPT).not.toContain("Respond with valid JSON only")
+    expect(JUDGE_SYSTEM_PROMPT).not.toContain("markdown fences")
+  })
+})
+
+describe("EvalResponseSchema", () => {
+  test("validates valid eval response", () => {
+    const result = EvalResponseSchema.safeParse({
+      classification: { pass: true, reasoning: "Correct" },
+      accuracy: { pass: true, reasoning: "Accurate" },
+      completeness: { pass: false, reasoning: "Incomplete" },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  test("validates response with suggestedClassification", () => {
+    const result = EvalResponseSchema.safeParse({
+      classification: {
+        pass: false,
+        reasoning: "Wrong",
+        suggestedClassification: "bug-fix",
+      },
+      accuracy: { pass: true, reasoning: "OK" },
+      completeness: { pass: true, reasoning: "OK" },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  test("rejects missing fields", () => {
+    const result = EvalResponseSchema.safeParse({
+      classification: { pass: true, reasoning: "OK" },
+    })
+    expect(result.success).toBe(false)
   })
 })
 
@@ -140,71 +177,7 @@ describe("parseEvalResponse", () => {
     expect(result.completenessVerdict.reasoning).toBe("Missing details")
   })
 
-  test("strips markdown json fences", () => {
-    const result = parseEvalResponse(
-      '```json\n{"classification":{"pass":true,"reasoning":"OK"},"accuracy":{"pass":true,"reasoning":"OK"},"completeness":{"pass":true,"reasoning":"OK"}}\n```',
-    )
-    expect(result.classificationVerdict.pass).toBe(true)
-  })
-
-  test("strips markdown fences without language tag", () => {
-    const result = parseEvalResponse(
-      '```\n{"classification":{"pass":true,"reasoning":"OK"},"accuracy":{"pass":true,"reasoning":"OK"},"completeness":{"pass":true,"reasoning":"OK"}}\n```',
-    )
-    expect(result.classificationVerdict.pass).toBe(true)
-  })
-
-  test("defaults to fail on invalid JSON", () => {
-    const result = parseEvalResponse("not json at all")
-    expect(result.classificationVerdict.pass).toBe(false)
-    expect(result.classificationVerdict.reasoning).toBe(
-      "Malformed judge response",
-    )
-    expect(result.accuracyVerdict.pass).toBe(false)
-    expect(result.completenessVerdict.pass).toBe(false)
-  })
-
-  test("defaults to fail on missing fields", () => {
-    const result = parseEvalResponse("{}")
-    expect(result.classificationVerdict.pass).toBe(false)
-    expect(result.accuracyVerdict.pass).toBe(false)
-    expect(result.completenessVerdict.pass).toBe(false)
-  })
-
-  test("defaults non-boolean pass to false", () => {
-    const result = parseEvalResponse(
-      JSON.stringify({
-        classification: { pass: "yes", reasoning: "OK" },
-        accuracy: { pass: true, reasoning: "OK" },
-        completeness: { pass: true, reasoning: "OK" },
-      }),
-    )
-    expect(result.classificationVerdict.pass).toBe(false)
-  })
-
-  test("defaults non-string reasoning", () => {
-    const result = parseEvalResponse(
-      JSON.stringify({
-        classification: { pass: false, reasoning: 123 },
-        accuracy: { pass: true, reasoning: "OK" },
-        completeness: { pass: true, reasoning: "OK" },
-      }),
-    )
-    expect(result.classificationVerdict.reasoning).toBe("No reasoning provided")
-  })
-
-  test("ignores invalid suggested classification", () => {
-    const result = parseEvalResponse(
-      JSON.stringify({
-        classification: {
-          pass: false,
-          reasoning: "Wrong",
-          suggestedClassification: "invalid-type",
-        },
-        accuracy: { pass: true, reasoning: "OK" },
-        completeness: { pass: true, reasoning: "OK" },
-      }),
-    )
-    expect(result.classificationVerdict.suggestedClassification).toBeUndefined()
+  test("throws on invalid JSON", () => {
+    expect(() => parseEvalResponse("not json at all")).toThrow()
   })
 })

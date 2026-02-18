@@ -66,29 +66,6 @@ describe("JudgeService", () => {
     expect(result.completenessVerdict.reasoning).toBe("Missing details")
   })
 
-  test("evaluateCommit defaults malformed response to fail", async () => {
-    const service = new JudgeService("test-key")
-    setClient(
-      service,
-      mockClient(() =>
-        Promise.resolve({
-          content: [{ type: "text", text: "not valid json" }],
-        }),
-      ),
-    )
-
-    const result = await service.evaluateCommit(
-      commit,
-      "diff",
-      "feature",
-      "Added feature",
-    )
-
-    expect(result.classificationVerdict.pass).toBe(false)
-    expect(result.accuracyVerdict.pass).toBe(false)
-    expect(result.completenessVerdict.pass).toBe(false)
-  })
-
   test("evaluateCommit propagates API errors", async () => {
     const service = new JudgeService("test-key")
     setClient(
@@ -101,29 +78,33 @@ describe("JudgeService", () => {
     ).rejects.toThrow("API error")
   })
 
-  test("evaluateCommit strips markdown fences from response", async () => {
+  test("evaluateCommit passes output_config in API call", async () => {
     const service = new JudgeService("test-key")
-    setClient(
-      service,
-      mockClient(() =>
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: '```json\n{"classification":{"pass":true,"reasoning":"OK"},"accuracy":{"pass":true,"reasoning":"OK"},"completeness":{"pass":true,"reasoning":"OK"}}\n```',
-            },
-          ],
-        }),
-      ),
+    const client = mockClient(() =>
+      Promise.resolve({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              classification: { pass: true, reasoning: "OK" },
+              accuracy: { pass: true, reasoning: "OK" },
+              completeness: { pass: true, reasoning: "OK" },
+            }),
+          },
+        ],
+      }),
     )
+    setClient(service, client)
 
-    const result = await service.evaluateCommit(
-      commit,
-      "diff",
-      "feature",
-      "summary",
-    )
-    expect(result.classificationVerdict.pass).toBe(true)
+    await service.evaluateCommit(commit, "diff", "feature", "summary")
+
+    const call = client.messages.create.mock.calls[0] as unknown as [
+      { output_config: unknown },
+    ]
+    expect(call[0].output_config).toBeDefined()
+    expect(
+      (call[0].output_config as { format: { type: string } }).format.type,
+    ).toBe("json_schema")
   })
 
   test("evaluateCommit uses custom model", () => {

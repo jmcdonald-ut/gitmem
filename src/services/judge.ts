@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import type { CommitInfo, EvalVerdict, IJudgeService } from "@/types"
 import {
   JUDGE_SYSTEM_PROMPT,
+  EVAL_OUTPUT_CONFIG,
   buildJudgeUserMessage,
   parseEvalResponse,
 } from "@services/judge-shared"
@@ -50,6 +51,7 @@ export class JudgeService implements IJudgeService {
       max_tokens: 1024,
       system: JUDGE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
+      output_config: EVAL_OUTPUT_CONFIG,
     })
 
     const text =
