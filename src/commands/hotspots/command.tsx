@@ -6,6 +6,7 @@ import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { AggregateRepository } from "@db/aggregates"
 import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
+import { resolveExcludedCategories } from "@services/file-filter"
 
 const VALID_SORT_FIELDS = [
   "total",
@@ -47,6 +48,13 @@ export const hotspotsCommand = new Command("hotspots")
   )
   .option("--path <prefix>", "Filter by directory prefix")
   .option("-l, --limit <number>", "Max results", parsePositiveInt, 10)
+  .option("--include-tests", "Include test files (excluded by default)")
+  .option("--include-docs", "Include documentation files (excluded by default)")
+  .option(
+    "--include-generated",
+    "Include generated/vendored files (excluded by default)",
+  )
+  .option("--all", "Include all files (no exclusions)")
   .action(async (opts, cmd) => {
     if (!VALID_SORT_FIELDS.includes(opts.sort)) {
       console.error(
@@ -57,11 +65,13 @@ export const hotspotsCommand = new Command("hotspots")
 
     await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
       const aggregates = new AggregateRepository(db)
+      const exclude = resolveExcludedCategories(opts)
 
       const hotspots = aggregates.getHotspots({
         limit: opts.limit,
         sort: opts.sort,
         pathPrefix: opts.path,
+        exclude,
       })
 
       if (

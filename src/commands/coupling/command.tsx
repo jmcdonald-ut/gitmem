@@ -6,6 +6,7 @@ import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { AggregateRepository } from "@db/aggregates"
 import { CouplingCommand } from "@commands/coupling/CouplingCommand"
+import { resolveExcludedCategories } from "@services/file-filter"
 
 const HELP_TEXT = `
 Co-change means two files were modified in the same commit. High
@@ -27,13 +28,21 @@ export const couplingCommand = new Command("coupling")
   .description("Show files that frequently change together")
   .addHelpText("after", HELP_TEXT)
   .option("-l, --limit <number>", "Max results", parsePositiveInt, 10)
+  .option("--include-tests", "Include test files (excluded by default)")
+  .option("--include-docs", "Include documentation files (excluded by default)")
+  .option(
+    "--include-generated",
+    "Include generated/vendored files (excluded by default)",
+  )
+  .option("--all", "Include all files (no exclusions)")
   .action(async (path, opts, cmd) => {
     await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
       const aggregates = new AggregateRepository(db)
       const limit = opts.limit
+      const exclude = resolveExcludedCategories(opts)
 
       if (!path) {
-        const pairs = aggregates.getTopCoupledPairs(limit)
+        const pairs = aggregates.getTopCoupledPairs(limit, exclude)
 
         if (formatOutput(format, { path: null, pairs })) return
 
@@ -41,7 +50,11 @@ export const couplingCommand = new Command("coupling")
       } else {
         const fileStats = aggregates.getFileStats(path)
         if (fileStats) {
-          const pairs = aggregates.getCoupledFilesWithRatio(path, limit)
+          const pairs = aggregates.getCoupledFilesWithRatio(
+            path,
+            limit,
+            exclude,
+          )
 
           if (formatOutput(format, { path, pairs })) return
 
@@ -55,7 +68,11 @@ export const couplingCommand = new Command("coupling")
             process.exit(1)
           }
 
-          const pairs = aggregates.getCoupledFilesForDirectory(prefix, limit)
+          const pairs = aggregates.getCoupledFilesForDirectory(
+            prefix,
+            limit,
+            exclude,
+          )
 
           if (formatOutput(format, { path: prefix, pairs })) return
 
