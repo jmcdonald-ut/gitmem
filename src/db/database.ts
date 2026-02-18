@@ -107,7 +107,18 @@ function createSchema(db: Database): void {
       failed_count INTEGER NOT NULL DEFAULT 0,
       submitted_at TEXT NOT NULL,
       completed_at TEXT,
-      model_used TEXT NOT NULL
+      model_used TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'index'
+    );
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS check_batch_items (
+      batch_id TEXT NOT NULL REFERENCES batch_jobs(batch_id),
+      hash TEXT NOT NULL,
+      classification TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      PRIMARY KEY (batch_id, hash)
     );
   `)
 
@@ -144,7 +155,8 @@ function needsMigration(db: Database): boolean {
     !hasColumn(db, "file_stats", "current_loc") ||
     !hasColumn(db, "file_stats", "current_complexity") ||
     !hasColumn(db, "file_stats", "avg_complexity") ||
-    !hasColumn(db, "file_stats", "max_complexity")
+    !hasColumn(db, "file_stats", "max_complexity") ||
+    !hasColumn(db, "batch_jobs", "type")
   )
 }
 
@@ -163,6 +175,13 @@ function migrateSchema(db: Database): void {
   }
   if (!hasColumn(db, "commit_files", "max_indent")) {
     db.run("ALTER TABLE commit_files ADD COLUMN max_indent INTEGER")
+  }
+
+  // batch_jobs type column
+  if (!hasColumn(db, "batch_jobs", "type")) {
+    db.run(
+      "ALTER TABLE batch_jobs ADD COLUMN type TEXT NOT NULL DEFAULT 'index'",
+    )
   }
 
   // file_stats complexity columns

@@ -378,13 +378,31 @@ export interface EvalSummary {
 /** Tracks progress through the check workflow. */
 export interface CheckProgress {
   /** Current check phase. */
-  phase: "evaluating" | "done"
+  phase: "evaluating" | "submitting" | "importing" | "done"
   /** Number of commits evaluated so far. */
   current: number
   /** Total commits to evaluate. */
   total: number
   /** Hash of the commit currently being evaluated. */
   currentHash?: string
+  /** Batch job ID when using batch mode. */
+  batchId?: string
+  /** Batch processing status when using batch mode. */
+  batchStatus?: string
+}
+
+/** Result from a batch check operation. */
+export interface CheckBatchResult {
+  /** Evaluation results (present when batch is complete). */
+  results?: EvalResult[]
+  /** Aggregate summary (present when batch is complete). */
+  summary?: EvalSummary
+  /** Path where detailed results were written. */
+  outputPath?: string
+  /** Batch job ID. */
+  batchId?: string
+  /** Current batch processing status. */
+  batchStatus?: string
 }
 
 /** Interface for LLM-based commit evaluation (judge). */

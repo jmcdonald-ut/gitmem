@@ -10,6 +10,15 @@ export interface BatchJobRow {
   submitted_at: string
   completed_at: string | null
   model_used: string
+  type: string
+}
+
+/** Database row representation of a check batch item. */
+export interface CheckBatchItemRow {
+  batch_id: string
+  hash: string
+  classification: string
+  summary: string
 }
 
 /** Repository for managing batch job records in the SQLite database. */
@@ -21,13 +30,18 @@ export class BatchJobRepository {
   }
 
   /** Inserts a new batch job record. */
-  insert(batchId: string, requestCount: number, modelUsed: string): void {
+  insert(
+    batchId: string,
+    requestCount: number,
+    modelUsed: string,
+    type: string = "index",
+  ): void {
     this.db
       .prepare(
-        `INSERT INTO batch_jobs (batch_id, status, request_count, submitted_at, model_used)
-         VALUES (?, 'submitted', ?, ?, ?)`,
+        `INSERT INTO batch_jobs (batch_id, status, request_count, submitted_at, model_used, type)
+         VALUES (?, 'submitted', ?, ?, ?, ?)`,
       )
-      .run(batchId, requestCount, new Date().toISOString(), modelUsed)
+      .run(batchId, requestCount, new Date().toISOString(), modelUsed, type)
   }
 
   /** Updates the status and counts for a batch job. */
@@ -78,5 +92,57 @@ export class BatchJobRepository {
         []
       >("SELECT * FROM batch_jobs ORDER BY submitted_at DESC")
       .all()
+  }
+
+  /** Returns the most recent pending batch job of a given type, or null. */
+  getPendingBatchByType(type: string): BatchJobRow | null {
+    return (
+      this.db
+        .query<
+          BatchJobRow,
+          [string]
+        >("SELECT * FROM batch_jobs WHERE status != 'ended' AND status != 'failed' AND type = ? ORDER BY submitted_at DESC LIMIT 1")
+        .get(type) ?? null
+    )
+  }
+
+  /** Inserts items for a check batch job. */
+  insertCheckBatchItems(
+    items: Array<{
+      batchId: string
+      hash: string
+      classification: string
+      summary: string
+    }>,
+  ): void {
+    const stmt = this.db.prepare(
+      `INSERT INTO check_batch_items (batch_id, hash, classification, summary)
+       VALUES (?, ?, ?, ?)`,
+    )
+    const transaction = this.db.transaction(
+      (
+        items: Array<{
+          batchId: string
+          hash: string
+          classification: string
+          summary: string
+        }>,
+      ) => {
+        for (const item of items) {
+          stmt.run(item.batchId, item.hash, item.classification, item.summary)
+        }
+      },
+    )
+    transaction(items)
+  }
+
+  /** Returns all check batch items for a given batch ID. */
+  getCheckBatchItems(batchId: string): CheckBatchItemRow[] {
+    return this.db
+      .query<
+        CheckBatchItemRow,
+        [string]
+      >("SELECT * FROM check_batch_items WHERE batch_id = ?")
+      .all(batchId)
   }
 }
