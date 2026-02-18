@@ -6,7 +6,7 @@
     "gitmem": "./src/cli.tsx"
   },
   "scripts": {
-    "build": "bun build --production --compile src/cli.tsx --format=esm --bytecode --minify --outfile build/gitmem",
+    "build": "bun build --production --compile src/cli.tsx --format=esm --bytecode --minify --external react-devtools-core --outfile build/gitmem",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "format": "prettier --write 'src/**/*.{ts,tsx}'",
