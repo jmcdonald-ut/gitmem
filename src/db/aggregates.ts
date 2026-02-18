@@ -473,23 +473,33 @@ export class AggregateRepository {
     pathPrefix?: string,
     exclude?: FileCategory[],
   ): Array<FileStatsRow & { combined_score: number }> {
-    const conditions: string[] = []
-    const params: (string | number)[] = []
+    // Build two separate WHERE clauses: bare for the CTE, qualified for the main query
+    const cteConditions: string[] = []
+    const cteParams: (string | number)[] = []
+    const mainConditions: string[] = []
+    const mainParams: (string | number)[] = []
 
     if (pathPrefix) {
-      conditions.push("fs.file_path LIKE ? || '%'")
-      // Push pathPrefix twice: once for the CTE WHERE, once for the main WHERE
-      params.push(pathPrefix, pathPrefix)
+      cteConditions.push("file_path LIKE ? || '%'")
+      cteParams.push(pathPrefix)
+      mainConditions.push("fs.file_path LIKE ? || '%'")
+      mainParams.push(pathPrefix)
     }
 
-    const excl = this.buildExclusionClauses("fs.file_path", exclude)
-    // Push exclusion params twice: once for the CTE, once for the main WHERE
-    conditions.push(...excl.conditions)
-    params.push(...excl.params, ...excl.params)
+    const bareExcl = this.buildExclusionClauses("file_path", exclude)
+    cteConditions.push(...bareExcl.conditions)
+    cteParams.push(...bareExcl.params)
 
-    const where =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
-    params.push(limit)
+    const qualExcl = this.buildExclusionClauses("fs.file_path", exclude)
+    mainConditions.push(...qualExcl.conditions)
+    mainParams.push(...qualExcl.params)
+
+    const cteWhere =
+      cteConditions.length > 0 ? `WHERE ${cteConditions.join(" AND ")}` : ""
+    const mainWhere =
+      mainConditions.length > 0 ? `WHERE ${mainConditions.join(" AND ")}` : ""
+
+    const params = [...cteParams, ...mainParams, limit]
 
     return this.db
       .query<FileStatsRow & { combined_score: number }, (string | number)[]>(
@@ -497,7 +507,7 @@ export class AggregateRepository {
            SELECT
              MAX(total_changes) as max_changes,
              MAX(current_complexity) as max_complexity
-           FROM file_stats ${where.replaceAll("fs.", "")}
+           FROM file_stats ${cteWhere}
          )
          SELECT fs.*,
            CASE
@@ -510,11 +520,25 @@ export class AggregateRepository {
              ELSE 0.0
            END as combined_score
          FROM file_stats fs, maxvals m
-         ${where}
+         ${mainWhere}
          ORDER BY combined_score DESC
          LIMIT ?`,
       )
       .all(...params)
+  }
+
+  /**
+   * Returns all file stats rows, optionally excluding file categories.
+   * @param exclude - File categories to exclude from results.
+   * @returns All file stats rows matching the filter.
+   */
+  getAllFileStats(exclude?: FileCategory[]): FileStatsRow[] {
+    const excl = this.buildExclusionClauses("file_path", exclude)
+    const where =
+      excl.conditions.length > 0 ? `WHERE ${excl.conditions.join(" AND ")}` : ""
+    return this.db
+      .query<FileStatsRow, string[]>(`SELECT * FROM file_stats ${where}`)
+      .all(...excl.params)
   }
 
   /**
