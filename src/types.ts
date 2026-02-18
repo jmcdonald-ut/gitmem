@@ -321,6 +321,8 @@ export interface IGitService {
     hashes: string[],
     maxChars?: number,
   ): Promise<Map<string, string>>
+  /** Returns all tracked file paths in the working tree. */
+  getTrackedFiles(): Promise<string[]>
   /** Checks whether the working directory is inside a git repository. */
   isGitRepo(): Promise<boolean>
   /** Returns file contents at specific commits using git cat-file --batch. */

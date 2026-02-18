@@ -76,6 +76,7 @@ describe("EnricherService", () => {
       }),
       getTotalCommitCount: mock(() => Promise.resolve(3)),
       getFileContentsBatch: mock(() => Promise.resolve(new Map())),
+      getTrackedFiles: mock(() => Promise.resolve([])),
     }
 
     mockLLM = {
