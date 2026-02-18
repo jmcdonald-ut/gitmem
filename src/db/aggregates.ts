@@ -8,6 +8,7 @@ import type {
   TrendPeriod,
   TrendSummary,
 } from "@/types"
+import { getExclusionPatterns, type FileCategory } from "@services/file-filter"
 
 /** Valid time window keys for trend queries. */
 export type WindowKey = "weekly" | "monthly" | "quarterly"
@@ -91,6 +92,8 @@ export interface HotspotsOptions {
   sort?: string
   /** Only include files under this directory prefix. */
   pathPrefix?: string
+  /** File categories to exclude from results. */
+  exclude?: FileCategory[]
 }
 
 const SORT_COLUMNS: Record<string, string> = {
@@ -113,6 +116,25 @@ export class AggregateRepository {
   /** @param db - The SQLite database instance. */
   constructor(db: Database) {
     this.db = db
+  }
+
+  /**
+   * Builds SQL NOT LIKE conditions and params for excluding file categories.
+   * @param column - The SQL column name to filter (e.g. "file_path").
+   * @param categories - File categories to exclude.
+   * @returns Object with conditions array and params array.
+   */
+  private buildExclusionClauses(
+    column: string,
+    categories?: FileCategory[],
+  ): { conditions: string[]; params: string[] } {
+    if (!categories || categories.length === 0)
+      return { conditions: [], params: [] }
+    const patterns = getExclusionPatterns(categories)
+    return {
+      conditions: patterns.map(() => `${column} NOT LIKE ? ESCAPE '\\'`),
+      params: patterns,
+    }
   }
 
   /**
@@ -405,10 +427,10 @@ export class AggregateRepository {
   getHotspots(
     options: HotspotsOptions = {},
   ): Array<FileStatsRow & { combined_score?: number }> {
-    const { limit = 10, sort = "total", pathPrefix } = options
+    const { limit = 10, sort = "total", pathPrefix, exclude } = options
 
     if (sort === "combined") {
-      return this.getHotspotsCombined(limit, pathPrefix)
+      return this.getHotspotsCombined(limit, pathPrefix, exclude)
     }
 
     const column = SORT_COLUMNS[sort]
@@ -425,6 +447,10 @@ export class AggregateRepository {
       conditions.push("file_path LIKE ? || '%'")
       params.push(pathPrefix)
     }
+
+    const excl = this.buildExclusionClauses("file_path", exclude)
+    conditions.push(...excl.conditions)
+    params.push(...excl.params)
 
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
@@ -445,6 +471,7 @@ export class AggregateRepository {
   private getHotspotsCombined(
     limit: number,
     pathPrefix?: string,
+    exclude?: FileCategory[],
   ): Array<FileStatsRow & { combined_score: number }> {
     const conditions: string[] = []
     const params: (string | number)[] = []
@@ -454,6 +481,11 @@ export class AggregateRepository {
       // Push pathPrefix twice: once for the CTE WHERE, once for the main WHERE
       params.push(pathPrefix, pathPrefix)
     }
+
+    const excl = this.buildExclusionClauses("fs.file_path", exclude)
+    // Push exclusion params twice: once for the CTE, once for the main WHERE
+    conditions.push(...excl.conditions)
+    params.push(...excl.params, ...excl.params)
 
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
@@ -465,7 +497,7 @@ export class AggregateRepository {
            SELECT
              MAX(total_changes) as max_changes,
              MAX(current_complexity) as max_complexity
-           FROM file_stats ${where.replace("fs.", "")}
+           FROM file_stats ${where.replaceAll("fs.", "")}
          )
          SELECT fs.*,
            CASE
@@ -615,15 +647,31 @@ export class AggregateRepository {
    * @param limit - Maximum number of pairs to return.
    * @returns Pairs ordered by co-change count descending.
    */
-  getTopCoupledPairs(limit: number = 10): CouplingPairGlobalRow[] {
+  getTopCoupledPairs(
+    limit: number = 10,
+    exclude?: FileCategory[],
+  ): CouplingPairGlobalRow[] {
+    const conditions: string[] = []
+    const params: (string | number)[] = []
+
+    const exclA = this.buildExclusionClauses("file_a", exclude)
+    const exclB = this.buildExclusionClauses("file_b", exclude)
+    conditions.push(...exclA.conditions, ...exclB.conditions)
+    params.push(...exclA.params, ...exclB.params)
+
+    const where =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+    params.push(limit)
+
     return this.db
-      .query<CouplingPairGlobalRow, [number]>(
+      .query<CouplingPairGlobalRow, (string | number)[]>(
         `SELECT file_a, file_b, co_change_count
          FROM file_coupling
+         ${where}
          ORDER BY co_change_count DESC
          LIMIT ?`,
       )
-      .all(limit)
+      .all(...params)
   }
 
   /**
@@ -635,7 +683,33 @@ export class AggregateRepository {
   getCoupledFilesWithRatio(
     filePath: string,
     limit: number = 10,
+    exclude?: FileCategory[],
   ): CouplingPairRow[] {
+    const excl = this.buildExclusionClauses("coupled.file", exclude)
+
+    if (excl.conditions.length > 0) {
+      const exclWhere = excl.conditions.join(" AND ")
+
+      return this.db
+        .query<CouplingPairRow, (string | number)[]>(
+          `WITH coupled AS (
+             SELECT
+               CASE WHEN fc.file_a = ? THEN fc.file_b ELSE fc.file_a END as file,
+               fc.co_change_count,
+               ROUND(CAST(fc.co_change_count AS REAL) / fs.total_changes, 2) as coupling_ratio
+             FROM file_coupling fc
+             JOIN file_stats fs ON fs.file_path = ?
+             WHERE fc.file_a = ? OR fc.file_b = ?
+           )
+           SELECT file, co_change_count, coupling_ratio
+           FROM coupled
+           WHERE ${exclWhere}
+           ORDER BY co_change_count DESC
+           LIMIT ?`,
+        )
+        .all(filePath, filePath, filePath, filePath, ...excl.params, limit)
+    }
+
     return this.db
       .query<CouplingPairRow, [string, string, string, string, number]>(
         `SELECT
@@ -752,7 +826,42 @@ export class AggregateRepository {
   getCoupledFilesForDirectory(
     prefix: string,
     limit: number = 10,
+    exclude?: FileCategory[],
   ): CouplingPairRow[] {
+    if (exclude && exclude.length > 0) {
+      const excl = this.buildExclusionClauses("coupled.file", exclude)
+      const exclWhere = excl.conditions.join(" AND ")
+      const innerParams = [prefix, prefix, prefix, prefix, prefix, prefix]
+      const outerParams = [...excl.params, limit]
+
+      return this.db
+        .query<CouplingPairRow, (string | number)[]>(
+          `WITH coupled AS (
+             SELECT
+               CASE
+                 WHEN fc.file_a LIKE ? || '%' THEN fc.file_b
+                 ELSE fc.file_a
+               END as file,
+               SUM(fc.co_change_count) as co_change_count,
+               ROUND(CAST(SUM(fc.co_change_count) AS REAL) / ds.total_changes, 2) as coupling_ratio
+             FROM file_coupling fc
+             JOIN (
+               SELECT COALESCE(SUM(total_changes), 0) as total_changes
+               FROM file_stats WHERE file_path LIKE ? || '%'
+             ) ds
+             WHERE (fc.file_a LIKE ? || '%' AND fc.file_b NOT LIKE ? || '%')
+                OR (fc.file_b LIKE ? || '%' AND fc.file_a NOT LIKE ? || '%')
+             GROUP BY file
+           )
+           SELECT file, co_change_count, coupling_ratio
+           FROM coupled
+           WHERE ${exclWhere}
+           ORDER BY co_change_count DESC
+           LIMIT ?`,
+        )
+        .all(...innerParams, ...outerParams)
+    }
+
     return this.db
       .query<
         CouplingPairRow,

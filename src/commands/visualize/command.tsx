@@ -11,6 +11,11 @@ import {
 import { buildHierarchy } from "@commands/visualize/hierarchy"
 import { generatePage } from "@commands/visualize/page"
 import type { FileStatsRow } from "@/types"
+import {
+  isExcluded,
+  resolveExcludedCategories,
+  type FileCategory,
+} from "@services/file-filter"
 
 function parsePort(value: string): number {
   const n = parseInt(value, 10)
@@ -20,7 +25,11 @@ function parsePort(value: string): number {
   return n
 }
 
-function handleDetails(url: URL, db: Database): Response {
+function handleDetails(
+  url: URL,
+  db: Database,
+  exclude: FileCategory[],
+): Response {
   const filePath = url.searchParams.get("path") ?? ""
   const commits = new CommitRepository(db)
   const aggregates = new AggregateRepository(db)
@@ -35,8 +44,9 @@ function handleDetails(url: URL, db: Database): Response {
       const hotspots = aggregates.getHotspots({
         sort: "combined",
         limit: 5,
+        exclude,
       })
-      const coupledPairs = aggregates.getTopCoupledPairs(5)
+      const coupledPairs = aggregates.getTopCoupledPairs(5, exclude)
       const trends = aggregates.getTrendsForDirectory("", window, trendLimit)
       const trendSummary = computeTrend(trends)
 
@@ -67,11 +77,16 @@ function handleDetails(url: URL, db: Database): Response {
       const dirStats = aggregates.getDirectoryStats(filePath)
       const fileCount = aggregates.getDirectoryFileCount(filePath)
       const contributors = aggregates.getDirectoryContributors(filePath, 5)
-      const coupled = aggregates.getCoupledFilesForDirectory(filePath, 5)
+      const coupled = aggregates.getCoupledFilesForDirectory(
+        filePath,
+        5,
+        exclude,
+      )
       const hotspots = aggregates.getHotspots({
         pathPrefix: filePath,
         sort: "combined",
         limit: 5,
+        exclude,
       })
       const trends = aggregates.getTrendsForDirectory(
         filePath,
@@ -106,7 +121,7 @@ function handleDetails(url: URL, db: Database): Response {
     // File level
     const fileStats = aggregates.getFileStats(filePath)
     const contributors = aggregates.getTopContributors(filePath, 5)
-    const coupled = aggregates.getCoupledFilesWithRatio(filePath, 5)
+    const coupled = aggregates.getCoupledFilesWithRatio(filePath, 5, exclude)
     const trends = aggregates.getTrendsForFile(filePath, window, trendLimit)
     const trendSummary = computeTrend(trends)
 
@@ -148,15 +163,28 @@ export const visualizeCommand = new Command("visualize")
   .description("Open an interactive visualization of the repository")
   .addHelpText("after", HELP_TEXT)
   .option("-p, --port <number>", "Server port (0 for auto)", parsePort, 0)
+  .option("--include-tests", "Include test files (excluded by default)")
+  .option("--include-docs", "Include documentation files (excluded by default)")
+  .option(
+    "--include-generated",
+    "Include generated/vendored files (excluded by default)",
+  )
+  .option("--all", "Include all files (no exclusions)")
   .action(async (opts, cmd) => {
     await runCommand(
       cmd.parent!.opts(),
       { needsApiKey: false },
       async ({ db, git, cwd }) => {
-        const trackedFiles = await git.getTrackedFiles()
+        const exclude = resolveExcludedCategories(opts)
+        const allTrackedFiles = await git.getTrackedFiles()
+        const trackedFiles =
+          exclude.length > 0
+            ? allTrackedFiles.filter((f) => !isExcluded(f, exclude))
+            : allTrackedFiles
         const allStats = db
           .query<FileStatsRow, []>("SELECT * FROM file_stats")
           .all()
+          .filter((s) => !isExcluded(s.file_path, exclude))
         const statsMap = new Map(allStats.map((s) => [s.file_path, s]))
 
         const hierarchy = buildHierarchy(trackedFiles, statsMap)
@@ -171,7 +199,8 @@ export const visualizeCommand = new Command("visualize")
               return new Response(html, {
                 headers: { "Content-Type": "text/html" },
               })
-            if (url.pathname === "/api/details") return handleDetails(url, db)
+            if (url.pathname === "/api/details")
+              return handleDetails(url, db, exclude)
             return new Response("Not found", { status: 404 })
           },
         })

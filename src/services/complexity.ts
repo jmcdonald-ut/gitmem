@@ -60,30 +60,4 @@ export function isBinary(content: Buffer): boolean {
   return false
 }
 
-const GENERATED_FILENAMES = new Set([
-  "package-lock.json",
-  "yarn.lock",
-  "bun.lockb",
-  "pnpm-lock.yaml",
-  "Gemfile.lock",
-  "Cargo.lock",
-  "composer.lock",
-  "poetry.lock",
-  "go.sum",
-])
-
-const GENERATED_EXTENSIONS = [".min.js", ".min.css", ".map", ".lock"]
-
-/**
- * Detects generated or vendored files that should be skipped for complexity measurement.
- * @param filePath - Repository-relative file path.
- * @returns true if the file should be skipped.
- */
-export function isGenerated(filePath: string): boolean {
-  const basename = filePath.split("/").pop() ?? ""
-  if (GENERATED_FILENAMES.has(basename)) return true
-  for (const ext of GENERATED_EXTENSIONS) {
-    if (filePath.endsWith(ext)) return true
-  }
-  return false
-}
+export { isGenerated } from "@services/file-filter"
