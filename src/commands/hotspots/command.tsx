@@ -6,7 +6,10 @@ import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { AggregateRepository } from "@db/aggregates"
 import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
-import { resolveExcludedCategories } from "@services/file-filter"
+import {
+  resolveExcludedCategories,
+  filterByTrackedFiles,
+} from "@services/file-filter"
 
 const VALID_SORT_FIELDS = [
   "total",
@@ -55,6 +58,7 @@ export const hotspotsCommand = new Command("hotspots")
     "Include generated/vendored files (excluded by default)",
   )
   .option("--all", "Include all files (no exclusions)")
+  .option("--include-deleted", "Include files no longer in the working tree")
   .action(async (opts, cmd) => {
     if (!VALID_SORT_FIELDS.includes(opts.sort)) {
       console.error(
@@ -63,29 +67,38 @@ export const hotspotsCommand = new Command("hotspots")
       process.exit(1)
     }
 
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
+    await runCommand(cmd.parent!.opts(), {}, async ({ format, db, git }) => {
       const aggregates = new AggregateRepository(db)
       const exclude = resolveExcludedCategories(opts)
 
+      const fetchLimit = opts.includeDeleted ? opts.limit : 10000
       const hotspots = aggregates.getHotspots({
-        limit: opts.limit,
+        limit: fetchLimit,
         sort: opts.sort,
         pathPrefix: opts.path,
         exclude,
       })
 
+      const filtered = opts.includeDeleted
+        ? hotspots
+        : filterByTrackedFiles(
+            hotspots,
+            new Set(await git.getTrackedFiles()),
+            opts.limit,
+          )
+
       if (
         formatOutput(format, {
           sort: opts.sort,
           path: opts.path ?? null,
-          hotspots,
+          hotspots: filtered,
         })
       )
         return
 
       render(
         <HotspotsCommand
-          hotspots={hotspots}
+          hotspots={filtered}
           sort={opts.sort}
           pathPrefix={opts.path}
         />,

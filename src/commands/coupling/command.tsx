@@ -6,7 +6,10 @@ import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
 import { AggregateRepository } from "@db/aggregates"
 import { CouplingCommand } from "@commands/coupling/CouplingCommand"
-import { resolveExcludedCategories } from "@services/file-filter"
+import {
+  resolveExcludedCategories,
+  filterPairsByTrackedFiles,
+} from "@services/file-filter"
 
 const HELP_TEXT = `
 Co-change means two files were modified in the same commit. High
@@ -35,14 +38,23 @@ export const couplingCommand = new Command("coupling")
     "Include generated/vendored files (excluded by default)",
   )
   .option("--all", "Include all files (no exclusions)")
+  .option("--include-deleted", "Include files no longer in the working tree")
   .action(async (path, opts, cmd) => {
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
+    await runCommand(cmd.parent!.opts(), {}, async ({ format, db, git }) => {
       const aggregates = new AggregateRepository(db)
       const limit = opts.limit
       const exclude = resolveExcludedCategories(opts)
 
+      const trackedFiles = opts.includeDeleted
+        ? undefined
+        : new Set(await git.getTrackedFiles())
+      const fetchLimit = trackedFiles ? 10000 : limit
+
       if (!path) {
-        const pairs = aggregates.getTopCoupledPairs(limit, exclude)
+        const raw = aggregates.getTopCoupledPairs(fetchLimit, exclude)
+        const pairs = trackedFiles
+          ? filterPairsByTrackedFiles(raw, trackedFiles, limit)
+          : raw
 
         if (formatOutput(format, { path: null, pairs })) return
 
@@ -50,11 +62,14 @@ export const couplingCommand = new Command("coupling")
       } else {
         const fileStats = aggregates.getFileStats(path)
         if (fileStats) {
-          const pairs = aggregates.getCoupledFilesWithRatio(
+          const raw = aggregates.getCoupledFilesWithRatio(
             path,
-            limit,
+            fetchLimit,
             exclude,
           )
+          const pairs = trackedFiles
+            ? raw.filter((r) => trackedFiles.has(r.file)).slice(0, limit)
+            : raw
 
           if (formatOutput(format, { path, pairs })) return
 
@@ -68,11 +83,14 @@ export const couplingCommand = new Command("coupling")
             process.exit(1)
           }
 
-          const pairs = aggregates.getCoupledFilesForDirectory(
+          const raw = aggregates.getCoupledFilesForDirectory(
             prefix,
-            limit,
+            fetchLimit,
             exclude,
           )
+          const pairs = trackedFiles
+            ? raw.filter((r) => trackedFiles.has(r.file)).slice(0, limit)
+            : raw
 
           if (formatOutput(format, { path: prefix, pairs })) return
 

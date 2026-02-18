@@ -121,7 +121,24 @@ export interface FilterFlags {
   includeTests?: boolean
   includeDocs?: boolean
   includeGenerated?: boolean
+  includeDeleted?: boolean
   all?: boolean
+}
+
+export function filterByTrackedFiles<T extends { file_path: string }>(
+  items: T[],
+  trackedFiles: Set<string>,
+  limit: number,
+): T[] {
+  return items.filter((r) => trackedFiles.has(r.file_path)).slice(0, limit)
+}
+
+export function filterPairsByTrackedFiles<
+  T extends { file_a: string; file_b: string },
+>(pairs: T[], trackedFiles: Set<string>, limit: number): T[] {
+  return pairs
+    .filter((p) => trackedFiles.has(p.file_a) && trackedFiles.has(p.file_b))
+    .slice(0, limit)
 }
 
 export function resolveExcludedCategories(opts: FilterFlags): FileCategory[] {

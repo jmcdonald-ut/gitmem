@@ -315,6 +315,79 @@ describe("handleDetails", () => {
     expect(data.enrichmentPct).toBe(50)
   })
 
+  test("filters deleted files from root hotspots and coupling when trackedFiles provided", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    // Only src/auth.ts exists in the working tree
+    const trackedFiles = new Set(["src/auth.ts"])
+    const res = handleDetails(
+      makeUrl(""),
+      commits,
+      aggregates,
+      [],
+      trackedFiles,
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("root")
+    // Hotspots should only include src/auth.ts
+    expect(data.hotspots.length).toBe(1)
+    expect(data.hotspots[0].file).toBe("src/auth.ts")
+    // Coupled pairs require both files in tracked set — src/utils.ts is deleted
+    expect(data.coupledPairs.length).toBe(0)
+  })
+
+  test("filters deleted files from directory hotspots and coupling when trackedFiles provided", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    // Only src/auth.ts exists
+    const trackedFiles = new Set(["src/auth.ts"])
+    const res = handleDetails(
+      makeUrl("src/"),
+      commits,
+      aggregates,
+      [],
+      trackedFiles,
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("directory")
+    expect(data.hotspots.length).toBe(1)
+    expect(data.hotspots[0].file).toBe("src/auth.ts")
+  })
+
+  test("filters deleted files from file coupled list when trackedFiles provided", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    // src/utils.ts is deleted — should be filtered from src/auth.ts coupled files
+    const trackedFiles = new Set(["src/auth.ts", "src/dashboard.ts"])
+    const res = handleDetails(
+      makeUrl("src/auth.ts"),
+      commits,
+      aggregates,
+      [],
+      trackedFiles,
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("file")
+    expect(data.coupled.length).toBe(0)
+  })
+
+  test("does not filter when trackedFiles is undefined", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    const res = handleDetails(makeUrl(""), commits, aggregates, [])
+    const data = await res.json()
+
+    expect(data.hotspots.length).toBe(3)
+    expect(data.coupledPairs.length).toBe(1)
+  })
+
   test("directory details include coupled files from outside the directory", async () => {
     const { db, commits, aggregates } = setup()
 

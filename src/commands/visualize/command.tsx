@@ -12,6 +12,8 @@ import { generatePage } from "@commands/visualize/page"
 import {
   isExcluded,
   resolveExcludedCategories,
+  filterByTrackedFiles,
+  filterPairsByTrackedFiles,
   type FileCategory,
 } from "@services/file-filter"
 
@@ -28,22 +30,30 @@ export function handleDetails(
   commits: CommitRepository,
   aggregates: AggregateRepository,
   exclude: FileCategory[],
+  trackedFiles?: Set<string>,
 ): Response {
   const filePath = url.searchParams.get("path") ?? ""
   const window: WindowKey = "monthly"
   const trendLimit = 12
+  const fetchLimit = trackedFiles ? 10000 : 5
 
   try {
     if (!filePath || filePath === "/") {
       // Root level
       const totalCommits = commits.getTotalCommitCount()
       const enrichedCommits = commits.getEnrichedCommitCount()
-      const hotspots = aggregates.getHotspots({
+      const rawHotspots = aggregates.getHotspots({
         sort: "combined",
-        limit: 5,
+        limit: fetchLimit,
         exclude,
       })
-      const coupledPairs = aggregates.getTopCoupledPairs(5, exclude)
+      const hotspots = trackedFiles
+        ? filterByTrackedFiles(rawHotspots, trackedFiles, 5)
+        : rawHotspots
+      const rawPairs = aggregates.getTopCoupledPairs(fetchLimit, exclude)
+      const coupledPairs = trackedFiles
+        ? filterPairsByTrackedFiles(rawPairs, trackedFiles, 5)
+        : rawPairs
       const trends = aggregates.getTrendsForDirectory("", window, trendLimit)
       const trendSummary = computeTrend(trends)
 
@@ -74,17 +84,23 @@ export function handleDetails(
       const dirStats = aggregates.getDirectoryStats(filePath)
       const fileCount = aggregates.getDirectoryFileCount(filePath)
       const contributors = aggregates.getDirectoryContributors(filePath, 5)
-      const coupled = aggregates.getCoupledFilesForDirectory(
+      const rawCoupled = aggregates.getCoupledFilesForDirectory(
         filePath,
-        5,
+        fetchLimit,
         exclude,
       )
-      const hotspots = aggregates.getHotspots({
+      const coupled = trackedFiles
+        ? rawCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
+        : rawCoupled
+      const rawHotspots = aggregates.getHotspots({
         pathPrefix: filePath,
         sort: "combined",
-        limit: 5,
+        limit: fetchLimit,
         exclude,
       })
+      const hotspots = trackedFiles
+        ? filterByTrackedFiles(rawHotspots, trackedFiles, 5)
+        : rawHotspots
       const trends = aggregates.getTrendsForDirectory(
         filePath,
         window,
@@ -118,7 +134,14 @@ export function handleDetails(
     // File level
     const fileStats = aggregates.getFileStats(filePath)
     const contributors = aggregates.getTopContributors(filePath, 5)
-    const coupled = aggregates.getCoupledFilesWithRatio(filePath, 5, exclude)
+    const rawCoupled = aggregates.getCoupledFilesWithRatio(
+      filePath,
+      fetchLimit,
+      exclude,
+    )
+    const coupled = trackedFiles
+      ? rawCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
+      : rawCoupled
     const trends = aggregates.getTrendsForFile(filePath, window, trendLimit)
     const trendSummary = computeTrend(trends)
 
@@ -150,6 +173,7 @@ export function createFetchHandler(
   commits: CommitRepository,
   aggregates: AggregateRepository,
   exclude: FileCategory[],
+  trackedFiles?: Set<string>,
 ): (req: Request) => Response {
   return (req: Request) => {
     const url = new URL(req.url)
@@ -158,7 +182,7 @@ export function createFetchHandler(
         headers: { "Content-Type": "text/html" },
       })
     if (url.pathname === "/api/details")
-      return handleDetails(url, commits, aggregates, exclude)
+      return handleDetails(url, commits, aggregates, exclude, trackedFiles)
     return new Response("Not found", { status: 404 })
   }
 }
@@ -185,6 +209,7 @@ export const visualizeCommand = new Command("visualize")
     "Include generated/vendored files (excluded by default)",
   )
   .option("--all", "Include all files (no exclusions)")
+  .option("--include-deleted", "Include files no longer in the working tree")
   .action(async (opts, cmd) => {
     await runCommand(
       cmd.parent!.opts(),
@@ -204,11 +229,20 @@ export const visualizeCommand = new Command("visualize")
         const hierarchy = buildHierarchy(trackedFiles, statsMap)
         const repoName = basename(cwd)
         const html = generatePage(hierarchy, repoName)
+        const detailsTrackedFiles = opts.includeDeleted
+          ? undefined
+          : new Set(allTrackedFiles)
 
         const server = Bun.serve({
           hostname: "127.0.0.1",
           port: opts.port,
-          fetch: createFetchHandler(html, commits, aggregates, exclude),
+          fetch: createFetchHandler(
+            html,
+            commits,
+            aggregates,
+            exclude,
+            detailsTrackedFiles,
+          ),
         })
 
         console.log(`Visualize: http://localhost:${server.port}`)
