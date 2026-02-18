@@ -966,6 +966,83 @@ describe("EnricherService", () => {
     expect(phases).not.toContain("indexing")
     expect(phases).toContain("done")
   })
+
+  // --- chunkBatchRequests tests ---
+
+  test("chunkBatchRequests splits by request count", () => {
+    const enricher = new EnricherService(
+      mockGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+    )
+
+    const requests = Array.from({ length: 5 }, (_, i) => ({
+      hash: `hash${i}`,
+      commit: {
+        hash: `hash${i}`,
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01",
+        message: "commit",
+        files: [],
+      },
+      diff: "small diff",
+    }))
+
+    // With small requests, they should all fit in one chunk
+    const chunks = enricher.chunkBatchRequests(requests)
+    expect(chunks).toHaveLength(1)
+    expect(chunks[0]).toHaveLength(5)
+  })
+
+  test("chunkBatchRequests splits by byte size", () => {
+    const enricher = new EnricherService(
+      mockGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+    )
+
+    // MAX_BATCH_BYTES is 200MB. Use many requests at ~500k each to exceed the limit.
+    // buildUserMessage truncates individual diffs, but the total across all
+    // requests still accumulates toward the batch byte limit.
+    const mediumDiff = "x".repeat(500_000) // ~500KB per diff (under per-message truncation limit)
+    const requestCount = 500 // 500 * ~500KB ≈ 250MB, should exceed 200MB
+    const requests = Array.from({ length: requestCount }, (_, i) => ({
+      hash: `hash${i}`,
+      commit: {
+        hash: `hash${i}`,
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01",
+        message: "commit",
+        files: [],
+      },
+      diff: mediumDiff,
+    }))
+
+    const chunks = enricher.chunkBatchRequests(requests)
+    expect(chunks.length).toBeGreaterThan(1)
+    // Total requests across all chunks should equal original count
+    const totalRequests = chunks.reduce((sum, c) => sum + c.length, 0)
+    expect(totalRequests).toBe(requestCount)
+  })
+
+  test("chunkBatchRequests handles empty input", () => {
+    const enricher = new EnricherService(
+      mockGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+    )
+
+    const chunks = enricher.chunkBatchRequests([])
+    expect(chunks).toHaveLength(0)
+  })
 })
 
 /** Helper to cast mock as BatchLLMService */

@@ -4,8 +4,12 @@ import { CommitRepository } from "@db/commits"
 import { AggregateRepository } from "@db/aggregates"
 import { SearchService } from "@db/search"
 import { BatchJobRepository } from "@db/batch-jobs"
-import type { BatchLLMService } from "@services/batch-llm"
+import type { BatchLLMService, BatchRequest } from "@services/batch-llm"
 import type { MeasurerService } from "@services/measurer"
+import { SYSTEM_PROMPT, buildUserMessage } from "@services/llm-shared"
+
+const MAX_BATCH_REQUESTS = 100_000
+const MAX_BATCH_BYTES = 200 * 1024 * 1024 // 200 MB, leaving margin from the 256 MB limit
 
 /**
  * Orchestrates the full indexing pipeline: discovers new commits, enriches them
@@ -357,7 +361,6 @@ export class EnricherService {
 
     const unenriched = this.commits.getUnenrichedCommits()
     if (unenriched.length > 0) {
-      const MAX_BATCH_SIZE = 10000
       const unenrichedHashes = unenriched.map((c) => c.hash)
       const diffMap = await this.git.getDiffBatch(unenrichedHashes)
       const filesMap = this.commits.getCommitFilesByHashes(unenrichedHashes)
@@ -381,22 +384,22 @@ export class EnricherService {
         }
       }
 
-      const batches = this.chunkCommits(needsLLM, MAX_BATCH_SIZE)
-
-      for (const batch of batches) {
-        const requests = batch.map((commit) => ({
+      const allRequests: BatchRequest[] = needsLLM.map((commit) => ({
+        hash: commit.hash,
+        commit: {
           hash: commit.hash,
-          commit: {
-            hash: commit.hash,
-            authorName: commit.author_name,
-            authorEmail: commit.author_email,
-            committedAt: commit.committed_at,
-            message: commit.message,
-            files: filesMap.get(commit.hash) ?? [],
-          },
-          diff: diffMap.get(commit.hash) ?? "",
-        }))
+          authorName: commit.author_name,
+          authorEmail: commit.author_email,
+          committedAt: commit.committed_at,
+          message: commit.message,
+          files: filesMap.get(commit.hash) ?? [],
+        },
+        diff: diffMap.get(commit.hash) ?? "",
+      }))
 
+      const batches = this.chunkBatchRequests(allRequests)
+
+      for (const requests of batches) {
         onProgress({
           phase: "enriching",
           current: 0,
@@ -470,11 +473,38 @@ export class EnricherService {
     return null
   }
 
-  private chunkCommits(commits: CommitRow[], size: number): CommitRow[][] {
-    const chunks: CommitRow[][] = []
-    for (let i = 0; i < commits.length; i += size) {
-      chunks.push(commits.slice(i, i + size))
+  /**
+   * Chunks batch requests respecting both the request count limit and
+   * the estimated serialized size limit.
+   */
+  chunkBatchRequests(requests: BatchRequest[]): BatchRequest[][] {
+    const chunks: BatchRequest[][] = []
+    let currentChunk: BatchRequest[] = []
+    let currentBytes = 0
+
+    for (const req of requests) {
+      const userMessage = buildUserMessage(req.commit, req.diff)
+      // Estimate serialized size: system prompt + user message + JSON overhead per request
+      const requestBytes = SYSTEM_PROMPT.length + userMessage.length + 256 // JSON envelope overhead
+
+      if (
+        currentChunk.length > 0 &&
+        (currentChunk.length >= MAX_BATCH_REQUESTS ||
+          currentBytes + requestBytes > MAX_BATCH_BYTES)
+      ) {
+        chunks.push(currentChunk)
+        currentChunk = []
+        currentBytes = 0
+      }
+
+      currentChunk.push(req)
+      currentBytes += requestBytes
     }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk)
+    }
+
     return chunks
   }
 }
