@@ -315,6 +315,7 @@ body {
 
   let focus = h;
   let view;
+  let selectedLeaf = null;
 
   const nodes = g.selectAll("circle")
     .data(h.descendants())
@@ -330,11 +331,14 @@ body {
     .on("click", (event, d) => {
       event.stopPropagation();
       if (focus === d) {
+        selectedLeaf = null;
         zoomTo(d.parent || h);
       } else if (d.children) {
+        selectedLeaf = null;
         zoomTo(d);
       } else {
         // Leaf: zoom to parent, show file details
+        selectedLeaf = d;
         zoomTo(d.parent || h);
         fetchDetails(d.data.path);
         updateBreadcrumb(d.data.path);
@@ -381,8 +385,59 @@ body {
 
     labels.attr("transform", d =>
       \`translate(\${(d.x - v[0]) * k + width / 2},\${(d.y - v[1]) * k + height / 2})\`
-    ).attr("font-size", d => Math.min(d.r * k * 0.6, 12))
-     .attr("opacity", d => d.r * k > 18 ? 1 : 0);
+    ).attr("font-size", d => Math.min(d.r * k * 0.6, 12));
+
+    resolveOverlaps(k);
+  }
+
+  function resolveOverlaps(k) {
+    const candidates = [];
+    labels.each(function(d) {
+      const screenR = d.r * k;
+      if (screenR <= 18) {
+        d3.select(this).attr("opacity", 0);
+        return;
+      }
+      const tx = (d.x - view[0]) * k + width / 2;
+      const ty = (d.y - view[1]) * k + height / 2;
+      const fontSize = Math.min(screenR * 0.6, 12);
+      const textWidth = d.data.name.length * fontSize * 0.55;
+      const padding = 3;
+      candidates.push({
+        el: this,
+        d: d,
+        left: tx - textWidth / 2 - padding,
+        right: tx + textWidth / 2 + padding,
+        top: ty - fontSize / 2 - padding,
+        bottom: ty + fontSize / 2 + padding,
+        screenR: screenR
+      });
+    });
+
+    // Selected leaf first, then largest radius
+    candidates.sort((a, b) => {
+      const aSelected = selectedLeaf && a.d === selectedLeaf ? 1 : 0;
+      const bSelected = selectedLeaf && b.d === selectedLeaf ? 1 : 0;
+      if (aSelected !== bSelected) return bSelected - aSelected;
+      return b.screenR - a.screenR;
+    });
+
+    const kept = [];
+    for (const c of candidates) {
+      let overlaps = false;
+      for (const p of kept) {
+        if (c.left < p.right && c.right > p.left && c.top < p.bottom && c.bottom > p.top) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (overlaps) {
+        d3.select(c.el).attr("opacity", 0);
+      } else {
+        kept.push(c);
+        d3.select(c.el).attr("opacity", 1);
+      }
+    }
   }
 
   function zoomTo(d) {
@@ -406,6 +461,7 @@ body {
   updateBreadcrumb("");
 
   svg.on("click", () => {
+    selectedLeaf = null;
     if (focus !== h) zoomTo(focus.parent || h);
   });
 
@@ -417,8 +473,10 @@ body {
     const target = h.descendants().find(d => d.data.path === path);
     if (target) {
       if (target.children) {
+        selectedLeaf = null;
         zoomTo(target);
       } else {
+        selectedLeaf = target;
         zoomTo(target.parent || h);
         fetchDetails(target.data.path);
         updateBreadcrumb(target.data.path);
@@ -447,6 +505,7 @@ body {
   function bindBreadcrumbClicks() {
     breadcrumbEl.querySelectorAll("span").forEach(span => {
       span.addEventListener("click", () => {
+        selectedLeaf = null;
         const p = span.dataset.path;
         if (p === "") {
           zoomTo(h);
