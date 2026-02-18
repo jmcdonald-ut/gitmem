@@ -7,6 +7,7 @@ import type {
   CommitRow,
 } from "@/types"
 import { CommitRepository } from "@db/commits"
+import { reconcileClassificationVerdict } from "@services/judge-shared"
 
 /**
  * Orchestrates the quality check workflow: fetches enriched commits,
@@ -68,6 +69,11 @@ export class CheckerService {
       diff,
       commit.classification,
       commit.summary,
+    )
+
+    verdicts.classificationVerdict = reconcileClassificationVerdict(
+      commit.classification,
+      verdicts.classificationVerdict,
     )
 
     onProgress({ phase: "done", current: 1, total: 1 })
@@ -182,6 +188,11 @@ export class CheckerService {
       diff,
       commit.classification,
       commit.summary,
+    )
+
+    verdicts.classificationVerdict = reconcileClassificationVerdict(
+      commit.classification,
+      verdicts.classificationVerdict,
     )
 
     return {

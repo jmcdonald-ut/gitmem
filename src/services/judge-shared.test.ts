@@ -4,6 +4,7 @@ import {
   buildJudgeUserMessage,
   parseEvalResponse,
   EvalResponseSchema,
+  reconcileClassificationVerdict,
 } from "@services/judge-shared"
 import type { CommitInfo } from "@/types"
 
@@ -199,5 +200,37 @@ describe("parseEvalResponse", () => {
 
   test("throws on invalid JSON", () => {
     expect(() => parseEvalResponse("not json at all")).toThrow()
+  })
+})
+
+describe("reconcileClassificationVerdict", () => {
+  test("flips self-contradictory verdict to pass", () => {
+    const verdict = reconcileClassificationVerdict("feature", {
+      pass: false,
+      reasoning: "Should be feature",
+      suggestedClassification: "feature",
+    })
+    expect(verdict.pass).toBe(true)
+    expect(verdict.reasoning).toBe("Should be feature")
+    expect(verdict.suggestedClassification).toBeUndefined()
+  })
+
+  test("preserves legitimate failure", () => {
+    const verdict = reconcileClassificationVerdict("feature", {
+      pass: false,
+      reasoning: "Should be bug-fix",
+      suggestedClassification: "bug-fix",
+    })
+    expect(verdict.pass).toBe(false)
+    expect(verdict.suggestedClassification).toBe("bug-fix")
+  })
+
+  test("leaves pass verdict unchanged", () => {
+    const verdict = reconcileClassificationVerdict("feature", {
+      pass: true,
+      reasoning: "Correct",
+    })
+    expect(verdict.pass).toBe(true)
+    expect(verdict.reasoning).toBe("Correct")
   })
 })
