@@ -1,6 +1,5 @@
 import { Command } from "commander"
 import { basename } from "path"
-import type { Database } from "bun:sqlite"
 import { runCommand } from "@commands/utils/command-context"
 import { CommitRepository } from "@db/commits"
 import {
@@ -10,7 +9,6 @@ import {
 } from "@db/aggregates"
 import { buildHierarchy } from "@commands/visualize/hierarchy"
 import { generatePage } from "@commands/visualize/page"
-import type { FileStatsRow } from "@/types"
 import {
   isExcluded,
   resolveExcludedCategories,
@@ -27,12 +25,11 @@ function parsePort(value: string): number {
 
 function handleDetails(
   url: URL,
-  db: Database,
+  commits: CommitRepository,
+  aggregates: AggregateRepository,
   exclude: FileCategory[],
 ): Response {
   const filePath = url.searchParams.get("path") ?? ""
-  const commits = new CommitRepository(db)
-  const aggregates = new AggregateRepository(db)
   const window: WindowKey = "monthly"
   const trendLimit = 12
 
@@ -181,10 +178,9 @@ export const visualizeCommand = new Command("visualize")
           exclude.length > 0
             ? allTrackedFiles.filter((f) => !isExcluded(f, exclude))
             : allTrackedFiles
-        const allStats = db
-          .query<FileStatsRow, []>("SELECT * FROM file_stats")
-          .all()
-          .filter((s) => !isExcluded(s.file_path, exclude))
+        const commits = new CommitRepository(db)
+        const aggregates = new AggregateRepository(db)
+        const allStats = aggregates.getAllFileStats(exclude)
         const statsMap = new Map(allStats.map((s) => [s.file_path, s]))
 
         const hierarchy = buildHierarchy(trackedFiles, statsMap)
@@ -200,7 +196,7 @@ export const visualizeCommand = new Command("visualize")
                 headers: { "Content-Type": "text/html" },
               })
             if (url.pathname === "/api/details")
-              return handleDetails(url, db, exclude)
+              return handleDetails(url, commits, aggregates, exclude)
             return new Response("Not found", { status: 404 })
           },
         })
@@ -213,7 +209,7 @@ export const visualizeCommand = new Command("visualize")
         }
 
         await new Promise<void>((resolve) => {
-          process.on("SIGINT", () => {
+          process.once("SIGINT", () => {
             server.stop()
             resolve()
           })
