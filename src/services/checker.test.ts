@@ -1,7 +1,9 @@
 import { describe, test, expect, beforeEach, mock } from "bun:test"
 import { createDatabase } from "@db/database"
 import { CommitRepository } from "@db/commits"
+import { BatchJobRepository } from "@db/batch-jobs"
 import { CheckerService } from "@services/checker"
+import type { BatchJudgeService } from "@services/batch-judge"
 import type { IGitService, IJudgeService, CheckProgress } from "@/types"
 import { Database } from "bun:sqlite"
 
@@ -690,5 +692,441 @@ describe("CheckerService", () => {
     expect(results).toHaveLength(0)
     expect(summary.total).toBe(0)
     expect(mockJudge.evaluateCommit).not.toHaveBeenCalled()
+  })
+
+  describe("checkSampleBatch", () => {
+    let batchJobs: BatchJobRepository
+
+    beforeEach(() => {
+      batchJobs = new BatchJobRepository(db)
+    })
+
+    function createMockBatchJudge(
+      behavior: "submit" | "status-in-progress" | "status-ended",
+    ): BatchJudgeService {
+      return {
+        submitBatch: mock(async () => ({
+          batchId: "msgbatch_check_001",
+          requestCount: 2,
+        })),
+        getBatchStatus: mock(async () => ({
+          processingStatus:
+            behavior === "status-in-progress" ? "in_progress" : "ended",
+          requestCounts: {
+            succeeded: 2,
+            errored: 0,
+            canceled: 0,
+            expired: 0,
+            processing: behavior === "status-in-progress" ? 2 : 0,
+          },
+        })),
+        getBatchResults: mock(async () => [
+          {
+            hash: "aaa",
+            result: {
+              classificationVerdict: { pass: true, reasoning: "Correct" },
+              accuracyVerdict: { pass: true, reasoning: "Accurate" },
+              completenessVerdict: { pass: true, reasoning: "Complete" },
+            },
+          },
+          {
+            hash: "bbb",
+            result: {
+              classificationVerdict: {
+                pass: false,
+                reasoning: "Wrong",
+                suggestedClassification: "refactor",
+              },
+              accuracyVerdict: { pass: true, reasoning: "OK" },
+              completenessVerdict: { pass: false, reasoning: "Missing" },
+            },
+          },
+        ]),
+      } as unknown as BatchJudgeService
+    }
+
+    test("submits new batch when no pending exists", async () => {
+      commits.insertRawCommits([
+        {
+          hash: "aaa",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit aaa",
+          files: [],
+        },
+        {
+          hash: "bbb",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit bbb",
+          files: [],
+        },
+      ])
+      commits.updateEnrichment("aaa", "feature", "summary a", "haiku")
+      commits.updateEnrichment("bbb", "bug-fix", "summary b", "haiku")
+
+      const batchJudge = createMockBatchJudge("submit")
+      const checker = new CheckerService(mockGit, mockJudge, commits)
+      const progress: CheckProgress[] = []
+      const result = await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        2,
+        "/tmp/claude/check-batch.json",
+        (p) => progress.push(p),
+      )
+
+      expect(result.batchId).toBe("msgbatch_check_001")
+      expect(result.batchStatus).toBe("submitted")
+      expect(result.results).toBeUndefined()
+      expect(batchJudge.submitBatch).toHaveBeenCalledTimes(1)
+
+      // Verify batch job was persisted
+      const job = batchJobs.get("msgbatch_check_001")
+      expect(job).not.toBeNull()
+      expect(job!.type).toBe("check")
+
+      // Verify check batch items were persisted
+      const items = batchJobs.getCheckBatchItems("msgbatch_check_001")
+      expect(items).toHaveLength(2)
+    })
+
+    test("polls in-progress batch and returns status", async () => {
+      // Pre-insert a pending check batch
+      batchJobs.insert(
+        "msgbatch_pending",
+        2,
+        "claude-sonnet-4-5-20250929",
+        "check",
+      )
+
+      const batchJudge = createMockBatchJudge("status-in-progress")
+      const checker = new CheckerService(mockGit, mockJudge, commits)
+      const result = await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        2,
+        "/tmp/claude/check-batch.json",
+        () => {},
+      )
+
+      expect(result.batchId).toBe("msgbatch_pending")
+      expect(result.batchStatus).toBe("in_progress")
+      expect(result.results).toBeUndefined()
+    })
+
+    test("imports completed batch results", async () => {
+      commits.insertRawCommits([
+        {
+          hash: "aaa",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit aaa",
+          files: [],
+        },
+        {
+          hash: "bbb",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit bbb",
+          files: [],
+        },
+      ])
+      commits.updateEnrichment("aaa", "feature", "summary a", "haiku")
+      commits.updateEnrichment("bbb", "bug-fix", "summary b", "haiku")
+
+      // Pre-insert a pending check batch with items
+      batchJobs.insert(
+        "msgbatch_done",
+        2,
+        "claude-sonnet-4-5-20250929",
+        "check",
+      )
+      batchJobs.insertCheckBatchItems([
+        {
+          batchId: "msgbatch_done",
+          hash: "aaa",
+          classification: "feature",
+          summary: "summary a",
+        },
+        {
+          batchId: "msgbatch_done",
+          hash: "bbb",
+          classification: "bug-fix",
+          summary: "summary b",
+        },
+      ])
+
+      const batchJudge = createMockBatchJudge("status-ended")
+      const checker = new CheckerService(mockGit, mockJudge, commits)
+      const outputPath = "/tmp/claude/check-batch-import.json"
+      const result = await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        2,
+        outputPath,
+        () => {},
+      )
+
+      expect(result.results).toHaveLength(2)
+      expect(result.summary).toBeDefined()
+      expect(result.summary!.total).toBe(2)
+      expect(result.summary!.classificationCorrect).toBe(1)
+      expect(result.summary!.summaryAccurate).toBe(2)
+      expect(result.summary!.summaryComplete).toBe(1)
+      expect(result.outputPath).toBe(outputPath)
+    })
+
+    test("handles empty sample", async () => {
+      const batchJudge = createMockBatchJudge("submit")
+      const checker = new CheckerService(mockGit, mockJudge, commits)
+      const result = await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        5,
+        "/tmp/claude/check-empty.json",
+        () => {},
+      )
+
+      expect(result.results).toEqual([])
+      expect(result.summary!.total).toBe(0)
+      expect(batchJudge.submitBatch).not.toHaveBeenCalled()
+    })
+
+    test("filters merge commits with empty diffs", async () => {
+      commits.insertRawCommits([
+        {
+          hash: "aaa",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "Merge branch 'feature' into main",
+          files: [],
+        },
+        {
+          hash: "bbb",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit bbb",
+          files: [],
+        },
+      ])
+      commits.updateEnrichment(
+        "aaa",
+        "chore",
+        "Merge commit: Merge branch 'feature' into main",
+        "haiku",
+      )
+      commits.updateEnrichment("bbb", "feature", "summary b", "haiku")
+
+      const mergeGit: IGitService = {
+        ...mockGit,
+        getDiffBatch: mock((hashes: string[]) => {
+          const map = new Map<string, string>()
+          for (const h of hashes) map.set(h, h === "aaa" ? "" : "diff content")
+          return Promise.resolve(map)
+        }),
+      }
+
+      const batchJudge = createMockBatchJudge("submit")
+      const checker = new CheckerService(mergeGit, mockJudge, commits)
+      await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        2,
+        "/tmp/claude/check-merge.json",
+        () => {},
+      )
+
+      // Only "bbb" should be submitted
+      const call = (batchJudge.submitBatch as ReturnType<typeof mock>).mock
+        .calls[0] as unknown as [Array<{ hash: string }>]
+      expect(call[0]).toHaveLength(1)
+      expect(call[0][0].hash).toBe("bbb")
+    })
+
+    test("all-merge-commit sample returns empty results", async () => {
+      commits.insertRawCommits([
+        {
+          hash: "aaa",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "Merge branch 'feature' into main",
+          files: [],
+        },
+      ])
+      commits.updateEnrichment(
+        "aaa",
+        "chore",
+        "Merge commit: Merge branch 'feature' into main",
+        "haiku",
+      )
+
+      const mergeGit: IGitService = {
+        ...mockGit,
+        getDiffBatch: mock((hashes: string[]) => {
+          const map = new Map<string, string>()
+          for (const h of hashes) map.set(h, "")
+          return Promise.resolve(map)
+        }),
+      }
+
+      const batchJudge = createMockBatchJudge("submit")
+      const checker = new CheckerService(mergeGit, mockJudge, commits)
+      const result = await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        1,
+        "/tmp/claude/check-all-merge.json",
+        () => {},
+      )
+
+      expect(result.results).toEqual([])
+      expect(result.summary!.total).toBe(0)
+      expect(batchJudge.submitBatch).not.toHaveBeenCalled()
+    })
+
+    test("reports progress through phases", async () => {
+      commits.insertRawCommits([
+        {
+          hash: "aaa",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit aaa",
+          files: [],
+        },
+      ])
+      commits.updateEnrichment("aaa", "feature", "summary a", "haiku")
+
+      const batchJudge = createMockBatchJudge("submit")
+      const checker = new CheckerService(mockGit, mockJudge, commits)
+      const phases: string[] = []
+      await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        1,
+        "/tmp/claude/check-progress.json",
+        (p) => phases.push(p.phase),
+      )
+
+      expect(phases).toContain("submitting")
+      expect(phases).toContain("evaluating")
+    })
+
+    test("reconciles self-contradictory classification verdict on import", async () => {
+      commits.insertRawCommits([
+        {
+          hash: "aaa",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit aaa",
+          files: [],
+        },
+      ])
+      commits.updateEnrichment("aaa", "feature", "summary a", "haiku")
+
+      batchJobs.insert(
+        "msgbatch_reconcile",
+        1,
+        "claude-sonnet-4-5-20250929",
+        "check",
+      )
+      batchJobs.insertCheckBatchItems([
+        {
+          batchId: "msgbatch_reconcile",
+          hash: "aaa",
+          classification: "feature",
+          summary: "summary a",
+        },
+      ])
+
+      const batchJudge = {
+        getBatchStatus: mock(async () => ({
+          processingStatus: "ended",
+          requestCounts: {
+            succeeded: 1,
+            errored: 0,
+            canceled: 0,
+            expired: 0,
+            processing: 0,
+          },
+        })),
+        getBatchResults: mock(async () => [
+          {
+            hash: "aaa",
+            result: {
+              classificationVerdict: {
+                pass: false,
+                reasoning: "Should be feature",
+                suggestedClassification: "feature",
+              },
+              accuracyVerdict: { pass: true, reasoning: "OK" },
+              completenessVerdict: { pass: true, reasoning: "OK" },
+            },
+          },
+        ]),
+      } as unknown as BatchJudgeService
+
+      const checker = new CheckerService(mockGit, mockJudge, commits)
+      const result = await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        1,
+        "/tmp/claude/check-reconcile.json",
+        () => {},
+      )
+
+      // Contradictory verdict should be reconciled to pass
+      expect(result.results![0].classificationVerdict.pass).toBe(true)
+      expect(result.summary!.classificationCorrect).toBe(1)
+    })
+
+    test("index and check batches do not interfere", async () => {
+      // Insert an active index batch
+      batchJobs.insert(
+        "msgbatch_index",
+        10,
+        "claude-haiku-4-5-20251001",
+        "index",
+      )
+
+      commits.insertRawCommits([
+        {
+          hash: "aaa",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit aaa",
+          files: [],
+        },
+      ])
+      commits.updateEnrichment("aaa", "feature", "summary a", "haiku")
+
+      const batchJudge = createMockBatchJudge("submit")
+      const checker = new CheckerService(mockGit, mockJudge, commits)
+      const result = await checker.checkSampleBatch(
+        batchJudge,
+        batchJobs,
+        1,
+        "/tmp/claude/check-no-interfere.json",
+        () => {},
+      )
+
+      // Should submit a new check batch, not pick up the index batch
+      expect(result.batchStatus).toBe("submitted")
+      expect(batchJudge.submitBatch).toHaveBeenCalledTimes(1)
+
+      // Both batches should exist
+      const all = batchJobs.getAll()
+      expect(all).toHaveLength(2)
+    })
   })
 })

@@ -400,6 +400,50 @@ export const SCHEMA: SchemaTable[] = [
         not_null: true,
         description: "Model identifier used for the batch",
       },
+      {
+        name: "type",
+        type: "TEXT",
+        primary_key: false,
+        not_null: true,
+        description:
+          "Batch job type ('index' for enrichment, 'check' for evaluation)",
+      },
+    ],
+  },
+  {
+    name: "check_batch_items",
+    description:
+      "Stores enrichment data for commits in a check batch, used to reconstruct results on import",
+    virtual: false,
+    columns: [
+      {
+        name: "batch_id",
+        type: "TEXT",
+        primary_key: true,
+        not_null: true,
+        description: "FK to batch_jobs.batch_id",
+      },
+      {
+        name: "hash",
+        type: "TEXT",
+        primary_key: true,
+        not_null: true,
+        description: "Commit hash",
+      },
+      {
+        name: "classification",
+        type: "TEXT",
+        primary_key: false,
+        not_null: true,
+        description: "Original enrichment classification at time of submission",
+      },
+      {
+        name: "summary",
+        type: "TEXT",
+        primary_key: false,
+        not_null: true,
+        description: "Original enrichment summary at time of submission",
+      },
     ],
   },
   {

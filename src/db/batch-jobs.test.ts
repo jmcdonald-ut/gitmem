@@ -84,4 +84,76 @@ describe("BatchJobRepository", () => {
   test("getAll returns empty array when no batches", () => {
     expect(repo.getAll()).toEqual([])
   })
+
+  test("insert stores type field defaulting to index", () => {
+    repo.insert("batch_typed", 10, "claude-haiku-4-5-20251001")
+
+    const row = repo.get("batch_typed")
+    expect(row!.type).toBe("index")
+  })
+
+  test("insert stores custom type field", () => {
+    repo.insert("batch_check", 5, "claude-sonnet-4-5-20250929", "check")
+
+    const row = repo.get("batch_check")
+    expect(row!.type).toBe("check")
+  })
+
+  test("getPendingBatchByType filters by type", () => {
+    repo.insert("batch_idx", 10, "claude-haiku-4-5-20251001", "index")
+    repo.insert("batch_chk", 5, "claude-sonnet-4-5-20250929", "check")
+
+    const indexBatch = repo.getPendingBatchByType("index")
+    expect(indexBatch).not.toBeNull()
+    expect(indexBatch!.batch_id).toBe("batch_idx")
+
+    const checkBatch = repo.getPendingBatchByType("check")
+    expect(checkBatch).not.toBeNull()
+    expect(checkBatch!.batch_id).toBe("batch_chk")
+  })
+
+  test("getPendingBatchByType returns null when no pending of that type", () => {
+    repo.insert("batch_idx", 10, "claude-haiku-4-5-20251001", "index")
+    repo.updateStatus("batch_idx", "ended", 10, 0)
+
+    expect(repo.getPendingBatchByType("index")).toBeNull()
+    expect(repo.getPendingBatchByType("check")).toBeNull()
+  })
+
+  test("getPendingBatchByType ignores batches of other types", () => {
+    repo.insert("batch_idx", 10, "claude-haiku-4-5-20251001", "index")
+
+    expect(repo.getPendingBatchByType("check")).toBeNull()
+    expect(repo.getPendingBatchByType("index")).not.toBeNull()
+  })
+
+  test("insertCheckBatchItems and getCheckBatchItems round-trip", () => {
+    repo.insert("batch_chk", 2, "claude-sonnet-4-5-20250929", "check")
+    repo.insertCheckBatchItems([
+      {
+        batchId: "batch_chk",
+        hash: "aaa",
+        classification: "feature",
+        summary: "Added feature",
+      },
+      {
+        batchId: "batch_chk",
+        hash: "bbb",
+        classification: "bug-fix",
+        summary: "Fixed bug",
+      },
+    ])
+
+    const items = repo.getCheckBatchItems("batch_chk")
+    expect(items).toHaveLength(2)
+    expect(items[0].hash).toBe("aaa")
+    expect(items[0].classification).toBe("feature")
+    expect(items[0].summary).toBe("Added feature")
+    expect(items[1].hash).toBe("bbb")
+    expect(items[1].classification).toBe("bug-fix")
+  })
+
+  test("getCheckBatchItems returns empty for nonexistent batch", () => {
+    expect(repo.getCheckBatchItems("nonexistent")).toEqual([])
+  })
 })

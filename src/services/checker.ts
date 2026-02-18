@@ -2,11 +2,17 @@ import type {
   IGitService,
   IJudgeService,
   CheckProgress,
+  CheckBatchResult,
   EvalResult,
   EvalSummary,
   CommitRow,
 } from "@/types"
 import { CommitRepository } from "@db/commits"
+import { BatchJobRepository } from "@db/batch-jobs"
+import type {
+  BatchJudgeService,
+  CheckBatchRequest,
+} from "@services/batch-judge"
 import { reconcileClassificationVerdict } from "@services/judge-shared"
 
 /**
@@ -184,6 +190,189 @@ export class CheckerService {
     onProgress({ phase: "done", current: evaluated, total })
 
     return { results, summary }
+  }
+
+  /**
+   * Evaluates a random sample of enriched commits using the Anthropic Batches API.
+   * Auto-detects state: submits a new batch, polls a pending one, or imports results.
+   * @param batchJudge - The batch judge service for API calls.
+   * @param batchJobs - The batch jobs repository for persistence.
+   * @param sampleSize - Number of random enriched commits to evaluate.
+   * @param outputPath - Path to write detailed results JSON.
+   * @param onProgress - Callback invoked with progress updates.
+   * @returns The batch result with optional results/summary or batch status.
+   */
+  async checkSampleBatch(
+    batchJudge: BatchJudgeService,
+    batchJobs: BatchJobRepository,
+    sampleSize: number,
+    outputPath: string,
+    onProgress: (progress: CheckProgress) => void,
+  ): Promise<CheckBatchResult> {
+    const pendingBatch = batchJobs.getPendingBatchByType("check")
+
+    if (pendingBatch) {
+      const status = await batchJudge.getBatchStatus(pendingBatch.batch_id)
+      batchJobs.updateStatus(
+        pendingBatch.batch_id,
+        status.processingStatus,
+        status.requestCounts.succeeded,
+        status.requestCounts.errored +
+          status.requestCounts.canceled +
+          status.requestCounts.expired,
+      )
+
+      if (status.processingStatus === "ended") {
+        const batchResults = await batchJudge.getBatchResults(
+          pendingBatch.batch_id,
+        )
+        onProgress({
+          phase: "importing",
+          current: 0,
+          total: batchResults.length,
+          batchId: pendingBatch.batch_id,
+          batchStatus: "importing",
+        })
+
+        const items = batchJobs.getCheckBatchItems(pendingBatch.batch_id)
+        const itemMap = new Map(items.map((i) => [i.hash, i]))
+
+        const results: EvalResult[] = []
+        for (const item of batchResults) {
+          if (item.result) {
+            const checkItem = itemMap.get(item.hash)
+            if (!checkItem) continue
+
+            item.result.classificationVerdict = reconcileClassificationVerdict(
+              checkItem.classification,
+              item.result.classificationVerdict,
+            )
+
+            results.push({
+              hash: item.hash,
+              classification: checkItem.classification,
+              summary: checkItem.summary,
+              ...item.result,
+            })
+          }
+        }
+
+        const summary: EvalSummary = {
+          total: results.length,
+          classificationCorrect: results.filter(
+            (r) => r.classificationVerdict.pass,
+          ).length,
+          summaryAccurate: results.filter((r) => r.accuracyVerdict.pass).length,
+          summaryComplete: results.filter((r) => r.completenessVerdict.pass)
+            .length,
+        }
+
+        await Bun.write(outputPath, JSON.stringify(results, null, 2))
+
+        onProgress({
+          phase: "done",
+          current: results.length,
+          total: results.length,
+        })
+
+        return { results, summary, outputPath }
+      }
+
+      // Still in progress
+      onProgress({
+        phase: "evaluating",
+        current: status.requestCounts.succeeded,
+        total: pendingBatch.request_count,
+        batchId: pendingBatch.batch_id,
+        batchStatus: status.processingStatus,
+      })
+
+      return {
+        batchId: pendingBatch.batch_id,
+        batchStatus: status.processingStatus,
+      }
+    }
+
+    // No pending batch — submit a new one
+    const sample = this.commits.getRandomEnrichedCommits(sampleSize)
+
+    if (sample.length === 0) {
+      onProgress({ phase: "done", current: 0, total: 0 })
+      return {
+        results: [],
+        summary: {
+          total: 0,
+          classificationCorrect: 0,
+          summaryAccurate: 0,
+          summaryComplete: 0,
+        },
+      }
+    }
+
+    const hashes = sample.map((c) => c.hash)
+    const diffMap = await this.git.getDiffBatch(hashes)
+    const filesMap = this.commits.getCommitFilesByHashes(hashes)
+
+    const evaluatable = sample.filter(
+      (c) =>
+        !this.isMergeCommitWithEmptyDiff(c.message, diffMap.get(c.hash) ?? ""),
+    )
+
+    if (evaluatable.length === 0) {
+      onProgress({ phase: "done", current: 0, total: 0 })
+      return {
+        results: [],
+        summary: {
+          total: 0,
+          classificationCorrect: 0,
+          summaryAccurate: 0,
+          summaryComplete: 0,
+        },
+      }
+    }
+
+    onProgress({
+      phase: "submitting",
+      current: 0,
+      total: evaluatable.length,
+      batchStatus: "submitting",
+    })
+
+    const requests: CheckBatchRequest[] = evaluatable.map((commit) => ({
+      hash: commit.hash,
+      commit: {
+        hash: commit.hash,
+        authorName: commit.author_name,
+        authorEmail: commit.author_email,
+        committedAt: commit.committed_at,
+        message: commit.message,
+        files: filesMap.get(commit.hash) ?? [],
+      },
+      diff: diffMap.get(commit.hash) ?? "",
+      classification: commit.classification!,
+      summary: commit.summary!,
+    }))
+
+    const { batchId, requestCount } = await batchJudge.submitBatch(requests)
+    batchJobs.insert(batchId, requestCount, "batch-judge", "check")
+    batchJobs.insertCheckBatchItems(
+      evaluatable.map((c) => ({
+        batchId,
+        hash: c.hash,
+        classification: c.classification!,
+        summary: c.summary!,
+      })),
+    )
+
+    onProgress({
+      phase: "evaluating",
+      current: 0,
+      total: requestCount,
+      batchId,
+      batchStatus: "submitted",
+    })
+
+    return { batchId, batchStatus: "submitted" }
   }
 
   /**
