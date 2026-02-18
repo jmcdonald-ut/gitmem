@@ -51,8 +51,14 @@ Classification edge cases:
 - Adding locale/translation files for an existing feature is "chore", not "feature". The feature already exists; adding a translation is maintenance.
 - Updating existing locale/translation text is "style", not "docs". Locale files are runtime UI strings, not documentation.
 - Regenerating test fixtures or snapshots without changing test logic is "chore", not "test".
-- Fixing broken links, broken builds, or broken configs is "bug-fix" regardless of which file type contains the fix.
+- Fixing broken links (404s), broken builds, or broken configs is "bug-fix" regardless of which file type contains the fix. However, fixing incorrect content in documentation (wrong variable names in examples, wrong property names, typos) is "docs", not "bug-fix" — the documentation content itself is the deliverable being corrected.
 - Classify by the purpose of the change, not the file type. A config file change that fixes a broken doc site is "bug-fix", not "docs" or "chore".
+- IMPORTANT: Always trust the diff over the commit message. If the message says "fix" but the diff shows only a refactor, the correct classification is "refactor". Do not override a diff-based classification using commit message wording.
+- Scratch files, playgrounds, and example scripts are not test files. Changes to non-test non-production files are "chore", not "test".
+
+Classification evaluation approach:
+- Pass if the classification is a reasonable fit for the commit, even if another classification could also apply.
+- Only fail if the classification is clearly wrong — i.e., there is a substantially better classification that the original clearly should have been.
 
 Accuracy evaluation guidelines:
 - Fail if the summary claims something changed that didn't, describes the wrong component, or misidentifies what type of change was made.
