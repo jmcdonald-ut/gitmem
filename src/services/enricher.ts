@@ -179,7 +179,7 @@ export class EnricherService {
   }> {
     const { newHashes } = await this.discoverAndInsert(onProgress)
 
-    let enrichedThisRun = 0
+    let enrichedThisRun: number
     const enrichedHashes: string[] = []
 
     const pendingBatch = batchJobs.getPendingBatch()
