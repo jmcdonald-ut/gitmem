@@ -145,6 +145,24 @@ export function handleDetails(
   }
 }
 
+export function createFetchHandler(
+  html: string,
+  commits: CommitRepository,
+  aggregates: AggregateRepository,
+  exclude: FileCategory[],
+): (req: Request) => Response {
+  return (req: Request) => {
+    const url = new URL(req.url)
+    if (url.pathname === "/")
+      return new Response(html, {
+        headers: { "Content-Type": "text/html" },
+      })
+    if (url.pathname === "/api/details")
+      return handleDetails(url, commits, aggregates, exclude)
+    return new Response("Not found", { status: 404 })
+  }
+}
+
 const HELP_TEXT = `
 Launches a browser-based visualization of repository hotspots,
 file coupling, and change patterns using an interactive circle-packing diagram.
@@ -189,16 +207,7 @@ export const visualizeCommand = new Command("visualize")
 
         const server = Bun.serve({
           port: opts.port,
-          fetch(req) {
-            const url = new URL(req.url)
-            if (url.pathname === "/")
-              return new Response(html, {
-                headers: { "Content-Type": "text/html" },
-              })
-            if (url.pathname === "/api/details")
-              return handleDetails(url, commits, aggregates, exclude)
-            return new Response("Not found", { status: 404 })
-          },
+          fetch: createFetchHandler(html, commits, aggregates, exclude),
         })
 
         console.log(`Visualize: http://localhost:${server.port}`)
