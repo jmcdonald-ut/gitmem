@@ -175,6 +175,19 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 70%;
+  cursor: pointer;
+}
+
+.list-file .clickable {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.list-file .clickable:hover { text-decoration: underline; }
+
+.list-file .separator {
+  color: var(--text-muted);
+  cursor: default;
 }
 
 .list-value {
@@ -394,6 +407,23 @@ body {
     if (focus !== h) zoomTo(focus.parent || h);
   });
 
+  detailsEl.addEventListener("click", (event) => {
+    const el = event.target.closest("[data-path]");
+    if (!el) return;
+    const path = el.dataset.path;
+    if (!path) return;
+    const target = h.descendants().find(d => d.data.path === path);
+    if (target) {
+      if (target.children) {
+        zoomTo(target);
+      } else {
+        zoomTo(target.parent || h);
+        fetchDetails(target.data.path);
+        updateBreadcrumb(target.data.path);
+      }
+    }
+  });
+
   function updateBreadcrumb(path) {
     if (!path) {
       breadcrumbEl.innerHTML = "";
@@ -451,7 +481,7 @@ body {
       if (data.hotspots && data.hotspots.length > 0) {
         html += '<h3>Top Hotspots</h3>';
         html += data.hotspots.map(h =>
-          '<div class="list-item"><span class="list-file">' + h.file +
+          '<div class="list-item"><span class="list-file">' + fileLink(h.file, 40) +
           '</span><span class="list-value">' + h.changes + ' changes</span></div>'
         ).join("");
       }
@@ -460,7 +490,7 @@ body {
         html += '<h3>Top Coupled Pairs</h3>';
         html += data.coupledPairs.map(p =>
           '<div class="list-item"><span class="list-file" style="max-width:90%;font-size:12px">' +
-          p.fileA + ' &harr; ' + p.fileB +
+          fileLink(p.fileA, 30) + '<span class="separator"> &harr; </span>' + fileLink(p.fileB, 30) +
           '</span><span class="list-value">' + p.count + '</span></div>'
         ).join("");
       }
@@ -483,7 +513,7 @@ body {
       if (data.hotspots && data.hotspots.length > 0) {
         html += '<h3>Hotspots</h3>';
         html += data.hotspots.map(h =>
-          '<div class="list-item"><span class="list-file">' + h.file +
+          '<div class="list-item"><span class="list-file">' + fileLink(h.file, 40) +
           '</span><span class="list-value">' + h.changes + '</span></div>'
         ).join("");
       }
@@ -499,7 +529,7 @@ body {
       if (data.coupled && data.coupled.length > 0) {
         html += '<h3>External Coupling</h3>';
         html += data.coupled.map(c =>
-          '<div class="list-item"><span class="list-file">' + c.file +
+          '<div class="list-item"><span class="list-file">' + fileLink(c.file, 40) +
           '</span><span class="list-value">' + (c.ratio * 100).toFixed(0) + '%</span></div>'
         ).join("");
       }
@@ -534,7 +564,7 @@ body {
       if (data.coupled && data.coupled.length > 0) {
         html += '<h3>Coupled Files</h3>';
         html += data.coupled.map(c =>
-          '<div class="list-item"><span class="list-file">' + c.file +
+          '<div class="list-item"><span class="list-file">' + fileLink(c.file, 40) +
           '</span><span class="list-value">' + (c.ratio * 100).toFixed(0) + '%</span></div>'
         ).join("");
       }
@@ -553,6 +583,33 @@ body {
   function fmt(n) {
     if (n == null) return "—";
     return n.toLocaleString();
+  }
+
+  function smartTruncate(filePath, maxChars) {
+    if (!filePath || filePath.length <= maxChars) return filePath;
+    const parts = filePath.split("/");
+    if (parts.length <= 2) return filePath;
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    // first/.../<last> is the minimum
+    const min = first + "/.../" + last;
+    if (min.length >= maxChars) return min;
+    // Try to include more segments from the end
+    let end = last;
+    for (let i = parts.length - 2; i > 0; i--) {
+      const candidate = first + "/.../" + parts.slice(i).join("/");
+      if (candidate.length <= maxChars) {
+        end = parts.slice(i).join("/");
+      } else {
+        break;
+      }
+    }
+    return first + "/.../" + end;
+  }
+
+  function fileLink(filePath, maxChars) {
+    const display = maxChars ? smartTruncate(filePath, maxChars) : filePath;
+    return '<span class="clickable" data-path="' + filePath + '" title="' + filePath + '">' + display + '</span>';
   }
 
   function classificationBar(stats) {
