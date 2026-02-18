@@ -269,7 +269,7 @@ body {
   </div>
 </div>
 
-<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
 <script>
 (function() {
   const hierarchyData = ${dataJson};
@@ -279,6 +279,12 @@ body {
   const tooltipEl = document.getElementById("tooltip");
   const detailsEl = document.getElementById("details");
   const breadcrumbEl = document.getElementById("breadcrumb");
+
+  function esc(s) {
+    if (!s) return "";
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
 
   const COLORS = {
     "bug-fix": "#EF4E4E",
@@ -316,12 +322,16 @@ body {
 
   pack(h);
 
+  const allNodes = h.descendants();
+  const leafNodes = allNodes.filter(d => !d.children);
+  const nodeByPath = new Map(allNodes.map(d => [d.data.path, d]));
+
   let focus = h;
   let view;
   let selectedLeaf = null;
 
   const nodes = g.selectAll("circle")
-    .data(h.descendants())
+    .data(allNodes)
     .join("circle")
     .attr("fill", d => {
       if (d.children) return "rgba(255,255,255,0.03)";
@@ -349,7 +359,7 @@ body {
     })
     .on("mouseenter", (event, d) => {
       if (!d.data.path) return;
-      let html = \`<strong>\${d.data.path || d.data.name}</strong>\`;
+      let html = \`<strong>\${esc(d.data.path || d.data.name)}</strong>\`;
       if (!d.children) {
         html += \`<br>LOC: \${d.data.loc || "—"}\`;
         html += \`<br>Changes: \${d.data.changes || 0}\`;
@@ -369,7 +379,7 @@ body {
     });
 
   const labels = g.selectAll("text")
-    .data(h.descendants().filter(d => !d.children))
+    .data(leafNodes)
     .join("text")
     .attr("text-anchor", "middle")
     .attr("dy", "0.3em")
@@ -386,12 +396,13 @@ body {
       \`translate(\${(d.x - v[0]) * k + width / 2},\${(d.y - v[1]) * k + height / 2})\`
     ).attr("r", d => d.r * k);
 
+    lastK = k;
     labels.attr("transform", d =>
       \`translate(\${(d.x - v[0]) * k + width / 2},\${(d.y - v[1]) * k + height / 2})\`
     ).attr("font-size", d => Math.min(d.r * k * 0.6, 12));
-
-    resolveOverlaps(k);
   }
+
+  let lastK = 1;
 
   function resolveOverlaps(k) {
     const candidates = [];
@@ -445,12 +456,14 @@ body {
 
   function zoomTo(d) {
     focus = d;
+    labels.attr("opacity", 0);
     const transition = svg.transition()
       .duration(500)
       .tween("zoom", () => {
         const i = d3.interpolateZoom(view, [d.x, d.y, d.r * 2]);
         return t => zoomView(i(t));
-      });
+      })
+      .on("end", () => resolveOverlaps(lastK));
 
     const detailPath = d === h ? "" : d.data.path;
     fetchDetails(detailPath);
@@ -460,6 +473,7 @@ body {
   let detailsAbort = null;
 
   zoomView([h.x, h.y, h.r * 2]);
+  resolveOverlaps(lastK);
   fetchDetails("");
   updateBreadcrumb("");
 
@@ -473,7 +487,7 @@ body {
     if (!el) return;
     const path = el.dataset.path;
     if (!path) return;
-    const target = h.descendants().find(d => d.data.path === path);
+    const target = nodeByPath.get(path);
     if (target) {
       if (target.children) {
         selectedLeaf = null;
@@ -488,7 +502,7 @@ body {
   });
 
   function updateBreadcrumb(path) {
-    let html = '<span data-path="">' + repoName + '</span>';
+    let html = '<span data-path="">' + esc(repoName) + '</span>';
     if (!path) {
       breadcrumbEl.innerHTML = html;
       bindBreadcrumbClicks();
@@ -499,7 +513,7 @@ body {
     for (let i = 0; i < parts.length; i++) {
       accumulated += parts[i] + (i < parts.length - 1 ? "/" : "");
       const displayPath = accumulated + (i < parts.length - 1 ? "/" : "");
-      html += ' / <span data-path="' + displayPath + '">' + parts[i] + '</span>';
+      html += ' / <span data-path="' + esc(displayPath) + '">' + esc(parts[i]) + '</span>';
     }
     breadcrumbEl.innerHTML = html;
     bindBreadcrumbClicks();
@@ -513,7 +527,7 @@ body {
         if (p === "") {
           zoomTo(h);
         } else {
-          const target = h.descendants().find(d => d.data.path === p);
+          const target = nodeByPath.get(p);
           if (target) zoomTo(target);
         }
       });
@@ -567,7 +581,7 @@ body {
       html += trendHtml(data.trendSummary);
 
     } else if (data.type === "directory") {
-      html += '<h2>' + data.path + '</h2>';
+      html += '<h2>' + esc(data.path) + '</h2>';
       html += '<div class="stat-grid">';
       html += statItem(fmt(data.fileCount), "Files");
       if (data.stats) {
@@ -590,7 +604,7 @@ body {
       if (data.contributors && data.contributors.length > 0) {
         html += '<h3>Contributors</h3>';
         html += data.contributors.map(c =>
-          '<div class="list-item"><span>' + c.name +
+          '<div class="list-item"><span>' + esc(c.name) +
           '</span><span class="list-value">' + c.commits + ' commits</span></div>'
         ).join("");
       }
@@ -606,7 +620,7 @@ body {
       html += trendHtml(data.trendSummary);
 
     } else if (data.type === "file") {
-      html += '<h2>' + data.path + '</h2>';
+      html += '<h2>' + esc(data.path) + '</h2>';
       if (data.stats) {
         html += '<div class="stat-grid">';
         html += statItem(fmt(data.stats.current_loc || 0), "LOC");
@@ -625,7 +639,7 @@ body {
       if (data.contributors && data.contributors.length > 0) {
         html += '<h3>Contributors</h3>';
         html += data.contributors.map(c =>
-          '<div class="list-item"><span>' + c.name +
+          '<div class="list-item"><span>' + esc(c.name) +
           '</span><span class="list-value">' + c.commits + ' commits</span></div>'
         ).join("");
       }
@@ -678,7 +692,7 @@ body {
 
   function fileLink(filePath, maxChars) {
     const display = maxChars ? smartTruncate(filePath, maxChars) : filePath;
-    return '<span class="clickable" data-path="' + filePath + '" title="' + filePath + '">' + display + '</span>';
+    return '<span class="clickable" data-path="' + esc(filePath) + '" title="' + esc(filePath) + '">' + esc(display) + '</span>';
   }
 
   function classificationBar(stats) {
