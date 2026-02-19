@@ -56,7 +56,7 @@ export function BatchCheckCommand({
   }
 
   if (result) {
-    if (result.batchStatus === "submitted") {
+    if (result.kind === "submitted") {
       return (
         <Box flexDirection="column">
           <Text color="yellow">Batch submitted! ID: {result.batchId}</Text>
@@ -69,11 +69,7 @@ export function BatchCheckCommand({
       )
     }
 
-    if (
-      result.batchStatus &&
-      result.batchStatus !== "ended" &&
-      result.batchStatus !== "submitted"
-    ) {
+    if (result.kind === "in_progress") {
       return (
         <Box flexDirection="column">
           <Text color="cyan">Batch in progress: {result.batchId}</Text>
@@ -85,13 +81,17 @@ export function BatchCheckCommand({
       )
     }
 
-    if (result.summary) {
+    if (result.kind === "complete") {
       return (
         <BatchCheckResultView
           summary={result.summary}
-          outputPath={result.outputPath!}
+          outputPath={result.outputPath}
         />
       )
+    }
+
+    if (result.kind === "empty") {
+      return <BatchCheckResultView summary={result.summary} />
     }
   }
 
@@ -112,7 +112,7 @@ function BatchCheckResultView({
   outputPath,
 }: {
   summary: EvalSummary
-  outputPath: string
+  outputPath?: string
 }) {
   return (
     <Box flexDirection="column">
@@ -132,10 +132,14 @@ function BatchCheckResultView({
         {"  "}Summary completeness: {summary.summaryComplete}/{summary.total}{" "}
         complete
       </Text>
-      <Text />
-      <Text>
-        {"  "}Details saved to: {outputPath}
-      </Text>
+      {outputPath && (
+        <>
+          <Text />
+          <Text>
+            {"  "}Details saved to: {outputPath}
+          </Text>
+        </>
+      )}
     </Box>
   )
 }

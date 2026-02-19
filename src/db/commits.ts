@@ -153,25 +153,57 @@ export class CommitRepository {
   getRandomEnrichedCommits(
     n: number,
     excludeHashes: Set<string> = new Set(),
+    excludeTemplateMerges: boolean = false,
   ): CommitRow[] {
+    const mergeFilter = excludeTemplateMerges
+      ? " AND NOT (message LIKE 'Merge%' AND summary LIKE 'Merge commit:%')"
+      : ""
+
     if (excludeHashes.size === 0) {
       return this.db
         .query<
           CommitRow,
           [number]
-        >("SELECT * FROM commits WHERE enriched_at IS NOT NULL ORDER BY RANDOM() LIMIT ?")
+        >(`SELECT * FROM commits WHERE enriched_at IS NOT NULL${mergeFilter} ORDER BY RANDOM() LIMIT ?`)
         .all(n)
     }
 
+    // Use temp table for large exclusion sets to stay within SQLite parameter limits
     const excluded = [...excludeHashes]
-    const placeholders = excluded.map(() => "?").join(", ")
-    const params: (string | number)[] = [...excluded, n]
-    return this.db
+    const CHUNK = 500
+
+    if (excluded.length <= CHUNK) {
+      const placeholders = excluded.map(() => "?").join(", ")
+      const params: (string | number)[] = [...excluded, n]
+      return this.db
+        .query<
+          CommitRow,
+          (string | number)[]
+        >(`SELECT * FROM commits WHERE enriched_at IS NOT NULL AND hash NOT IN (${placeholders})${mergeFilter} ORDER BY RANDOM() LIMIT ?`)
+        .all(...params)
+    }
+
+    this.db.run(
+      "CREATE TEMP TABLE IF NOT EXISTS _exclude_hashes (hash TEXT PRIMARY KEY)",
+    )
+    this.db.run("DELETE FROM _exclude_hashes")
+    const insertStmt = this.db.prepare(
+      "INSERT OR IGNORE INTO _exclude_hashes (hash) VALUES (?)",
+    )
+    const insertTx = this.db.transaction((hashes: string[]) => {
+      for (const h of hashes) insertStmt.run(h)
+    })
+    insertTx(excluded)
+
+    const results = this.db
       .query<
         CommitRow,
-        (string | number)[]
-      >(`SELECT * FROM commits WHERE enriched_at IS NOT NULL AND hash NOT IN (${placeholders}) ORDER BY RANDOM() LIMIT ?`)
-      .all(...params)
+        [number]
+      >(`SELECT * FROM commits WHERE enriched_at IS NOT NULL AND hash NOT IN (SELECT hash FROM _exclude_hashes)${mergeFilter} ORDER BY RANDOM() LIMIT ?`)
+      .all(n)
+
+    this.db.run("DELETE FROM _exclude_hashes")
+    return results
   }
 
   /**

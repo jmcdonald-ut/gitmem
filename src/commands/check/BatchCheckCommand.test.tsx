@@ -35,8 +35,8 @@ function createMockChecker(
             batchStatus: "submitting",
           })
           return {
+            kind: "submitted",
             batchId: "msgbatch_check_test",
-            batchStatus: "submitted",
           }
         }
 
@@ -49,6 +49,7 @@ function createMockChecker(
             batchStatus: "in_progress",
           })
           return {
+            kind: "in_progress",
             batchId: "msgbatch_check_poll",
             batchStatus: "in_progress",
           }
@@ -57,6 +58,7 @@ function createMockChecker(
         if (behavior === "empty") {
           onProgress({ phase: "done", current: 0, total: 0 })
           return {
+            kind: "empty",
             results: [],
             summary: {
               total: 0,
@@ -77,6 +79,7 @@ function createMockChecker(
         })
         onProgress({ phase: "done", current: 5, total: 5 })
         return {
+          kind: "complete",
           results: Array.from({ length: 5 }, (_, i) => ({
             hash: `hash${i}`,
             classification: "feature",

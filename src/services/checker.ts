@@ -1,6 +1,7 @@
 import type {
   IGitService,
   IJudgeService,
+  IBatchJudgeService,
   CheckProgress,
   CheckBatchResult,
   EvalResult,
@@ -9,10 +10,7 @@ import type {
 } from "@/types"
 import { CommitRepository } from "@db/commits"
 import { BatchJobRepository } from "@db/batch-jobs"
-import type {
-  BatchJudgeService,
-  CheckBatchRequest,
-} from "@services/batch-judge"
+import type { CheckBatchRequest } from "@services/batch-judge"
 import { reconcileClassificationVerdict } from "@services/judge-shared"
 
 /**
@@ -157,13 +155,7 @@ export class CheckerService {
       }
     }
 
-    const summary: EvalSummary = {
-      total: results.length,
-      classificationCorrect: results.filter((r) => r.classificationVerdict.pass)
-        .length,
-      summaryAccurate: results.filter((r) => r.accuracyVerdict.pass).length,
-      summaryComplete: results.filter((r) => r.completenessVerdict.pass).length,
-    }
+    const summary = this.computeSummary(results)
 
     onProgress({ phase: "done", current: evaluated, total })
 
@@ -181,7 +173,7 @@ export class CheckerService {
    * @returns The batch result with optional results/summary or batch status.
    */
   async checkSampleBatch(
-    batchJudge: BatchJudgeService,
+    batchJudge: IBatchJudgeService,
     batchJobs: BatchJobRepository,
     sampleSize: number,
     outputPath: string,
@@ -235,17 +227,9 @@ export class CheckerService {
           }
         }
 
-        const summary: EvalSummary = {
-          total: results.length,
-          classificationCorrect: results.filter(
-            (r) => r.classificationVerdict.pass,
-          ).length,
-          summaryAccurate: results.filter((r) => r.accuracyVerdict.pass).length,
-          summaryComplete: results.filter((r) => r.completenessVerdict.pass)
-            .length,
-        }
-
+        const summary = this.computeSummary(results)
         await Bun.write(outputPath, JSON.stringify(results, null, 2))
+        batchJobs.deleteCheckBatchItems(pendingBatch.batch_id)
 
         onProgress({
           phase: "done",
@@ -253,7 +237,7 @@ export class CheckerService {
           total: results.length,
         })
 
-        return { results, summary, outputPath }
+        return { kind: "complete", results, summary, outputPath }
       }
 
       // Still in progress
@@ -266,6 +250,7 @@ export class CheckerService {
       })
 
       return {
+        kind: "in_progress",
         batchId: pendingBatch.batch_id,
         batchStatus: status.processingStatus,
       }
@@ -278,6 +263,7 @@ export class CheckerService {
     if (evaluatable.length === 0) {
       onProgress({ phase: "done", current: 0, total: 0 })
       return {
+        kind: "empty",
         results: [],
         summary: {
           total: 0,
@@ -314,7 +300,7 @@ export class CheckerService {
     }))
 
     const { batchId, requestCount } = await batchJudge.submitBatch(requests)
-    batchJobs.insert(batchId, requestCount, "batch-judge", "check")
+    batchJobs.insert(batchId, requestCount, batchJudge.model, "check")
     batchJobs.insertCheckBatchItems(
       evaluatable.map((c) => ({
         batchId,
@@ -332,7 +318,7 @@ export class CheckerService {
       batchStatus: "submitted",
     })
 
-    return { batchId, batchStatus: "submitted" }
+    return { kind: "submitted", batchId }
   }
 
   /**
@@ -355,6 +341,17 @@ export class CheckerService {
     )
   }
 
+  /** Computes aggregate summary statistics from evaluation results. */
+  private computeSummary(results: EvalResult[]): EvalSummary {
+    return {
+      total: results.length,
+      classificationCorrect: results.filter((r) => r.classificationVerdict.pass)
+        .length,
+      summaryAccurate: results.filter((r) => r.accuracyVerdict.pass).length,
+      summaryComplete: results.filter((r) => r.completenessVerdict.pass).length,
+    }
+  }
+
   /**
    * Samples evaluatable commits by iteratively fetching random enriched commits,
    * filtering out merge commits with empty diffs, and backfilling until the
@@ -369,7 +366,7 @@ export class CheckerService {
 
     while (evaluatable.length < sampleSize) {
       const remaining = sampleSize - evaluatable.length
-      const batch = this.commits.getRandomEnrichedCommits(remaining, seen)
+      const batch = this.commits.getRandomEnrichedCommits(remaining, seen, true)
 
       if (batch.length === 0) break // DB exhausted
 

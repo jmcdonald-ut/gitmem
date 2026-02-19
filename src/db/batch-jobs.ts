@@ -1,16 +1,17 @@
 import { Database } from "bun:sqlite"
+import type { BatchJobStatus, BatchJobType } from "@/types"
 
 /** Database row representation of a batch job. */
 export interface BatchJobRow {
   batch_id: string
-  status: string
+  status: BatchJobStatus
   request_count: number
   succeeded_count: number
   failed_count: number
   submitted_at: string
   completed_at: string | null
   model_used: string
-  type: string
+  type: BatchJobType
 }
 
 /** Database row representation of a check batch item. */
@@ -34,7 +35,7 @@ export class BatchJobRepository {
     batchId: string,
     requestCount: number,
     modelUsed: string,
-    type: string = "index",
+    type: BatchJobType = "index",
   ): void {
     this.db
       .prepare(
@@ -95,7 +96,7 @@ export class BatchJobRepository {
   }
 
   /** Returns the most recent pending batch job of a given type, or null. */
-  getPendingBatchByType(type: string): BatchJobRow | null {
+  getPendingBatchByType(type: BatchJobType): BatchJobRow | null {
     return (
       this.db
         .query<
@@ -144,5 +145,12 @@ export class BatchJobRepository {
         [string]
       >("SELECT * FROM check_batch_items WHERE batch_id = ?")
       .all(batchId)
+  }
+
+  /** Deletes all check batch items for a given batch ID. */
+  deleteCheckBatchItems(batchId: string): void {
+    this.db
+      .prepare("DELETE FROM check_batch_items WHERE batch_id = ?")
+      .run(batchId)
   }
 }
