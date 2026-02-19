@@ -19,6 +19,8 @@ describe("generateSkill", () => {
   test("writes SKILL.md to default path", () => {
     const result = generateSkill({ repoRoot: tempDir })
 
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
     expect(result.skillDir).toBe(
       join(tempDir, ".claude", "skills", "use-gitmem"),
     )
@@ -29,13 +31,14 @@ describe("generateSkill", () => {
     expect(readFileSync(result.skillPath, "utf-8")).toBe(getSkillContent())
   })
 
-  test("errors when skill exists without --force", () => {
+  test("returns error when skill exists without --force", () => {
     generateSkill({ repoRoot: tempDir })
 
-    expect(() => generateSkill({ repoRoot: tempDir })).toThrow(
-      "Skill already exists",
-    )
-    expect(() => generateSkill({ repoRoot: tempDir })).toThrow("--force")
+    const result = generateSkill({ repoRoot: tempDir })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain("Skill already exists")
+    expect(result.error).toContain("--force")
   })
 
   test("overwrites with --force", () => {
@@ -50,6 +53,8 @@ describe("generateSkill", () => {
     const customDir = join(tempDir, "custom", "skill-dir")
     const result = generateSkill({ repoRoot: tempDir, out: customDir })
 
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
     expect(result.skillDir).toBe(customDir)
     expect(result.skillPath).toBe(join(customDir, "SKILL.md"))
     expect(existsSync(result.skillPath)).toBe(true)
