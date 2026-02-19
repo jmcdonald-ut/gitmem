@@ -24,7 +24,7 @@ Add --batch with --sample to use the Anthropic Message Batches API
 for 50% cost reduction. Re-run the same command to poll/import results.
 
 Evaluates three dimensions: classification correctness, summary
-accuracy, and summary completeness. Each dimension is scored 1-5.
+accuracy, and summary completeness. Each dimension receives a pass/fail verdict.
 
 Default output for --sample mode:  .gitmem/check-<timestamp>.json
 

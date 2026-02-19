@@ -41,6 +41,7 @@ src/
       <Name>.tsx       # Ink React component for terminal UI (most commands)
       <Name>.test.tsx  # Component tests (co-located)
     index/             # Also has BatchIndexCommand.tsx for --batch mode
+    check/             # Also has BatchCheckCommand.tsx for --batch mode
     visualize/         # HTTP server (no Ink component): hierarchy.ts, page.ts
     utils/
       command-context.ts   # Shared runCommand() setup, file locking (index.lock)
@@ -64,6 +65,8 @@ src/
     checker.ts         # Orchestrates enrichment quality evaluation
     judge.ts           # Anthropic API for commit evaluation (JudgeService)
     judge-shared.ts    # Shared judge prompt, message builder, response parser
+    batch-judge.ts     # Anthropic Message Batches API for evaluation (BatchJudgeService)
+    batch-shared.ts    # Shared batch status polling utility
 ```
 
 ## CLI commands

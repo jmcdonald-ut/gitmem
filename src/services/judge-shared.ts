@@ -116,7 +116,7 @@ export function parseEvalResponse(text: string): {
   accuracyVerdict: EvalVerdict
   completenessVerdict: EvalVerdict
 } {
-  const parsed = JSON.parse(text)
+  const parsed = EvalResponseSchema.parse(JSON.parse(text))
 
   return {
     classificationVerdict: toVerdict(parsed.classification),
