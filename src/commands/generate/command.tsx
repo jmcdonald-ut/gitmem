@@ -1,0 +1,75 @@
+import { Command } from "commander"
+import React from "react"
+import { render } from "ink"
+import { join, relative } from "path"
+import { existsSync, mkdirSync, writeFileSync } from "fs"
+import { runCommand } from "@commands/utils/command-context"
+import { formatOutput } from "@/output"
+import { getSkillContent } from "@commands/generate/skill-content"
+import { GenerateSkillCommand } from "@commands/generate/GenerateSkillCommand"
+
+export interface GenerateSkillOptions {
+  repoRoot: string
+  out?: string
+  force?: boolean
+}
+
+export interface GenerateSkillResult {
+  skillDir: string
+  skillPath: string
+}
+
+export function generateSkill(opts: GenerateSkillOptions): GenerateSkillResult {
+  const skillDir =
+    opts.out ?? join(opts.repoRoot, ".claude", "skills", "use-gitmem")
+  const skillPath = join(skillDir, "SKILL.md")
+
+  if (existsSync(skillPath) && !opts.force) {
+    throw new Error(
+      `Skill already exists: ${skillPath}\nUse --force to overwrite.`,
+    )
+  }
+
+  mkdirSync(skillDir, { recursive: true })
+  writeFileSync(skillPath, getSkillContent())
+
+  return { skillDir, skillPath }
+}
+
+const SKILL_HELP_TEXT = `
+Writes a SKILL.md file so Claude Code can discover and use gitmem commands
+for codebase analysis. Default location: .claude/skills/use-gitmem/SKILL.md
+
+Examples:
+  gitmem generate skill
+  gitmem generate skill --force
+  gitmem generate skill --out ./custom/skill-dir`
+
+const skillCommand = new Command("skill")
+  .description("Generate a Claude Code skill file for this repository")
+  .option("-f, --force", "Overwrite existing skill file")
+  .option("-o, --out <path>", "Output directory for the skill file")
+  .addHelpText("after", SKILL_HELP_TEXT)
+  .action(async (opts, cmd) => {
+    await runCommand(
+      cmd.parent!.parent!.opts(),
+      { needsGit: true, needsDb: false },
+      async ({ format, git }) => {
+        const repoRoot = await git.getRepoRoot()
+        const result = generateSkill({
+          repoRoot,
+          out: opts.out,
+          force: opts.force,
+        })
+
+        const displayPath = relative(process.cwd(), result.skillPath)
+        if (formatOutput(format, result)) return
+
+        render(<GenerateSkillCommand skillPath={displayPath} />).unmount()
+      },
+    )
+  })
+
+export const generateCommand = new Command("generate")
+  .description("Generate project files")
+  .addCommand(skillCommand)

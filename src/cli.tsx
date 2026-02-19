@@ -10,6 +10,7 @@ import { couplingCommand } from "@commands/coupling/command"
 import { trendsCommand } from "@commands/trends/command"
 import { schemaCommand } from "@commands/schema/command"
 import { visualizeCommand } from "@commands/visualize/command"
+import { generateCommand } from "@commands/generate/command"
 
 const HELP_TEXT = `
 Getting started:
@@ -38,5 +39,6 @@ program.addCommand(couplingCommand)
 program.addCommand(trendsCommand)
 program.addCommand(schemaCommand)
 program.addCommand(visualizeCommand)
+program.addCommand(generateCommand)
 
 program.parse()
