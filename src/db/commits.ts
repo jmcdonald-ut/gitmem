@@ -147,15 +147,31 @@ export class CommitRepository {
   /**
    * Returns N random enriched commits for quality evaluation.
    * @param n - Maximum number of commits to return.
+   * @param excludeHashes - Hashes to exclude from selection.
    * @returns Array of enriched commit rows in random order.
    */
-  getRandomEnrichedCommits(n: number): CommitRow[] {
+  getRandomEnrichedCommits(
+    n: number,
+    excludeHashes: Set<string> = new Set(),
+  ): CommitRow[] {
+    if (excludeHashes.size === 0) {
+      return this.db
+        .query<
+          CommitRow,
+          [number]
+        >("SELECT * FROM commits WHERE enriched_at IS NOT NULL ORDER BY RANDOM() LIMIT ?")
+        .all(n)
+    }
+
+    const excluded = [...excludeHashes]
+    const placeholders = excluded.map(() => "?").join(", ")
+    const params: (string | number)[] = [...excluded, n]
     return this.db
       .query<
         CommitRow,
-        [number]
-      >("SELECT * FROM commits WHERE enriched_at IS NOT NULL ORDER BY RANDOM() LIMIT ?")
-      .all(n)
+        (string | number)[]
+      >(`SELECT * FROM commits WHERE enriched_at IS NOT NULL AND hash NOT IN (${placeholders}) ORDER BY RANDOM() LIMIT ?`)
+      .all(...params)
   }
 
   /**
