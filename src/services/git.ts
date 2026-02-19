@@ -127,6 +127,13 @@ export class GitService implements IGitService {
     }
   }
 
+  /** Returns the absolute path to the repository root. */
+  async getRepoRoot(): Promise<string> {
+    const result =
+      await Bun.$`git -C ${this.cwd} rev-parse --show-toplevel`.quiet()
+    return result.text().trim()
+  }
+
   /**
    * Determines the default branch name by checking the remote HEAD,
    * falling back to "main"/"master", then the current HEAD.
