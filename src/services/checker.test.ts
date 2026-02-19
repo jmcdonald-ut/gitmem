@@ -614,7 +614,7 @@ describe("CheckerService", () => {
     expect(mockJudge.evaluateCommit).toHaveBeenCalled()
   })
 
-  test("checkSample excludes merge commits with empty diffs", async () => {
+  test("checkSample backfills past merge commits with empty diffs", async () => {
     commits.insertRawCommits([
       {
         hash: "aaa",
@@ -632,6 +632,14 @@ describe("CheckerService", () => {
         message: "commit bbb",
         files: [],
       },
+      {
+        hash: "ccc",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "commit ccc",
+        files: [],
+      },
     ])
     commits.updateEnrichment(
       "aaa",
@@ -640,6 +648,7 @@ describe("CheckerService", () => {
       "haiku",
     )
     commits.updateEnrichment("bbb", "feature", "summary b", "haiku")
+    commits.updateEnrichment("ccc", "refactor", "summary c", "haiku")
 
     const mergeGit: IGitService = {
       ...mockGit,
@@ -653,10 +662,11 @@ describe("CheckerService", () => {
     const checker = new CheckerService(mergeGit, mockJudge, commits)
     const { results, summary } = await checker.checkSample(2, () => {})
 
-    // Only "bbb" should be evaluated — "aaa" is a merge commit with empty diff
-    expect(results).toHaveLength(1)
-    expect(results[0].hash).toBe("bbb")
-    expect(summary.total).toBe(1)
+    // Should get 2 results by backfilling past the merge commit
+    expect(results).toHaveLength(2)
+    expect(summary.total).toBe(2)
+    const hashes = results.map((r) => r.hash).sort()
+    expect(hashes).toEqual(["bbb", "ccc"])
   })
 
   test("checkSample handles all-merge-commit sample", async () => {
@@ -897,7 +907,7 @@ describe("CheckerService", () => {
       expect(batchJudge.submitBatch).not.toHaveBeenCalled()
     })
 
-    test("filters merge commits with empty diffs", async () => {
+    test("backfills past merge commits with empty diffs", async () => {
       commits.insertRawCommits([
         {
           hash: "aaa",
@@ -915,6 +925,14 @@ describe("CheckerService", () => {
           message: "commit bbb",
           files: [],
         },
+        {
+          hash: "ccc",
+          authorName: "Test",
+          authorEmail: "test@example.com",
+          committedAt: "2024-01-01T00:00:00Z",
+          message: "commit ccc",
+          files: [],
+        },
       ])
       commits.updateEnrichment(
         "aaa",
@@ -923,6 +941,7 @@ describe("CheckerService", () => {
         "haiku",
       )
       commits.updateEnrichment("bbb", "feature", "summary b", "haiku")
+      commits.updateEnrichment("ccc", "refactor", "summary c", "haiku")
 
       const mergeGit: IGitService = {
         ...mockGit,
@@ -943,11 +962,12 @@ describe("CheckerService", () => {
         () => {},
       )
 
-      // Only "bbb" should be submitted
+      // Should submit 2 non-merge commits by backfilling past "aaa"
       const call = (batchJudge.submitBatch as ReturnType<typeof mock>).mock
         .calls[0] as unknown as [Array<{ hash: string }>]
-      expect(call[0]).toHaveLength(1)
-      expect(call[0][0].hash).toBe("bbb")
+      expect(call[0]).toHaveLength(2)
+      const hashes = call[0].map((r: { hash: string }) => r.hash).sort()
+      expect(hashes).toEqual(["bbb", "ccc"])
     })
 
     test("all-merge-commit sample returns empty results", async () => {

@@ -200,6 +200,21 @@ describe("CommitRepository", () => {
     expect(results).toHaveLength(0)
   })
 
+  test("getRandomEnrichedCommits excludes specified hashes", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa"),
+      makeCommit("bbb"),
+      makeCommit("ccc"),
+    ])
+    repo.updateEnrichment("aaa", "feature", "summary a", "haiku-4.5")
+    repo.updateEnrichment("bbb", "bug-fix", "summary b", "haiku-4.5")
+    repo.updateEnrichment("ccc", "refactor", "summary c", "haiku-4.5")
+
+    const results = repo.getRandomEnrichedCommits(10, new Set(["aaa", "bbb"]))
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("ccc")
+  })
+
   test("getCommitFilesByHashes returns files grouped by hash", () => {
     repo.insertRawCommits([
       makeCommit("aaa", {

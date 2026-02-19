@@ -116,33 +116,11 @@ export class CheckerService {
     sampleSize: number,
     onProgress: (progress: CheckProgress) => void,
   ): Promise<{ results: EvalResult[]; summary: EvalSummary }> {
-    const sample = this.commits.getRandomEnrichedCommits(sampleSize)
+    const { commits: evaluatable, diffMap } =
+      await this.sampleEvaluatableCommits(sampleSize)
+
     const results: EvalResult[] = []
     let evaluated = 0
-
-    if (sample.length === 0) {
-      onProgress({ phase: "done", current: 0, total: 0 })
-      return {
-        results: [],
-        summary: {
-          total: 0,
-          classificationCorrect: 0,
-          summaryAccurate: 0,
-          summaryComplete: 0,
-        },
-      }
-    }
-
-    // Pre-fetch all diffs in one batch
-    const hashes = sample.map((c) => c.hash)
-    const diffMap = await this.git.getDiffBatch(hashes)
-
-    // Filter out merge commits with empty diffs — these were template-enriched
-    // during indexing and evaluating them provides no signal about LLM quality.
-    const evaluatable = sample.filter(
-      (c) =>
-        !this.isMergeCommitWithEmptyDiff(c.message, diffMap.get(c.hash) ?? ""),
-    )
     const total = evaluatable.length
 
     if (total === 0) {
@@ -294,29 +272,8 @@ export class CheckerService {
     }
 
     // No pending batch — submit a new one
-    const sample = this.commits.getRandomEnrichedCommits(sampleSize)
-
-    if (sample.length === 0) {
-      onProgress({ phase: "done", current: 0, total: 0 })
-      return {
-        results: [],
-        summary: {
-          total: 0,
-          classificationCorrect: 0,
-          summaryAccurate: 0,
-          summaryComplete: 0,
-        },
-      }
-    }
-
-    const hashes = sample.map((c) => c.hash)
-    const diffMap = await this.git.getDiffBatch(hashes)
-    const filesMap = this.commits.getCommitFilesByHashes(hashes)
-
-    const evaluatable = sample.filter(
-      (c) =>
-        !this.isMergeCommitWithEmptyDiff(c.message, diffMap.get(c.hash) ?? ""),
-    )
+    const { commits: evaluatable, diffMap } =
+      await this.sampleEvaluatableCommits(sampleSize)
 
     if (evaluatable.length === 0) {
       onProgress({ phase: "done", current: 0, total: 0 })
@@ -330,6 +287,9 @@ export class CheckerService {
         },
       }
     }
+
+    const evalHashes = evaluatable.map((c) => c.hash)
+    const filesMap = this.commits.getCommitFilesByHashes(evalHashes)
 
     onProgress({
       phase: "submitting",
@@ -393,6 +353,41 @@ export class CheckerService {
     throw new Error(
       `Ambiguous hash prefix "${hash}" matches ${matches.length} commits: ${matchList}. Please provide more characters.`,
     )
+  }
+
+  /**
+   * Samples evaluatable commits by iteratively fetching random enriched commits,
+   * filtering out merge commits with empty diffs, and backfilling until the
+   * requested sample size is met (or the database is exhausted).
+   */
+  private async sampleEvaluatableCommits(
+    sampleSize: number,
+  ): Promise<{ commits: CommitRow[]; diffMap: Map<string, string> }> {
+    const evaluatable: CommitRow[] = []
+    const diffMap = new Map<string, string>()
+    const seen = new Set<string>()
+
+    while (evaluatable.length < sampleSize) {
+      const remaining = sampleSize - evaluatable.length
+      const batch = this.commits.getRandomEnrichedCommits(remaining, seen)
+
+      if (batch.length === 0) break // DB exhausted
+
+      for (const c of batch) seen.add(c.hash)
+
+      const batchHashes = batch.map((c) => c.hash)
+      const batchDiffs = await this.git.getDiffBatch(batchHashes)
+
+      for (const c of batch) {
+        const diff = batchDiffs.get(c.hash) ?? ""
+        diffMap.set(c.hash, diff)
+        if (!this.isMergeCommitWithEmptyDiff(c.message, diff)) {
+          evaluatable.push(c)
+        }
+      }
+    }
+
+    return { commits: evaluatable.slice(0, sampleSize), diffMap }
   }
 
   /**
