@@ -25,6 +25,7 @@ describe("MeasurerService", () => {
       getTotalCommitCount: mock(() => Promise.resolve(0)),
       getFileContentsBatch: mock(() => Promise.resolve(new Map())),
       getTrackedFiles: mock(() => Promise.resolve([])),
+      getRepoRoot: mock(() => Promise.resolve("/repo")),
     }
   })
 

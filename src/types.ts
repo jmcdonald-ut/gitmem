@@ -325,6 +325,8 @@ export interface IGitService {
   getTrackedFiles(): Promise<string[]>
   /** Checks whether the working directory is inside a git repository. */
   isGitRepo(): Promise<boolean>
+  /** Returns the absolute path to the repository root. */
+  getRepoRoot(): Promise<string>
   /** Returns file contents at specific commits using git cat-file --batch. */
   getFileContentsBatch(
     entries: Array<{ hash: string; filePath: string }>,
