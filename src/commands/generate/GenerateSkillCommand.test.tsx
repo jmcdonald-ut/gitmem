@@ -23,4 +23,19 @@ describe("GenerateSkillCommand", () => {
     expect(output).toContain("Claude Code")
     expect(output).toContain("gitmem")
   })
+
+  test("displays error when provided", () => {
+    const { lastFrame } = render(
+      <GenerateSkillCommand
+        skillPath=".claude/skills/use-gitmem/SKILL.md"
+        error="Skill already exists at .claude/skills/use-gitmem/SKILL.md\nUse --force to overwrite"
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("Create failed")
+    expect(output).toContain(".claude/skills/use-gitmem/SKILL.md")
+    expect(output).toContain("Skill already exists")
+    expect(output).toContain("--force")
+  })
 })
