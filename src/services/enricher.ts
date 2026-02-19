@@ -186,7 +186,7 @@ export class EnricherService {
     let enrichedThisRun: number
     const enrichedHashes: string[] = []
 
-    const pendingBatch = batchJobs.getPendingBatch()
+    const pendingBatch = batchJobs.getPendingBatchByType("index")
 
     if (pendingBatch) {
       const result = await this.handlePendingBatch(

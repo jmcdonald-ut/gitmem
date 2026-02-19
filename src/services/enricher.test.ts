@@ -591,6 +591,48 @@ describe("EnricherService", () => {
     expect(job!.request_count).toBe(3)
   })
 
+  test("runBatch ignores pending check batches (type isolation)", async () => {
+    const batchJobs = new BatchJobRepository(db)
+    // Pre-insert a pending CHECK batch — enricher should ignore it
+    batchJobs.insert(
+      "msgbatch_check_pending",
+      5,
+      "claude-sonnet-4-5-20250929",
+      "check",
+    )
+
+    const mockBatchLLM = {
+      submitBatch: mock(() =>
+        Promise.resolve({ batchId: "msgbatch_index_new", requestCount: 3 }),
+      ),
+      getBatchStatus: mock(() => Promise.resolve({})),
+      getBatchResults: mock(() => Promise.resolve([])),
+    } as unknown as BatchLLMService
+
+    const enricher = new EnricherService(
+      mockGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+    )
+
+    const result = await enricher.runBatch(
+      batchLLM(mockBatchLLM),
+      batchJobs,
+      () => {},
+    )
+
+    // Should submit a NEW index batch, not pick up the check batch
+    expect(result.batchId).toBe("msgbatch_index_new")
+    expect(result.batchStatus).toBe("submitted")
+    expect(mockBatchLLM.getBatchStatus).not.toHaveBeenCalled()
+
+    // Both batches should exist
+    const all = batchJobs.getAll()
+    expect(all).toHaveLength(2)
+  })
+
   test("runBatch polls in-progress batch", async () => {
     const batchJobs = new BatchJobRepository(db)
     // Pre-insert commits and a pending batch
