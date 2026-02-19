@@ -2,12 +2,14 @@
 export function getSkillContent(): string {
   return `---
 name: use-gitmem
-description: Search git history, find hotspots, coupling, trends, and codebase analytics using the gitmem CLI. Use when asked about git history, commit search, file hotspots, change coupling, code trends, or codebase analysis.
+description: Use when investigating why code was written or changed, searching for past bug fixes in an area, finding files that co-evolve together, identifying high-risk or frequently buggy files, scoping work in unfamiliar code, or assessing change trends. Provides AI-enriched git history search, hotspots, coupling analysis, and trends via the gitmem CLI.
 ---
 
-# gitmem — AI-powered git history index
+# gitmem — Git History Intelligence
 
 gitmem enriches git commits with AI-generated classifications and summaries, stored in a local SQLite database. All query commands run locally with **no API calls**.
+
+It provides signals you cannot get from static analysis alone — behavioral patterns like which files co-evolve, which areas accumulate bug fixes, and how change velocity shifts over time.
 
 ## Setup
 
@@ -20,73 +22,95 @@ gitmem index
 
 Check index health with \`gitmem status\`.
 
-## Query commands
+## When to Reach for gitmem
 
-### Search commits
+**Investigating history or intent** — Use \`gitmem query\` to search enriched commit summaries. More useful than \`git log --grep\` because commits are classified (bug-fix, feature, refactor, etc.) and summarized. Filter by classification to narrow results.
 
-\`\`\`bash
-gitmem query "auth bug"              # Full-text search over enriched commits
-gitmem query "refactor database" -n 20  # Limit results
-gitmem query "auth bug" --json       # Machine-readable output
-\`\`\`
+**Finding what co-evolves with a file** — Use \`gitmem coupling <file>\` to find files that historically change alongside it. This reveals behavioral coupling that may not be visible from imports alone — useful for catching related files you might need to update, or during code review to spot what might be missing from a changeset.
 
-### Find hotspots
+**Finding high-risk or buggy files** — Use \`gitmem hotspots --sort bug-fix\` to surface files with the most bug-fix commits. Use \`--sort combined\` to find files that are both frequently changed and complex. Scope with \`--path <dir>\` to focus on a specific area.
 
-\`\`\`bash
-gitmem hotspots                      # Most-changed files with classification breakdown
-gitmem hotspots -n 20               # Top 20 files
-gitmem hotspots --all                # Include test/docs/generated files
-gitmem hotspots --json               # Machine-readable output
-\`\`\`
+**Profiling a file or directory** — Use \`gitmem stats <path>\` to see a file's classification breakdown, top contributors, and recent commits before making changes. For directories, shows aggregate stats and the hottest files within.
 
-### File coupling
+**Assessing change velocity** — Use \`gitmem trends <path>\` to see whether an area is stabilizing or accumulating more changes over time. Supports weekly, monthly, or quarterly windows.
 
-\`\`\`bash
-gitmem coupling                      # Files that frequently change together
-gitmem coupling src/auth.ts          # Coupling for a specific file
-gitmem coupling --json               # Machine-readable output
-\`\`\`
+**Custom analysis** — Use \`gitmem schema\` to see the database tables, then query \`.gitmem/index.db\` directly with SQL for questions the built-in commands don't cover.
 
-### Change trends
+## Command Reference
+
+### gitmem query <query>
+
+Full-text search over enriched commits.
 
 \`\`\`bash
-gitmem trends                        # Change velocity over time (monthly)
-gitmem trends --interval weekly      # Weekly breakdown
-gitmem trends --json                 # Machine-readable output
+gitmem query "memory leak"
+gitmem query "auth NOT oauth" --limit 5
+gitmem query "refactor" --classification refactor
 \`\`\`
 
-### File/directory stats
+Classifications: \`bug-fix\`, \`feature\`, \`refactor\`, \`docs\`, \`chore\`, \`perf\`, \`test\`, \`style\`
+
+FTS5 syntax: \`"exact phrase"\`, \`term1 NOT term2\`, \`summary:keyword\`
+
+### gitmem hotspots
+
+Most-changed files with classification breakdown.
 
 \`\`\`bash
-gitmem stats src/auth.ts             # Detailed stats for a file
-gitmem stats src/services/           # Aggregate stats for a directory
-gitmem stats src/auth.ts --json      # Machine-readable output
+gitmem hotspots                                  # Top files by total changes
+gitmem hotspots --sort bug-fix                   # Files with the most bug fixes
+gitmem hotspots --sort combined                  # High churn AND high complexity
+gitmem hotspots --path src/services/ --limit 20  # Scoped to a directory
 \`\`\`
 
-### Index status
+Sort options: \`total\`, \`bug-fix\`, \`feature\`, \`refactor\`, \`docs\`, \`chore\`, \`perf\`, \`test\`, \`style\`, \`complexity\`, \`combined\`
+
+### gitmem coupling [path]
+
+Files that frequently change together (co-change in the same commit).
 
 \`\`\`bash
-gitmem status                        # Coverage %, commit counts, DB size
-gitmem status --json                 # Machine-readable output
+gitmem coupling                        # Global top pairs
+gitmem coupling src/auth.ts            # Files most coupled to a specific file
+gitmem coupling src/services/          # Top pairs within a directory
 \`\`\`
 
-### Database schema
+Test, docs, and generated files are excluded by default. Use \`--include-tests\`, \`--include-docs\`, \`--include-generated\`, or \`--all\` to override.
+
+### gitmem stats <path>
+
+Classification breakdown, top contributors, and recent commits for a file. Aggregate stats and hottest files for a directory.
 
 \`\`\`bash
-gitmem schema                        # Display table and column documentation
-gitmem schema --json                 # Machine-readable output
+gitmem stats src/auth.ts
+gitmem stats src/services/
 \`\`\`
 
-### Interactive visualization
+### gitmem trends <path>
+
+Change velocity and classification mix over time.
 
 \`\`\`bash
-gitmem visualize                     # Opens circle-packing visualization in browser
+gitmem trends src/services/                      # Monthly (default)
+gitmem trends src/services/ --window weekly       # Weekly granularity
+gitmem trends src/ --window quarterly --limit 8   # Quarterly, last 8 periods
 \`\`\`
+
+Trend indicators: \`increasing\`, \`decreasing\`, or \`stable\`.
+
+### gitmem schema
+
+Database table documentation for writing custom SQL queries against \`.gitmem/index.db\`.
+
+### gitmem status
+
+Index health, coverage percentage, commit counts, and database size.
 
 ## Tips
 
-- Use \`--json\` on any command for structured output suitable for further processing.
-- By default, test, docs, and generated files are excluded from hotspots and coupling. Use \`--all\` to include them.
-- The database is at \`.gitmem/index.db\` and can be queried directly with SQLite. Run \`gitmem schema\` to see the table definitions.
+- Use \`--json\` on any command for structured output.
+- \`gitmem coupling\` and \`gitmem hotspots\` exclude test/docs/generated files by default.
+- The \`--classification\` filter on \`gitmem query\` is useful for narrowing searches to specific change types.
+- The database at \`.gitmem/index.db\` can be queried directly with SQLite for analysis the built-in commands don't cover.
 `
 }

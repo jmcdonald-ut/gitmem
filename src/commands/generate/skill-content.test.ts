@@ -18,7 +18,6 @@ describe("getSkillContent", () => {
     expect(content).toContain("gitmem stats")
     expect(content).toContain("gitmem status")
     expect(content).toContain("gitmem schema")
-    expect(content).toContain("gitmem visualize")
   })
 
   test("mentions --json flag for machine-readable output", () => {
