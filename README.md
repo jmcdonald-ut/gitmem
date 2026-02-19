@@ -105,6 +105,7 @@ Commands:
   trends|t [options] <path>    Show change velocity and classification mix over time
   schema                       Display database schema documentation
   visualize|viz [options]      Open an interactive visualization of the repository
+  generate                     Generate project files
   help [command]               display help for command
 
 Getting started:

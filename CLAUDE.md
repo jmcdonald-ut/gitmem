@@ -43,6 +43,7 @@ src/
     index/             # Also has BatchIndexCommand.tsx for --batch mode
     check/             # Also has BatchCheckCommand.tsx for --batch mode
     visualize/         # HTTP server (no Ink component): hierarchy.ts, page.ts
+    generate/          # Claude Code skill file generation: skill-content.ts
     utils/
       command-context.ts   # Shared runCommand() setup, file locking (index.lock)
       test-utils.ts        # Test helpers (waitForFrame)
@@ -83,6 +84,7 @@ src/
 | `check` | — | LLM-as-judge quality evaluation of enrichments |
 | `schema` | — | Display database schema documentation |
 | `visualize` | `viz` | Interactive circle-packing visualization via local HTTP server |
+| `generate skill` | — | Generate a Claude Code skill file for this repository |
 
 Several commands (`hotspots`, `coupling`, `visualize`) support file-filter flags (`--include-tests`, `--include-docs`, `--include-generated`, `--all`) via `file-filter.ts`. By default, test, docs, and generated files are excluded.
 
