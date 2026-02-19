@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk"
-import type { CommitInfo, EnrichmentResult } from "@/types"
+import type { CommitInfo, EnrichmentResult, BatchStatusResult } from "@/types"
 import {
   SYSTEM_PROMPT,
   ENRICHMENT_OUTPUT_CONFIG,
   buildUserMessage,
   parseEnrichmentResponse,
 } from "@services/llm-shared"
+import { getBatchStatus as getBatchStatusShared } from "@services/batch-shared"
 
 /** A single request item for a batch submission. */
 export interface BatchRequest {
@@ -62,27 +63,8 @@ export class BatchLLMService {
    * @param batchId - The batch ID to check.
    * @returns Processing status and request counts.
    */
-  async getBatchStatus(batchId: string): Promise<{
-    processingStatus: string
-    requestCounts: {
-      succeeded: number
-      errored: number
-      canceled: number
-      expired: number
-      processing: number
-    }
-  }> {
-    const batch = await this.client.messages.batches.retrieve(batchId)
-    return {
-      processingStatus: batch.processing_status,
-      requestCounts: {
-        succeeded: batch.request_counts.succeeded,
-        errored: batch.request_counts.errored,
-        canceled: batch.request_counts.canceled,
-        expired: batch.request_counts.expired,
-        processing: batch.request_counts.processing,
-      },
-    }
+  async getBatchStatus(batchId: string): Promise<BatchStatusResult> {
+    return getBatchStatusShared(this.client, batchId)
   }
 
   /**

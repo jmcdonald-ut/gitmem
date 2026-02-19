@@ -1,11 +1,17 @@
 import Anthropic from "@anthropic-ai/sdk"
-import type { CommitInfo, EvalVerdict } from "@/types"
+import type {
+  CommitInfo,
+  EvalVerdict,
+  IBatchJudgeService,
+  BatchStatusResult,
+} from "@/types"
 import {
   JUDGE_SYSTEM_PROMPT,
   EVAL_OUTPUT_CONFIG,
   buildJudgeUserMessage,
   parseEvalResponse,
 } from "@services/judge-shared"
+import { getBatchStatus as getBatchStatusShared } from "@services/batch-shared"
 
 /** A single request item for a check batch submission. */
 export interface CheckBatchRequest {
@@ -28,9 +34,9 @@ export interface CheckBatchResultItem {
 }
 
 /** Submits and retrieves commit evaluations via the Anthropic Message Batches API. */
-export class BatchJudgeService {
+export class BatchJudgeService implements IBatchJudgeService {
   private client: Anthropic
-  private model: string
+  readonly model: string
 
   constructor(apiKey: string, model: string = "claude-sonnet-4-5-20250929") {
     this.client = new Anthropic({ apiKey })
@@ -76,27 +82,8 @@ export class BatchJudgeService {
    * @param batchId - The batch ID to check.
    * @returns Processing status and request counts.
    */
-  async getBatchStatus(batchId: string): Promise<{
-    processingStatus: string
-    requestCounts: {
-      succeeded: number
-      errored: number
-      canceled: number
-      expired: number
-      processing: number
-    }
-  }> {
-    const batch = await this.client.messages.batches.retrieve(batchId)
-    return {
-      processingStatus: batch.processing_status,
-      requestCounts: {
-        succeeded: batch.request_counts.succeeded,
-        errored: batch.request_counts.errored,
-        canceled: batch.request_counts.canceled,
-        expired: batch.request_counts.expired,
-        processing: batch.request_counts.processing,
-      },
-    }
+  async getBatchStatus(batchId: string): Promise<BatchStatusResult> {
+    return getBatchStatusShared(this.client, batchId)
   }
 
   /**

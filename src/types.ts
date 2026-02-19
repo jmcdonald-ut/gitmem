@@ -391,19 +391,46 @@ export interface CheckProgress {
   batchStatus?: string
 }
 
-/** Result from a batch check operation. */
-export interface CheckBatchResult {
-  /** Evaluation results (present when batch is complete). */
-  results?: EvalResult[]
-  /** Aggregate summary (present when batch is complete). */
-  summary?: EvalSummary
-  /** Path where detailed results were written. */
-  outputPath?: string
-  /** Batch job ID. */
-  batchId?: string
-  /** Current batch processing status. */
-  batchStatus?: string
+/** Valid batch job processing statuses. */
+export type BatchJobStatus = "submitted" | "in_progress" | "ended" | "failed"
+
+/** Valid batch job types. */
+export type BatchJobType = "index" | "check"
+
+/** Status result from polling a batch job via the Anthropic API. */
+export interface BatchStatusResult {
+  processingStatus: string
+  requestCounts: {
+    succeeded: number
+    errored: number
+    canceled: number
+    expired: number
+    processing: number
+  }
 }
+
+/** Result from a batch check operation. */
+export type CheckBatchResult =
+  | {
+      kind: "complete"
+      results: EvalResult[]
+      summary: EvalSummary
+      outputPath: string
+    }
+  | {
+      kind: "empty"
+      results: EvalResult[]
+      summary: EvalSummary
+    }
+  | {
+      kind: "submitted"
+      batchId: string
+    }
+  | {
+      kind: "in_progress"
+      batchId: string
+      batchStatus: string
+    }
 
 /** Interface for LLM-based commit evaluation (judge). */
 export interface IJudgeService {
@@ -418,6 +445,36 @@ export interface IJudgeService {
     accuracyVerdict: EvalVerdict
     completenessVerdict: EvalVerdict
   }>
+}
+
+/** Interface for batch LLM-based commit evaluation (judge). */
+export interface IBatchJudgeService {
+  /** The model used for batch evaluation. */
+  readonly model: string
+  /** Submits a batch of evaluation requests. */
+  submitBatch(
+    requests: Array<{
+      hash: string
+      commit: CommitInfo
+      diff: string
+      classification: string
+      summary: string
+    }>,
+  ): Promise<{ batchId: string; requestCount: number }>
+  /** Retrieves the current status of a batch. */
+  getBatchStatus(batchId: string): Promise<BatchStatusResult>
+  /** Retrieves and parses results from a completed batch. */
+  getBatchResults(batchId: string): Promise<
+    Array<{
+      hash: string
+      result?: {
+        classificationVerdict: EvalVerdict
+        accuracyVerdict: EvalVerdict
+        completenessVerdict: EvalVerdict
+      }
+      error?: string
+    }>
+  >
 }
 
 /** A column within a database table, used for schema documentation. */

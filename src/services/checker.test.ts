@@ -3,8 +3,12 @@ import { createDatabase } from "@db/database"
 import { CommitRepository } from "@db/commits"
 import { BatchJobRepository } from "@db/batch-jobs"
 import { CheckerService } from "@services/checker"
-import type { BatchJudgeService } from "@services/batch-judge"
-import type { IGitService, IJudgeService, CheckProgress } from "@/types"
+import type {
+  IGitService,
+  IJudgeService,
+  IBatchJudgeService,
+  CheckProgress,
+} from "@/types"
 import { Database } from "bun:sqlite"
 
 describe("CheckerService", () => {
@@ -713,8 +717,9 @@ describe("CheckerService", () => {
 
     function createMockBatchJudge(
       behavior: "submit" | "status-in-progress" | "status-ended",
-    ): BatchJudgeService {
+    ): IBatchJudgeService {
       return {
+        model: "claude-sonnet-4-5-20250929",
         submitBatch: mock(async () => ({
           batchId: "msgbatch_check_001",
           requestCount: 2,
@@ -745,14 +750,14 @@ describe("CheckerService", () => {
               classificationVerdict: {
                 pass: false,
                 reasoning: "Wrong",
-                suggestedClassification: "refactor",
+                suggestedClassification: "refactor" as const,
               },
               accuracyVerdict: { pass: true, reasoning: "OK" },
               completenessVerdict: { pass: false, reasoning: "Missing" },
             },
           },
         ]),
-      } as unknown as BatchJudgeService
+      }
     }
 
     test("submits new batch when no pending exists", async () => {
@@ -788,9 +793,9 @@ describe("CheckerService", () => {
         (p) => progress.push(p),
       )
 
+      expect(result.kind).toBe("submitted")
+      if (result.kind !== "submitted") throw new Error("unreachable")
       expect(result.batchId).toBe("msgbatch_check_001")
-      expect(result.batchStatus).toBe("submitted")
-      expect(result.results).toBeUndefined()
       expect(batchJudge.submitBatch).toHaveBeenCalledTimes(1)
 
       // Verify batch job was persisted
@@ -822,9 +827,10 @@ describe("CheckerService", () => {
         () => {},
       )
 
+      expect(result.kind).toBe("in_progress")
+      if (result.kind !== "in_progress") throw new Error("unreachable")
       expect(result.batchId).toBe("msgbatch_pending")
       expect(result.batchStatus).toBe("in_progress")
-      expect(result.results).toBeUndefined()
     })
 
     test("imports completed batch results", async () => {
@@ -882,12 +888,13 @@ describe("CheckerService", () => {
         () => {},
       )
 
+      expect(result.kind).toBe("complete")
+      if (result.kind !== "complete") throw new Error("unreachable")
       expect(result.results).toHaveLength(2)
-      expect(result.summary).toBeDefined()
-      expect(result.summary!.total).toBe(2)
-      expect(result.summary!.classificationCorrect).toBe(1)
-      expect(result.summary!.summaryAccurate).toBe(2)
-      expect(result.summary!.summaryComplete).toBe(1)
+      expect(result.summary.total).toBe(2)
+      expect(result.summary.classificationCorrect).toBe(1)
+      expect(result.summary.summaryAccurate).toBe(2)
+      expect(result.summary.summaryComplete).toBe(1)
       expect(result.outputPath).toBe(outputPath)
     })
 
@@ -902,8 +909,10 @@ describe("CheckerService", () => {
         () => {},
       )
 
+      expect(result.kind).toBe("empty")
+      if (result.kind !== "empty") throw new Error("unreachable")
       expect(result.results).toEqual([])
-      expect(result.summary!.total).toBe(0)
+      expect(result.summary.total).toBe(0)
       expect(batchJudge.submitBatch).not.toHaveBeenCalled()
     })
 
@@ -1007,8 +1016,10 @@ describe("CheckerService", () => {
         () => {},
       )
 
+      expect(result.kind).toBe("empty")
+      if (result.kind !== "empty") throw new Error("unreachable")
       expect(result.results).toEqual([])
-      expect(result.summary!.total).toBe(0)
+      expect(result.summary.total).toBe(0)
       expect(batchJudge.submitBatch).not.toHaveBeenCalled()
     })
 
@@ -1068,7 +1079,8 @@ describe("CheckerService", () => {
         },
       ])
 
-      const batchJudge = {
+      const batchJudge: IBatchJudgeService = {
+        model: "claude-sonnet-4-5-20250929",
         getBatchStatus: mock(async () => ({
           processingStatus: "ended",
           requestCounts: {
@@ -1086,14 +1098,15 @@ describe("CheckerService", () => {
               classificationVerdict: {
                 pass: false,
                 reasoning: "Should be feature",
-                suggestedClassification: "feature",
+                suggestedClassification: "feature" as const,
               },
               accuracyVerdict: { pass: true, reasoning: "OK" },
               completenessVerdict: { pass: true, reasoning: "OK" },
             },
           },
         ]),
-      } as unknown as BatchJudgeService
+        submitBatch: mock(async () => ({ batchId: "", requestCount: 0 })),
+      }
 
       const checker = new CheckerService(mockGit, mockJudge, commits)
       const result = await checker.checkSampleBatch(
@@ -1105,8 +1118,10 @@ describe("CheckerService", () => {
       )
 
       // Contradictory verdict should be reconciled to pass
-      expect(result.results![0].classificationVerdict.pass).toBe(true)
-      expect(result.summary!.classificationCorrect).toBe(1)
+      expect(result.kind).toBe("complete")
+      if (result.kind !== "complete") throw new Error("unreachable")
+      expect(result.results[0].classificationVerdict.pass).toBe(true)
+      expect(result.summary.classificationCorrect).toBe(1)
     })
 
     test("index and check batches do not interfere", async () => {
@@ -1141,7 +1156,7 @@ describe("CheckerService", () => {
       )
 
       // Should submit a new check batch, not pick up the index batch
-      expect(result.batchStatus).toBe("submitted")
+      expect(result.kind).toBe("submitted")
       expect(batchJudge.submitBatch).toHaveBeenCalledTimes(1)
 
       // Both batches should exist
