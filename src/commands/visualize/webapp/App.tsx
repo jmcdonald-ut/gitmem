@@ -7,12 +7,20 @@ import { CirclePacking } from "./components/CirclePacking"
 import { DetailsPanel } from "./components/DetailsPanel"
 
 export function App() {
-  const { data: hierarchyData, loading: hierarchyLoading } = useHierarchy()
+  const {
+    data: hierarchyData,
+    loading: hierarchyLoading,
+    error: hierarchyError,
+  } = useHierarchy()
   const [focusPath, setFocusPath] = useState("")
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
 
   const detailsPath = selectedPath ?? focusPath
-  const { data: detailsData, loading: detailsLoading } = useDetails(detailsPath)
+  const {
+    data: detailsData,
+    loading: detailsLoading,
+    error: detailsError,
+  } = useDetails(detailsPath)
 
   const handleNavigate = useCallback((path: string) => {
     // Determine if this is a directory or file
@@ -40,6 +48,20 @@ export function App() {
       setSelectedPath(path)
     }
   }, [])
+
+  if (hierarchyError) {
+    return (
+      <div className="layout">
+        <div className="header">
+          <h1>gitmem</h1>
+        </div>
+        <div className="viz-container">
+          <div className="loading">Failed to load: {hierarchyError}</div>
+        </div>
+        <div className="details" />
+      </div>
+    )
+  }
 
   if (hierarchyLoading || !hierarchyData) {
     return (
@@ -79,6 +101,7 @@ export function App() {
         data={detailsData}
         totalTracked={hierarchyData.totalTracked}
         loading={detailsLoading}
+        error={detailsError}
         onNavigate={handleNavigate}
       />
     </div>

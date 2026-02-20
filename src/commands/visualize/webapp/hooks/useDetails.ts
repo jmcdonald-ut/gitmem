@@ -5,6 +5,7 @@ import type { DetailsResponse } from "../types"
 export function useDetails(path: string | null) {
   const [data, setData] = useState<DetailsResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
 
   // Reset loading state when path changes (React pattern for adjusting state on prop change)
@@ -12,6 +13,7 @@ export function useDetails(path: string | null) {
   if (prevPath !== path) {
     setPrevPath(path)
     setLoading(true)
+    setError(null)
   }
 
   useEffect(() => {
@@ -23,13 +25,18 @@ export function useDetails(path: string | null) {
     fetch(`/api/details?path=${encodeURIComponent(query)}`, {
       signal: controller.signal,
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then((d: DetailsResponse) => {
         setData(d)
+        setError(null)
         setLoading(false)
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
+          setError(err.message)
           setData(null)
           setLoading(false)
         }
@@ -38,5 +45,5 @@ export function useDetails(path: string | null) {
     return () => controller.abort()
   }, [path])
 
-  return { data, loading }
+  return { data, loading, error }
 }
