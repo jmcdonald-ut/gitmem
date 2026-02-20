@@ -44,7 +44,13 @@ src/
     init/              # Initialize gitmem in a repository
     index/             # Also has BatchIndexCommand.tsx for --batch mode
     check/             # Also has BatchCheckCommand.tsx for --batch mode
-    visualize/         # HTTP server (no Ink component): hierarchy.ts, page.ts
+    visualize/         # HTTP server + React webapp: hierarchy.ts, command.tsx
+      webapp/            # Browser SPA (React + D3 circle-packing)
+        App.tsx          # Root component wiring hierarchy, details, and navigation
+        types.ts         # API response types (DetailsResponse, HierarchyResponse)
+        components/      # CirclePacking, DetailsPanel, Header, Tooltip, etc.
+        hooks/           # useHierarchy, useDetails (fetch hooks)
+        lib/             # colors.ts (classification palette), format.ts (number/string utils)
     generate/          # Claude Code skill file generation: skill-content.ts
     utils/
       command-context.ts   # Shared runCommand() setup, file locking (index.lock)
