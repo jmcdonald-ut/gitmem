@@ -19,6 +19,17 @@ export function StatusCommand({ status }: StatusCommandProps) {
       ? Math.round((status.indexedCommits / status.totalCommits) * 100)
       : 0
 
+  const config = status.config
+
+  let aiDisplay: string
+  if (config) {
+    if (config.ai === false) aiDisplay = "disabled"
+    else if (config.ai === true) aiDisplay = "enabled"
+    else aiDisplay = `enabled for commits after ${config.ai}`
+  } else {
+    aiDisplay = "enabled"
+  }
+
   return (
     <Box flexDirection="column">
       <Text bold>gitmem status</Text>
@@ -43,6 +54,19 @@ export function StatusCommand({ status }: StatusCommandProps) {
             ? `${(status.dbSize / 1024).toFixed(1)} KB`
             : `${(status.dbSize / (1024 * 1024)).toFixed(1)} MB`}
       </Text>
+
+      {config && (
+        <>
+          <Text> </Text>
+          <Text bold>Config:</Text>
+          <Text> AI: {aiDisplay}</Text>
+          <Text>
+            {"  "}Index start date: {config.indexStartDate ?? "all history"}
+          </Text>
+          <Text> Index model: {config.indexModel}</Text>
+          <Text> Check model: {config.checkModel}</Text>
+        </>
+      )}
     </Box>
   )
 }

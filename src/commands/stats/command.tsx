@@ -4,6 +4,7 @@ import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
+import { getAiCoverage } from "@/config"
 import { AggregateRepository } from "@db/aggregates"
 import { CommitRepository } from "@db/commits"
 import { StatsCommand } from "@commands/stats/StatsCommand"
@@ -26,9 +27,14 @@ export const statsCommand = new Command("stats")
   .description("Show detailed change statistics for a file or directory")
   .addHelpText("after", HELP_TEXT)
   .action(async (path, opts, cmd) => {
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
+    await runCommand(cmd.parent!.opts(), {}, async ({ format, db, config }) => {
       const aggregates = new AggregateRepository(db)
       const commits = new CommitRepository(db)
+      const aiCoverage = getAiCoverage(
+        config,
+        commits.getEnrichedCommitCount(),
+        commits.getTotalCommitCount(),
+      )
       const limit = opts.limit
 
       const fileStats = aggregates.getFileStats(path)
@@ -54,6 +60,7 @@ export const statsCommand = new Command("stats")
             stats={fileStats}
             contributors={contributors}
             recentCommits={recentCommits}
+            aiCoverage={aiCoverage}
           />,
         ).unmount()
       } else {
@@ -92,6 +99,7 @@ export const statsCommand = new Command("stats")
             stats={dirStats}
             contributors={contributors}
             topFiles={topFiles}
+            aiCoverage={aiCoverage}
           />,
         ).unmount()
       }

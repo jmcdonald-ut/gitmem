@@ -3,6 +3,7 @@ import React from "react"
 import { render } from "ink-testing-library"
 import { StatsCommand } from "@commands/stats/StatsCommand"
 import type { FileStatsRow, FileContributorRow, RecentCommit } from "@/types"
+import type { AiCoverage } from "@/config"
 
 const makeStats = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({
   file_path: "src/main.ts",
@@ -336,5 +337,64 @@ describe("StatsCommand", () => {
     const output = lastFrame()
 
     expect(output).toContain("No files found")
+  })
+
+  test("shows disclaimer when AI is disabled", () => {
+    const aiCoverage: AiCoverage = { status: "disabled" }
+    const { lastFrame } = render(
+      <StatsCommand
+        path="src/main.ts"
+        type="file"
+        stats={makeStats()}
+        contributors={[]}
+        recentCommits={[]}
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("AI enrichment is disabled")
+    expect(output).toContain("Classification data is not available")
+  })
+
+  test("shows disclaimer when AI coverage is partial", () => {
+    const aiCoverage: AiCoverage = {
+      status: "partial",
+      enriched: 30,
+      total: 100,
+      aiConfig: true,
+    }
+    const { lastFrame } = render(
+      <StatsCommand
+        path="src/main.ts"
+        type="file"
+        stats={makeStats()}
+        contributors={[]}
+        recentCommits={[]}
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("AI classifications reflect 30 of 100")
+    expect(output).toContain("30%")
+  })
+
+  test("shows no disclaimer when AI coverage is full", () => {
+    const aiCoverage: AiCoverage = { status: "full" }
+    const { lastFrame } = render(
+      <StatsCommand
+        path="src/main.ts"
+        type="file"
+        stats={makeStats()}
+        contributors={[]}
+        recentCommits={[]}
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).not.toContain("AI enrichment is disabled")
+    expect(output).not.toContain("AI classifications reflect")
   })
 })

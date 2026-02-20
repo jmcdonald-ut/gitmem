@@ -2,6 +2,7 @@ import React from "react"
 import { Box, Text } from "ink"
 import type { FileStatsRow } from "@/types"
 import { CLASSIFICATION_COLORS, CLASSIFICATION_KEYS } from "@/types"
+import type { AiCoverage } from "@/config"
 
 /** Props for the HotspotsCommand component. */
 interface HotspotsCommandProps {
@@ -11,6 +12,8 @@ interface HotspotsCommandProps {
   sort: string
   /** Active path prefix filter, if any. */
   pathPrefix?: string
+  /** AI coverage status for disclaimer display. */
+  aiCoverage?: AiCoverage
 }
 
 /**
@@ -21,6 +24,7 @@ export function HotspotsCommand({
   hotspots,
   sort,
   pathPrefix,
+  aiCoverage,
 }: HotspotsCommandProps) {
   const showMeta = sort !== "total" || pathPrefix
 
@@ -44,6 +48,8 @@ export function HotspotsCommand({
           <Text> </Text>
         </>
       )}
+
+      <AiCoverageDisclaimer aiCoverage={aiCoverage} />
 
       {hotspots.length === 0 ? (
         <Text color="gray">No hotspots found.</Text>
@@ -92,4 +98,28 @@ export function HotspotsCommand({
       )}
     </Box>
   )
+}
+
+function AiCoverageDisclaimer({ aiCoverage }: { aiCoverage?: AiCoverage }) {
+  if (!aiCoverage) return null
+
+  if (aiCoverage.status === "disabled") {
+    return (
+      <Text color="yellow">
+        AI enrichment is disabled. Classification data is not available.
+      </Text>
+    )
+  }
+
+  if (aiCoverage.status === "partial") {
+    const pct = Math.round((aiCoverage.enriched / aiCoverage.total) * 100)
+    return (
+      <Text color="yellow">
+        AI classifications reflect {aiCoverage.enriched} of {aiCoverage.total}{" "}
+        commits ({pct}%).
+      </Text>
+    )
+  }
+
+  return null
 }

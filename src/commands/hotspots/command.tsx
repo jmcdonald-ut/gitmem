@@ -4,6 +4,8 @@ import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
+import { isAiEnabled, getAiCoverage } from "@/config"
+import { CommitRepository } from "@db/commits"
 import { AggregateRepository } from "@db/aggregates"
 import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
 import {
@@ -67,41 +69,76 @@ export const hotspotsCommand = new Command("hotspots")
       process.exit(1)
     }
 
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, db, git }) => {
-      const aggregates = new AggregateRepository(db)
-      const exclude = resolveExcludedCategories(opts)
+    const CLASSIFICATION_SORT_FIELDS = [
+      "bug-fix",
+      "feature",
+      "refactor",
+      "docs",
+      "chore",
+      "perf",
+      "test",
+      "style",
+    ]
 
-      const fetchLimit = opts.includeDeleted ? opts.limit : 10000
-      const hotspots = aggregates.getHotspots({
-        limit: fetchLimit,
-        sort: opts.sort,
-        pathPrefix: opts.path,
-        exclude,
-      })
+    await runCommand(
+      cmd.parent!.opts(),
+      {},
+      async ({ format, db, git, config }) => {
+        if (
+          CLASSIFICATION_SORT_FIELDS.includes(opts.sort) &&
+          !isAiEnabled(config)
+        ) {
+          const msg = `Error: sorting by "${opts.sort}" requires AI enrichment, but AI is disabled in .gitmem/config.json`
+          if (format === "json") {
+            formatOutput("json", { success: false, error: msg })
+          } else {
+            console.error(msg)
+          }
+          process.exit(1)
+        }
 
-      const filtered = opts.includeDeleted
-        ? hotspots
-        : filterByTrackedFiles(
-            hotspots,
-            new Set(await git.getTrackedFiles()),
-            opts.limit,
-          )
+        const commits = new CommitRepository(db)
+        const aggregates = new AggregateRepository(db)
+        const aiCoverage = getAiCoverage(
+          config,
+          commits.getEnrichedCommitCount(),
+          commits.getTotalCommitCount(),
+        )
+        const exclude = resolveExcludedCategories(opts)
 
-      if (
-        formatOutput(format, {
+        const fetchLimit = opts.includeDeleted ? opts.limit : 10000
+        const hotspots = aggregates.getHotspots({
+          limit: fetchLimit,
           sort: opts.sort,
-          path: opts.path ?? null,
-          hotspots: filtered,
+          pathPrefix: opts.path,
+          exclude,
         })
-      )
-        return
 
-      render(
-        <HotspotsCommand
-          hotspots={filtered}
-          sort={opts.sort}
-          pathPrefix={opts.path}
-        />,
-      ).unmount()
-    })
+        const filtered = opts.includeDeleted
+          ? hotspots
+          : filterByTrackedFiles(
+              hotspots,
+              new Set(await git.getTrackedFiles()),
+              opts.limit,
+            )
+
+        if (
+          formatOutput(format, {
+            sort: opts.sort,
+            path: opts.path ?? null,
+            hotspots: filtered,
+          })
+        )
+          return
+
+        render(
+          <HotspotsCommand
+            hotspots={filtered}
+            sort={opts.sort}
+            pathPrefix={opts.path}
+            aiCoverage={aiCoverage}
+          />,
+        ).unmount()
+      },
+    )
   })

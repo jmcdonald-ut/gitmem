@@ -4,6 +4,7 @@ import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
+import { isAiEnabled } from "@/config"
 import { CommitRepository } from "@db/commits"
 import { SearchService, InvalidQueryError } from "@db/search"
 import { QueryCommand } from "@commands/query/QueryCommand"
@@ -32,49 +33,64 @@ export const queryCommand = new Command("query")
   .description("Full-text search over enriched commits (no API calls)")
   .addHelpText("after", HELP_TEXT)
   .action(async (query, opts, cmd) => {
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, git, db }) => {
-      const commits = new CommitRepository(db)
-      const search = new SearchService(db)
-      const branch = await git.getDefaultBranch()
-      const totalCommits = await git.getTotalCommitCount(branch)
-      const enrichedCommits = commits.getEnrichedCommitCount()
-      const coveragePct =
-        totalCommits > 0
-          ? Math.round((enrichedCommits / totalCommits) * 100)
-          : 0
-
-      const classification: string | undefined = opts.classification
-      let results
-      try {
-        results = search.search(query, opts.limit, classification)
-      } catch (error) {
-        if (error instanceof InvalidQueryError) {
-          console.error(`Error: ${error.message}`)
-          console.error(
-            'Hint: use quotes for phrases, e.g. gitmem query "memory leak"',
-          )
+    await runCommand(
+      cmd.parent!.opts(),
+      {},
+      async ({ format, git, db, config }) => {
+        if (opts.classification && !isAiEnabled(config)) {
+          const msg =
+            "Error: --classification filter requires AI enrichment, but AI is disabled in .gitmem/config.json"
+          if (format === "json") {
+            formatOutput("json", { success: false, error: msg })
+          } else {
+            console.error(msg)
+          }
           process.exit(1)
         }
-        throw error
-      }
 
-      if (
-        formatOutput(format, {
-          query,
-          classification_filter: classification ?? null,
-          results,
-          coveragePct,
-        })
-      )
-        return
+        const commits = new CommitRepository(db)
+        const search = new SearchService(db)
+        const branch = await git.getDefaultBranch()
+        const totalCommits = await git.getTotalCommitCount(branch)
+        const enrichedCommits = commits.getEnrichedCommitCount()
+        const coveragePct =
+          totalCommits > 0
+            ? Math.round((enrichedCommits / totalCommits) * 100)
+            : 0
 
-      render(
-        <QueryCommand
-          query={query}
-          results={results}
-          classificationFilter={classification}
-          coveragePct={coveragePct}
-        />,
-      ).unmount()
-    })
+        const classification: string | undefined = opts.classification
+        let results
+        try {
+          results = search.search(query, opts.limit, classification)
+        } catch (error) {
+          if (error instanceof InvalidQueryError) {
+            console.error(`Error: ${error.message}`)
+            console.error(
+              'Hint: use quotes for phrases, e.g. gitmem query "memory leak"',
+            )
+            process.exit(1)
+          }
+          throw error
+        }
+
+        if (
+          formatOutput(format, {
+            query,
+            classification_filter: classification ?? null,
+            results,
+            coveragePct,
+          })
+        )
+          return
+
+        render(
+          <QueryCommand
+            query={query}
+            results={results}
+            classificationFilter={classification}
+            coveragePct={coveragePct}
+          />,
+        ).unmount()
+      },
+    )
   })

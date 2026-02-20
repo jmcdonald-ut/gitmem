@@ -5,6 +5,7 @@ import { resolve, join } from "path"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
+import { isAiEnabled } from "@/config"
 import { CommitRepository } from "@db/commits"
 import { BatchJobRepository } from "@db/batch-jobs"
 import { JudgeService } from "@services/judge"
@@ -43,11 +44,7 @@ export const checkCommand = new Command("check")
     "Number of random enriched commits to evaluate",
     parsePositiveInt,
   )
-  .option(
-    "-m, --model <model>",
-    "Judge model to use",
-    "claude-sonnet-4-5-20250929",
-  )
+  .option("-m, --model <model>", "Judge model to use")
   .option("-o, --output <path>", "Detail file path for batch results")
   .option(
     "-c, --concurrency <number>",
@@ -73,9 +70,21 @@ export const checkCommand = new Command("check")
     await runCommand(
       cmd.parent!.opts(),
       { needsApiKey: true, needsLock: true },
-      async ({ format, cwd, git, apiKey, db }) => {
+      async ({ format, cwd, git, apiKey, db, config }) => {
+        if (!isAiEnabled(config)) {
+          const msg =
+            "Error: AI is disabled in .gitmem/config.json. The check command requires AI enrichment."
+          if (format === "json") {
+            formatOutput("json", { success: false, error: msg })
+          } else {
+            console.error(msg)
+          }
+          process.exit(1)
+        }
+
+        const model = opts.model ?? config.checkModel
         const commits = new CommitRepository(db)
-        const judge = new JudgeService(apiKey, opts.model)
+        const judge = new JudgeService(apiKey, model)
         const checker = new CheckerService(
           git,
           judge,
@@ -91,7 +100,7 @@ export const checkCommand = new Command("check")
           )
 
         if (opts.batch) {
-          const batchJudge = new BatchJudgeService(apiKey, opts.model)
+          const batchJudge = new BatchJudgeService(apiKey, model)
           const batchJobs = new BatchJobRepository(db)
 
           if (format === "json") {
