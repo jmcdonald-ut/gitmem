@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+import { forwardRef } from "react"
 
 export interface TooltipData {
   path: string
@@ -11,32 +12,34 @@ export interface TooltipData {
 
 interface TooltipProps {
   data: TooltipData | null
-  x: number
-  y: number
 }
 
-export function Tooltip({ data, x, y }: TooltipProps) {
-  if (!data) return <div className="tooltip" />
-
-  return (
-    <div className="tooltip visible" style={{ left: x + 12, top: y - 10 }}>
-      <strong>{data.path}</strong>
-      {data.isLeaf && (
-        <>
-          <br />
-          LOC: {data.loc ?? "\u2014"}
-          <br />
-          Changes: {data.changes ?? 0}
-          <br />
-          Score: {(data.score ?? 0).toFixed(3)}
-          {!data.indexed && (
-            <>
-              <br />
-              <em>Not indexed</em>
-            </>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
+export const Tooltip = forwardRef<HTMLDivElement, TooltipProps>(
+  function Tooltip({ data }, ref) {
+    return (
+      <div ref={ref} className={`tooltip ${data ? "visible" : ""}`}>
+        {data && (
+          <>
+            <strong>{data.path}</strong>
+            {data.isLeaf && (
+              <>
+                <br />
+                LOC: {data.loc ?? "\u2014"}
+                <br />
+                Changes: {data.changes ?? 0}
+                <br />
+                Score: {(data.score ?? 0).toFixed(3)}
+                {!data.indexed && (
+                  <>
+                    <br />
+                    <em>Not indexed</em>
+                  </>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    )
+  },
+)
