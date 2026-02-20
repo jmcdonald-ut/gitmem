@@ -2,7 +2,7 @@
 
 ## Project overview
 
-gitmem is an AI-powered git history index. It enriches commits with Claude API classifications and summaries, stores everything in a local SQLite database, and provides full-text search with no LLM calls at query time.
+gitmem is a git history index with optional AI enrichment. When enabled, it classifies and summarizes commits via the Claude API. All query commands run locally against a SQLite database with no API calls. AI enrichment can be disabled or date-limited via `.gitmem/config.json`.
 
 ## Tech stack
 
@@ -32,6 +32,7 @@ bun run build         # Compile to standalone binary at build/gitmem
 ```
 src/
   cli.tsx              # Entry point — registers commands via addCommand()
+  config.ts            # Config loading from .gitmem/config.json (AI toggle, model defaults)
   types.ts             # All shared types, interfaces, and constants
   schema.ts            # Database schema documentation
   output.ts            # CLI output format resolution
@@ -75,7 +76,7 @@ src/
 | Command | Alias | Description |
 |---------|-------|-------------|
 | `index` | `i` | Run the 5-phase enrichment pipeline (`--batch` for async Batches API) |
-| `query` | `q` | FTS5 full-text search over enriched commits (no API calls) |
+| `query` | `q` | FTS5 full-text search over indexed commits (no API calls) |
 | `hotspots` | `h` | Most-changed files with classification breakdown |
 | `coupling` | `c` | Files that frequently change together |
 | `trends` | `t` | Change velocity over time (weekly/monthly/quarterly) |
@@ -93,7 +94,7 @@ Several commands (`hotspots`, `coupling`, `visualize`) support file-filter flags
 The indexing pipeline has 5 phases:
 1. **Discover** - Extract commit metadata from git (bulk via `getCommitInfoBatch`)
 2. **Measure** - Compute indentation-based complexity metrics for changed files
-3. **Enrich** - Classify each commit via Claude API (parallel sliding window or batch API)
+3. **Enrich** - Classify each commit via Claude API (skipped if AI is disabled; date-filtered if `ai` is a date string)
 4. **Aggregate** - Compute per-file analytics: hotspots, contributors, file coupling
 5. **Index** - Rebuild SQLite FTS5 full-text search index
 
@@ -109,8 +110,20 @@ Data is stored in `.gitmem/index.db`. Write commands acquire a file lock (`.gitm
 - Classes for repositories and services, interfaces prefixed with `I` for dependency injection
 - Commit classifications: `bug-fix`, `feature`, `refactor`, `docs`, `chore`, `perf`, `test`, `style`
 
+## Configuration
+
+Settings are stored in `.gitmem/config.json` (auto-created with defaults on first run):
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `ai` | `boolean \| "YYYY-MM-DD"` | `true` | `false` disables AI enrichment, `true` enriches all commits, a date string enriches only commits on/after that date |
+| `indexStartDate` | `string \| null` | `null` | Limit discovery to commits on/after this date (`"YYYY-MM-DD"`) |
+| `indexModel` | `string` | `"claude-haiku-4-5-20251001"` | Default model for `gitmem index` |
+| `checkModel` | `string` | `"claude-sonnet-4-5-20250929"` | Default model for `gitmem check` |
+
 ## Environment
 
-- Requires `ANTHROPIC_API_KEY` env var for indexing commands
+- Requires `ANTHROPIC_API_KEY` env var for indexing commands (unless AI is disabled in config)
 - Database stored at `<repo>/.gitmem/index.db`
+- Configuration stored at `<repo>/.gitmem/config.json`
 - Git operations use `Bun.$` shell with `-C` flag for working directory

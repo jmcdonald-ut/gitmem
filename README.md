@@ -58,7 +58,7 @@ bun run build   # Compile to standalone binary at build/gitmem
 
 The produced binary can be found at `build/gitmem`. Add it to your path or copy it into a shared bin folder.
 
-**IMPORTANT:** At present, an Anthropic API key is required in order to index a repo. It's also required for one other command, `gitmem check`, which is used to help with development.
+AI enrichment is enabled by default and requires an Anthropic API key. It can be disabled or date-limited in `.gitmem/config.json` (auto-created on first run), in which case no API key is needed.
 
 ```sh
 # One-time use
@@ -97,7 +97,7 @@ Options:
 Commands:
   index|i [options]            Analyze new commits via Claude API and rebuild search index
   status|s                     Show index health, coverage, and database statistics
-  query|q [options] <query>    Full-text search over enriched commits (no API calls)
+  query|q [options] <query>    Full-text search over indexed commits (no API calls)
   check [options] [hash]       Evaluate enrichment quality via LLM-as-judge
   hotspots|h [options]         Show most-changed files with classification breakdown
   stats [options] <path>       Show detailed change statistics for a file or directory
@@ -124,7 +124,7 @@ Run gitmem schema for database table documentation.
 ```
 1. Discover   — extract commit metadata and file stats from git
 2. Measure    — compute indentation-based complexity metrics for changed files
-3. Enrich     — classify each commit via Claude API (bug-fix, feature, refactor, docs, chore, perf, test, style)
+3. Enrich     — classify each commit via Claude API (skipped if AI is disabled; date-filtered if configured)
 4. Aggregate  — compute per-file analytics: change hotspots, contributor breakdown, file coupling
 5. Index      — rebuild SQLite FTS5 full-text search index
 ```
