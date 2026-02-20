@@ -312,6 +312,17 @@ export const visualizeCommand = new Command("visualize")
             "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
         }
 
+        // Pre-compress hierarchy JSON (static payload, potentially large)
+        const hierarchyJson = JSON.stringify({
+          ...hierarchyData,
+          repoName,
+          pathPrefix,
+        })
+        const hierarchyGzip = Bun.gzipSync(Buffer.from(hierarchyJson))
+
+        // Cache details responses (DB is read-only during visualization)
+        const detailsCache = new Map<string, Response>()
+
         const server = Bun.serve({
           hostname: "127.0.0.1",
           port: opts.port,
@@ -321,16 +332,29 @@ export const visualizeCommand = new Command("visualize")
           fetch(req) {
             const url = new URL(req.url)
             if (url.pathname === "/api/hierarchy") {
-              return Response.json(
-                {
-                  ...hierarchyData,
-                  repoName,
-                  pathPrefix,
+              const acceptGzip =
+                req.headers.get("accept-encoding")?.includes("gzip") ?? false
+              if (acceptGzip) {
+                return new Response(hierarchyGzip, {
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Content-Encoding": "gzip",
+                    ...securityHeaders,
+                  },
+                })
+              }
+              return new Response(hierarchyJson, {
+                headers: {
+                  "Content-Type": "application/json",
+                  ...securityHeaders,
                 },
-                { headers: securityHeaders },
-              )
+              })
             }
             if (url.pathname === "/api/details") {
+              const cacheKey = url.searchParams.get("path") ?? ""
+              const cached = detailsCache.get(cacheKey)
+              if (cached) return cached.clone()
+
               const res = handleDetails(
                 url,
                 commits,
@@ -342,6 +366,7 @@ export const visualizeCommand = new Command("visualize")
               for (const [k, v] of Object.entries(securityHeaders)) {
                 res.headers.set(k, v)
               }
+              detailsCache.set(cacheKey, res.clone())
               return res
             }
             return new Response("Not found", {
