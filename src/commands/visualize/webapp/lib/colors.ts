@@ -2,17 +2,19 @@
 import { scaleLinear } from "d3-scale"
 import { interpolateRgb } from "d3-interpolate"
 
+/** Classification colors referencing CSS custom properties from styles.css. */
 export const COLORS: Record<string, string> = {
-  "bug-fix": "#EF4E4E",
-  feature: "#3EBD93",
-  refactor: "#F7C948",
-  docs: "#47A3F3",
-  chore: "#9FB3C8",
-  perf: "#9446ED",
-  test: "#38BEC9",
-  style: "#F0F4F8",
+  "bug-fix": "var(--red)",
+  feature: "var(--green)",
+  refactor: "var(--yellow)",
+  docs: "var(--blue)",
+  chore: "var(--gray)",
+  perf: "var(--purple)",
+  test: "var(--cyan)",
+  style: "var(--white)",
 }
 
+/** Score heatmap: green → yellow → red. Uses hex values for d3 interpolation. */
 export const scoreColor = scaleLinear<string>()
   .domain([0, 0.5, 1])
   .range(["#3EBD93", "#F7C948", "#EF4E4E"])

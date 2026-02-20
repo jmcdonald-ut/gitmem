@@ -3,15 +3,15 @@ import { describe, test, expect } from "bun:test"
 import { COLORS, scoreColor } from "./colors"
 
 describe("COLORS", () => {
-  test("has all classification colors", () => {
-    expect(COLORS["bug-fix"]).toBe("#EF4E4E")
-    expect(COLORS["feature"]).toBe("#3EBD93")
-    expect(COLORS["refactor"]).toBe("#F7C948")
-    expect(COLORS["docs"]).toBe("#47A3F3")
-    expect(COLORS["chore"]).toBe("#9FB3C8")
-    expect(COLORS["perf"]).toBe("#9446ED")
-    expect(COLORS["test"]).toBe("#38BEC9")
-    expect(COLORS["style"]).toBe("#F0F4F8")
+  test("has all classification colors as CSS custom property references", () => {
+    expect(COLORS["bug-fix"]).toBe("var(--red)")
+    expect(COLORS["feature"]).toBe("var(--green)")
+    expect(COLORS["refactor"]).toBe("var(--yellow)")
+    expect(COLORS["docs"]).toBe("var(--blue)")
+    expect(COLORS["chore"]).toBe("var(--gray)")
+    expect(COLORS["perf"]).toBe("var(--purple)")
+    expect(COLORS["test"]).toBe("var(--cyan)")
+    expect(COLORS["style"]).toBe("var(--white)")
   })
 })
 
