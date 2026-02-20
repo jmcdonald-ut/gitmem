@@ -210,10 +210,10 @@ export interface CouplingPairGlobalRow {
   co_change_count: number
 }
 
-/** A recent enriched commit associated with a file or directory. */
+/** A recent commit associated with a file or directory. */
 export interface RecentCommit {
   hash: string
-  classification: Classification
+  classification: string
   summary: string
   committed_at: string
 }
@@ -307,7 +307,7 @@ export interface IGitService {
   /** Determines the default branch name (e.g. "main" or "master"). */
   getDefaultBranch(): Promise<string>
   /** Returns all commit hashes on the given branch in reverse chronological order. */
-  getCommitHashes(branch: string): Promise<string[]>
+  getCommitHashes(branch: string, after?: string): Promise<string[]>
   /** Retrieves full commit metadata and file list for a single commit. */
   getCommitInfo(hash: string): Promise<CommitInfo>
   /** Returns the unified diff for a commit, truncated to maxChars. */
@@ -521,4 +521,6 @@ export interface StatusInfo {
   dbPath: string
   /** Database file size in bytes. */
   dbSize: number
+  /** Effective configuration, if loaded. */
+  config?: import("@/config").GitmemConfig
 }

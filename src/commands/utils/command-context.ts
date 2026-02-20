@@ -1,8 +1,10 @@
 import type { Database } from "bun:sqlite"
 import type { OutputFormat } from "@/types"
+import type { GitmemConfig } from "@/config"
+import { loadConfig, isAiEnabled } from "@/config"
 import { GitService } from "@services/git"
 import { createDatabase } from "@db/database"
-import { resolveFormat } from "@/output"
+import { resolveFormat, formatOutput } from "@/output"
 import { resolve, join } from "path"
 import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "fs"
 import { openSync, closeSync } from "fs"
@@ -15,6 +17,7 @@ export interface CommandContext {
   apiKey: string
   db: Database
   dbPath: string
+  config: GitmemConfig
 }
 
 export interface CommandRequirements {
@@ -86,8 +89,22 @@ export async function runCommand(
     }
   }
 
+  const gitmemDir = resolve(cwd, ".gitmem")
+  let config: GitmemConfig
+  try {
+    config = loadConfig(gitmemDir)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (format === "json") {
+      formatOutput("json", { success: false, error: message })
+    } else {
+      console.error(`Error: ${message}`)
+    }
+    process.exit(1)
+  }
+
   let apiKey = ""
-  if (requirements.needsApiKey) {
+  if (requirements.needsApiKey && isAiEnabled(config)) {
     apiKey = process.env.ANTHROPIC_API_KEY ?? ""
     if (!apiKey) {
       console.error("Error: ANTHROPIC_API_KEY environment variable is required")
@@ -111,7 +128,7 @@ export async function runCommand(
   }
 
   try {
-    await handler({ format, cwd, git: git!, apiKey, db: db!, dbPath })
+    await handler({ format, cwd, git: git!, apiKey, db: db!, dbPath, config })
   } finally {
     db?.close()
     if (lockPath) releaseLock(lockPath)

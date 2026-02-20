@@ -1,0 +1,150 @@
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
+import { join } from "path"
+
+/** Controls whether AI enrichment is used and for which commits. */
+export type AiConfigValue = boolean | string
+
+/** Configuration for gitmem stored in `.gitmem/config.json`. */
+export interface GitmemConfig {
+  /** false (disabled), true (all commits), or "YYYY-MM-DD" (commits on/after date). */
+  ai: AiConfigValue
+  /** null (all history) or "YYYY-MM-DD" (limit discovery to commits on/after date). */
+  indexStartDate: string | null
+  /** Default model for `gitmem index`. */
+  indexModel: string
+  /** Default model for `gitmem check`. */
+  checkModel: string
+}
+
+/** AI coverage status for UI disclaimers. */
+export type AiCoverage =
+  | { status: "disabled" }
+  | { status: "full" }
+  | {
+      status: "partial"
+      enriched: number
+      total: number
+      aiConfig: AiConfigValue
+    }
+
+/** Default configuration values. */
+export const DEFAULTS: GitmemConfig = {
+  ai: true,
+  indexStartDate: null,
+  indexModel: "claude-haiku-4-5-20251001",
+  checkModel: "claude-sonnet-4-5-20250929",
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Loads config from `.gitmem/config.json`, creating it with defaults if missing.
+ * Missing keys are backfilled from defaults in memory only.
+ * Throws on invalid config values.
+ */
+export function loadConfig(gitmemDir: string): GitmemConfig {
+  const configPath = join(gitmemDir, "config.json")
+
+  if (!existsSync(configPath)) {
+    if (!existsSync(gitmemDir)) {
+      mkdirSync(gitmemDir, { recursive: true })
+    }
+    writeFileSync(configPath, JSON.stringify(DEFAULTS, null, 2) + "\n")
+    return { ...DEFAULTS }
+  }
+
+  let raw: unknown
+  try {
+    raw = JSON.parse(readFileSync(configPath, "utf-8"))
+  } catch {
+    throw new Error(`Invalid config: ${configPath} is not valid JSON`)
+  }
+
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error(`Invalid config: ${configPath} must be a JSON object`)
+  }
+
+  const obj = raw as Record<string, unknown>
+  const config: GitmemConfig = { ...DEFAULTS }
+
+  // ai
+  if ("ai" in obj) {
+    const ai = obj.ai
+    if (ai === true || ai === false) {
+      config.ai = ai
+    } else if (typeof ai === "string") {
+      if (!DATE_RE.test(ai)) {
+        throw new Error(
+          `Invalid config: "ai" must be true, false, or a "YYYY-MM-DD" date string, got "${ai}"`,
+        )
+      }
+      config.ai = ai
+    } else {
+      throw new Error(
+        `Invalid config: "ai" must be true, false, or a "YYYY-MM-DD" date string`,
+      )
+    }
+  }
+
+  // indexStartDate
+  if ("indexStartDate" in obj) {
+    const isd = obj.indexStartDate
+    if (isd === null) {
+      config.indexStartDate = null
+    } else if (typeof isd === "string") {
+      if (!DATE_RE.test(isd)) {
+        throw new Error(
+          `Invalid config: "indexStartDate" must be null or a "YYYY-MM-DD" date string, got "${isd}"`,
+        )
+      }
+      config.indexStartDate = isd
+    } else {
+      throw new Error(
+        `Invalid config: "indexStartDate" must be null or a "YYYY-MM-DD" date string`,
+      )
+    }
+  }
+
+  // indexModel
+  if ("indexModel" in obj) {
+    if (typeof obj.indexModel !== "string" || obj.indexModel === "") {
+      throw new Error(`Invalid config: "indexModel" must be a non-empty string`)
+    }
+    config.indexModel = obj.indexModel
+  }
+
+  // checkModel
+  if ("checkModel" in obj) {
+    if (typeof obj.checkModel !== "string" || obj.checkModel === "") {
+      throw new Error(`Invalid config: "checkModel" must be a non-empty string`)
+    }
+    config.checkModel = obj.checkModel
+  }
+
+  return config
+}
+
+/** Returns the AI coverage status for UI disclaimers. */
+export function getAiCoverage(
+  config: GitmemConfig,
+  enrichedCount: number,
+  totalCount: number,
+): AiCoverage {
+  if (config.ai === false) {
+    return { status: "disabled" }
+  }
+  if (totalCount === 0 || enrichedCount >= totalCount) {
+    return { status: "full" }
+  }
+  return {
+    status: "partial",
+    enriched: enrichedCount,
+    total: totalCount,
+    aiConfig: config.ai,
+  }
+}
+
+/** Convenience: returns true when AI is not explicitly disabled. */
+export function isAiEnabled(config: GitmemConfig): boolean {
+  return config.ai !== false
+}

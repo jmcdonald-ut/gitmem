@@ -317,4 +317,69 @@ describe("runCommand", () => {
       "Error: another gitmem process is running (lock file exists: .gitmem/index.lock)",
     )
   })
+
+  test("passes config to handler", async () => {
+    const { $ } = await import("bun")
+    await $`git init ${tempDir}`.quiet()
+
+    const handler = mock(async () => {})
+
+    await runCommand({}, { needsApiKey: false, dbMustExist: false }, handler)
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    const calls = handler.mock.calls as unknown as [[CommandContext]]
+    const ctx = calls[0][0]
+    expect(ctx.config).toBeDefined()
+    expect(ctx.config.ai).toBe(true)
+    expect(ctx.config.indexModel).toBe("claude-haiku-4-5-20251001")
+  })
+
+  test("skips API key check when AI is disabled", async () => {
+    const { $ } = await import("bun")
+    const { mkdirSync, writeFileSync } = await import("fs")
+    await $`git init ${tempDir}`.quiet()
+
+    // Write config with ai: false
+    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
+    writeFileSync(
+      join(tempDir, ".gitmem", "config.json"),
+      JSON.stringify({ ai: false }),
+    )
+
+    const originalKey = process.env.ANTHROPIC_API_KEY
+    delete process.env.ANTHROPIC_API_KEY
+
+    try {
+      const handler = mock(async () => {})
+      await runCommand({}, { needsApiKey: true, needsDb: false }, handler)
+
+      // Should NOT exit — API key is not needed when AI is disabled
+      expect(handler).toHaveBeenCalledTimes(1)
+      const calls = handler.mock.calls as unknown as [[CommandContext]]
+      expect(calls[0][0].config.ai).toBe(false)
+      expect(calls[0][0].apiKey).toBe("")
+    } finally {
+      if (originalKey !== undefined) {
+        process.env.ANTHROPIC_API_KEY = originalKey
+      }
+    }
+  })
+
+  test("exits with error on invalid config", async () => {
+    const { $ } = await import("bun")
+    const { mkdirSync, writeFileSync } = await import("fs")
+    await $`git init ${tempDir}`.quiet()
+
+    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
+    writeFileSync(join(tempDir, ".gitmem", "config.json"), "{invalid")
+
+    await expect(
+      runCommand({}, { needsDb: false }, async () => {}),
+    ).rejects.toThrow("process.exit(1)")
+
+    expect(exitCode).toBe(1)
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("not valid JSON"),
+    )
+  })
 })
