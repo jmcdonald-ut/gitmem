@@ -10,7 +10,10 @@ export function useHierarchy() {
   useEffect(() => {
     const controller = new AbortController()
     fetch("/api/hierarchy", { signal: controller.signal })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then((d: HierarchyResponse) => {
         setData(d)
         setLoading(false)

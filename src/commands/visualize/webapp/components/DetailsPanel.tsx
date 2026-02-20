@@ -9,6 +9,7 @@ interface DetailsPanelProps {
   data: DetailsResponse | null
   totalTracked: number
   loading: boolean
+  error?: string | null
   onNavigate: (path: string) => void
 }
 
@@ -38,8 +39,17 @@ export function DetailsPanel({
   data,
   totalTracked,
   loading,
+  error,
   onNavigate,
 }: DetailsPanelProps) {
+  if (error) {
+    return (
+      <div className="details">
+        <div className="loading">Failed to load details: {error}</div>
+      </div>
+    )
+  }
+
   if (loading || !data) {
     return (
       <div className="details">

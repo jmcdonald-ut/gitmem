@@ -12,10 +12,24 @@ const hierarchyResponse = {
     indexed: true,
     children: [
       { name: "a.ts", path: "a.ts", indexed: true, loc: 100, score: 0.5 },
+      {
+        name: "lib",
+        path: "lib/",
+        indexed: true,
+        children: [
+          {
+            name: "b.ts",
+            path: "lib/b.ts",
+            indexed: true,
+            loc: 50,
+            score: 0.3,
+          },
+        ],
+      },
     ],
   },
-  totalTracked: 1,
-  totalIndexed: 1,
+  totalTracked: 2,
+  totalIndexed: 2,
   unindexedCount: 0,
   repoName: "test-repo",
   pathPrefix: "",
@@ -80,14 +94,16 @@ const fileDrillInResponse = {
   },
 }
 
-afterEach(cleanup)
+const originalFetch = globalThis.fetch
+
+afterEach(() => {
+  cleanup()
+  globalThis.fetch = originalFetch
+})
 
 describe("App", () => {
   beforeEach(() => {
-    let detailsCounter = 0
-
     const fetchMock = mock((url: string | URL | Request) => {
-      console.log("RUNNING ", url)
       const urlStr =
         typeof url === "string"
           ? url
@@ -98,9 +114,10 @@ describe("App", () => {
         return Promise.resolve(new Response(JSON.stringify(hierarchyResponse)))
       }
       if (urlStr.includes("/api/details")) {
+        const params = new URL(urlStr, "http://localhost").searchParams
+        const path = params.get("path") ?? "/"
         const dataResponse =
-          detailsCounter === 0 ? rootDetailsResponse : fileDrillInResponse
-        detailsCounter++
+          path === "/" ? rootDetailsResponse : fileDrillInResponse
         return Promise.resolve(new Response(JSON.stringify(dataResponse)))
       }
       return Promise.resolve(new Response("Not found", { status: 404 }))
@@ -159,6 +176,65 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(getAllByText("Loading...").length).toBeGreaterThan(0)
+    })
+  })
+
+  test("navigates back to root via breadcrumb", async () => {
+    const { getByText, getByTestId } = render(<App />)
+
+    await waitFor(() => {
+      expect(getByText("test-repo")).toBeTruthy()
+    })
+
+    // Drill into a file first
+    await userEvent.click(getByTestId("file-link-a.ts"))
+    await waitFor(() => {
+      expect(getByText("Chandler Goat")).toBeTruthy()
+    })
+
+    // Click repo name breadcrumb to navigate back (calls handleNavigate(""))
+    await userEvent.click(getByText("test-repo"))
+    await waitFor(() => {
+      expect(getByText("Repository Overview")).toBeTruthy()
+    })
+  })
+
+  test("clicking a directory circle selects the directory", async () => {
+    const { getByText, getByTestId } = render(<App />)
+
+    await waitFor(() => {
+      expect(getByText("test-repo")).toBeTruthy()
+    })
+
+    // Click a directory circle (calls handleSelect("lib/") which clears selectedPath)
+    await userEvent.click(getByTestId("circle-lib/"))
+
+    await waitFor(() => {
+      // Directory details should be fetched for "lib/"
+      expect(getByText("lib/")).toBeTruthy()
+    })
+  })
+})
+
+describe("App error handling", () => {
+  test("shows error when hierarchy fetch fails", async () => {
+    globalThis.fetch = mock((url: string | URL | Request) => {
+      const urlStr =
+        typeof url === "string"
+          ? url
+          : url instanceof URL
+            ? url.toString()
+            : url.url
+      if (urlStr.includes("/api/hierarchy")) {
+        return Promise.resolve(new Response("Server Error", { status: 500 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify({})))
+    }) as unknown as typeof fetch
+
+    const { getByText } = render(<App />)
+
+    await waitFor(() => {
+      expect(getByText(/Failed to load/)).toBeTruthy()
     })
   })
 })
