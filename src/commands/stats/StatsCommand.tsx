@@ -6,6 +6,7 @@ import {
   CLASSIFICATION_KEYS,
   type Classification,
 } from "@/types"
+import { AiCoverageDisclaimer } from "@commands/utils/AiCoverageDisclaimer"
 import type { AiCoverage } from "@/config"
 
 /** Props for the StatsCommand component. */
@@ -61,7 +62,7 @@ export function StatsCommand({
       </Text>
       <Text> </Text>
 
-      <AiCoverageDisclaimer aiCoverage={aiCoverage} />
+      <AiCoverageDisclaimer aiCoverage={aiCoverage} spaceAfter />
 
       <Box marginLeft={2} flexDirection="column">
         <Text>
@@ -203,34 +204,4 @@ export function StatsCommand({
       )}
     </Box>
   )
-}
-
-function AiCoverageDisclaimer({ aiCoverage }: { aiCoverage?: AiCoverage }) {
-  if (!aiCoverage) return null
-
-  if (aiCoverage.status === "disabled") {
-    return (
-      <>
-        <Text color="yellow">
-          AI enrichment is disabled. Classification data is not available.
-        </Text>
-        <Text> </Text>
-      </>
-    )
-  }
-
-  if (aiCoverage.status === "partial") {
-    const pct = Math.round((aiCoverage.enriched / aiCoverage.total) * 100)
-    return (
-      <>
-        <Text color="yellow">
-          AI classifications reflect {aiCoverage.enriched} of {aiCoverage.total}{" "}
-          commits ({pct}%).
-        </Text>
-        <Text> </Text>
-      </>
-    )
-  }
-
-  return null
 }
