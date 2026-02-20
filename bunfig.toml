@@ -4,6 +4,8 @@ coverageThreshold = 0.9
 coveragePathIgnorePatterns = [
   "src/commands/utils/test-utils.ts",
   "src/commands/visualize/command.tsx",
+  "src/commands/visualize/webapp/index.tsx",
+  "src/commands/visualize/webapp/test-setup.ts",
   # Remove once we add integration tests that cover command action handlers
   "src/commands/generate/command.tsx"
 ]
