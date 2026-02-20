@@ -16,7 +16,7 @@ export interface GenerateSkillOptions {
 
 type GenerateSkillResult =
   | { ok: true; skillDir: string; skillPath: string }
-  | { ok: false; skillPath: string; error: string }
+  | { ok: false; skillDir: string; skillPath: string; error: string }
 
 export function generateSkill(opts: GenerateSkillOptions): GenerateSkillResult {
   const skillDir =
@@ -26,13 +26,24 @@ export function generateSkill(opts: GenerateSkillOptions): GenerateSkillResult {
   if (existsSync(skillPath) && !opts.force) {
     return {
       ok: false,
+      skillDir,
       skillPath,
       error: `Skill already exists at ${skillPath}\nUse --force to overwrite`,
     }
   }
 
-  mkdirSync(skillDir, { recursive: true })
-  writeFileSync(skillPath, getSkillContent())
+  try {
+    mkdirSync(skillDir, { recursive: true })
+    writeFileSync(skillPath, getSkillContent())
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return {
+      ok: false,
+      skillDir,
+      skillPath,
+      error: `Failed to write skill file: ${message}`,
+    }
+  }
 
   return { ok: true, skillDir, skillPath }
 }
