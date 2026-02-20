@@ -456,4 +456,42 @@ describe("CommitRepository", () => {
     const results = repo.getRecentCommitsForDirectory("nonexistent/")
     expect(results).toHaveLength(0)
   })
+
+  test("getUnenrichedCommitsSince returns only unenriched commits on or after date", () => {
+    repo.insertRawCommits([
+      makeCommit("old", { committedAt: "2023-06-01T00:00:00Z" }),
+      makeCommit("boundary", { committedAt: "2024-01-01T00:00:00Z" }),
+      makeCommit("new", { committedAt: "2024-06-01T00:00:00Z" }),
+    ])
+    // Enrich one so it's excluded
+    repo.updateEnrichment("new", "feature", "summary", "haiku-4.5")
+
+    const results = repo.getUnenrichedCommitsSince("2024-01-01")
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("boundary")
+  })
+
+  test("getUnenrichedCommitsSince returns empty when all are enriched", () => {
+    repo.insertRawCommits([
+      makeCommit("aaa", { committedAt: "2024-06-01T00:00:00Z" }),
+    ])
+    repo.updateEnrichment("aaa", "feature", "summary", "haiku-4.5")
+
+    const results = repo.getUnenrichedCommitsSince("2024-01-01")
+    expect(results).toHaveLength(0)
+  })
+
+  test("getUnenrichedCommitsSince orders by committed_at DESC", () => {
+    repo.insertRawCommits([
+      makeCommit("jan", { committedAt: "2024-01-15T00:00:00Z" }),
+      makeCommit("jun", { committedAt: "2024-06-15T00:00:00Z" }),
+      makeCommit("mar", { committedAt: "2024-03-15T00:00:00Z" }),
+    ])
+
+    const results = repo.getUnenrichedCommitsSince("2024-01-01")
+    expect(results).toHaveLength(3)
+    expect(results[0].hash).toBe("jun")
+    expect(results[1].hash).toBe("mar")
+    expect(results[2].hash).toBe("jan")
+  })
 })
