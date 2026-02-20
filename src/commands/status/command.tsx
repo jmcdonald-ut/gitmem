@@ -22,7 +22,7 @@ export const statusCommand = new Command("status")
     await runCommand(
       cmd.parent!.opts(),
       {},
-      async ({ format, git, db, dbPath }) => {
+      async ({ format, git, db, dbPath, config }) => {
         const commits = new CommitRepository(db)
         const branch = await git.getDefaultBranch()
         const totalCommits = await git.getTotalCommitCount(branch)
@@ -53,6 +53,7 @@ export const statusCommand = new Command("status")
           modelUsed,
           dbPath,
           dbSize,
+          config,
         }
 
         if (formatOutput(format, status)) return

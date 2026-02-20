@@ -1,7 +1,12 @@
 import React from "react"
 import { Box, Text } from "ink"
 import type { FileStatsRow, FileContributorRow, RecentCommit } from "@/types"
-import { CLASSIFICATION_COLORS, CLASSIFICATION_KEYS } from "@/types"
+import {
+  CLASSIFICATION_COLORS,
+  CLASSIFICATION_KEYS,
+  type Classification,
+} from "@/types"
+import type { AiCoverage } from "@/config"
 
 /** Props for the StatsCommand component. */
 interface StatsCommandProps {
@@ -19,6 +24,8 @@ interface StatsCommandProps {
   recentCommits?: RecentCommit[]
   /** Top files by change count (directory only). */
   topFiles?: FileStatsRow[]
+  /** AI coverage status for disclaimer display. */
+  aiCoverage?: AiCoverage
 }
 
 /**
@@ -34,6 +41,7 @@ export function StatsCommand({
   contributors,
   recentCommits,
   topFiles,
+  aiCoverage,
 }: StatsCommandProps) {
   const additions = stats.total_additions
   const deletions = stats.total_deletions
@@ -52,6 +60,8 @@ export function StatsCommand({
         )
       </Text>
       <Text> </Text>
+
+      <AiCoverageDisclaimer aiCoverage={aiCoverage} />
 
       <Box marginLeft={2} flexDirection="column">
         <Text>
@@ -78,11 +88,11 @@ export function StatsCommand({
                 {"  "}avg:{" "}
                 {stats.avg_complexity != null
                   ? Math.round(stats.avg_complexity)
-                  : "—"}
+                  : "\u2014"}
                 {"  "}max:{" "}
                 {stats.max_complexity != null
                   ? Math.round(stats.max_complexity)
-                  : "—"}
+                  : "\u2014"}
                 {stats.current_loc != null && stats.current_loc > 0 && (
                   <>
                     {"  "}LOC: {stats.current_loc}
@@ -146,12 +156,22 @@ export function StatsCommand({
                 <Box key={c.hash} marginLeft={2}>
                   <Text>
                     <Text color="gray">{c.hash.slice(0, 7)}</Text>{" "}
-                    <Text
-                      color={CLASSIFICATION_COLORS[c.classification] ?? "white"}
-                    >
-                      [{c.classification}]
-                    </Text>{" "}
-                    {c.summary}
+                    {c.classification ? (
+                      <>
+                        <Text
+                          color={
+                            CLASSIFICATION_COLORS[
+                              c.classification as Classification
+                            ] ?? "white"
+                          }
+                        >
+                          [{c.classification}]
+                        </Text>{" "}
+                        {c.summary}
+                      </>
+                    ) : (
+                      <Text color="gray">(not enriched)</Text>
+                    )}
                   </Text>
                 </Box>
               ))
@@ -183,4 +203,34 @@ export function StatsCommand({
       )}
     </Box>
   )
+}
+
+function AiCoverageDisclaimer({ aiCoverage }: { aiCoverage?: AiCoverage }) {
+  if (!aiCoverage) return null
+
+  if (aiCoverage.status === "disabled") {
+    return (
+      <>
+        <Text color="yellow">
+          AI enrichment is disabled. Classification data is not available.
+        </Text>
+        <Text> </Text>
+      </>
+    )
+  }
+
+  if (aiCoverage.status === "partial") {
+    const pct = Math.round((aiCoverage.enriched / aiCoverage.total) * 100)
+    return (
+      <>
+        <Text color="yellow">
+          AI classifications reflect {aiCoverage.enriched} of {aiCoverage.total}{" "}
+          commits ({pct}%).
+        </Text>
+        <Text> </Text>
+      </>
+    )
+  }
+
+  return null
 }

@@ -3,6 +3,7 @@ import React from "react"
 import { render } from "ink-testing-library"
 import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
 import type { FileStatsRow } from "@/types"
+import type { AiCoverage } from "@/config"
 
 const makeRow = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({
   file_path: "src/main.ts",
@@ -104,5 +105,55 @@ describe("HotspotsCommand", () => {
 
     expect(output).not.toContain("Sort:")
     expect(output).not.toContain("Path:")
+  })
+
+  test("shows disclaimer when AI is disabled", () => {
+    const aiCoverage: AiCoverage = { status: "disabled" }
+    const { lastFrame } = render(
+      <HotspotsCommand
+        hotspots={[makeRow()]}
+        sort="total"
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("AI enrichment is disabled")
+    expect(output).toContain("Classification data is not available")
+  })
+
+  test("shows disclaimer when AI coverage is partial", () => {
+    const aiCoverage: AiCoverage = {
+      status: "partial",
+      enriched: 50,
+      total: 100,
+      aiConfig: true,
+    }
+    const { lastFrame } = render(
+      <HotspotsCommand
+        hotspots={[makeRow()]}
+        sort="total"
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("AI classifications reflect 50 of 100")
+    expect(output).toContain("50%")
+  })
+
+  test("shows no disclaimer when AI coverage is full", () => {
+    const aiCoverage: AiCoverage = { status: "full" }
+    const { lastFrame } = render(
+      <HotspotsCommand
+        hotspots={[makeRow()]}
+        sort="total"
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).not.toContain("AI enrichment is disabled")
+    expect(output).not.toContain("AI classifications reflect")
   })
 })

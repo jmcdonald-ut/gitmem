@@ -4,6 +4,8 @@ import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
+import { getAiCoverage } from "@/config"
+import { CommitRepository } from "@db/commits"
 import type { WindowKey } from "@db/aggregates"
 import { AggregateRepository, computeTrend } from "@db/aggregates"
 import { TrendsCommand } from "@commands/trends/TrendsCommand"
@@ -46,8 +48,14 @@ export const trendsCommand = new Command("trends")
       process.exit(1)
     }
 
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, db }) => {
+    await runCommand(cmd.parent!.opts(), {}, async ({ format, db, config }) => {
+      const commits = new CommitRepository(db)
       const aggregates = new AggregateRepository(db)
+      const aiCoverage = getAiCoverage(
+        config,
+        commits.getEnrichedCommitCount(),
+        commits.getTotalCommitCount(),
+      )
       const limit = opts.limit
       const window = opts.window as WindowKey
 
@@ -92,6 +100,7 @@ export const trendsCommand = new Command("trends")
           window={opts.window}
           periods={periods}
           trend={trend}
+          aiCoverage={aiCoverage}
         />,
       ).unmount()
     })

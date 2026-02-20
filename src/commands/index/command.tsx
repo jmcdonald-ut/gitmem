@@ -4,6 +4,7 @@ import { render } from "ink"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { formatOutput } from "@/output"
+import { isAiEnabled } from "@/config"
 import { CommitRepository } from "@db/commits"
 import { AggregateRepository } from "@db/aggregates"
 import { SearchService } from "@db/search"
@@ -16,7 +17,8 @@ import { IndexCommand } from "@commands/index/IndexCommand"
 import { BatchIndexCommand } from "@commands/index/BatchIndexCommand"
 
 const HELP_TEXT = `
-Requires ANTHROPIC_API_KEY environment variable.
+Requires ANTHROPIC_API_KEY environment variable (unless AI is disabled
+in .gitmem/config.json).
 
 Indexing is incremental — only new commits are analyzed. Re-running is
 safe and will pick up where it left off.
@@ -34,11 +36,7 @@ export const indexCommand = new Command("index")
   .alias("i")
   .description("Analyze new commits via Claude API and rebuild search index")
   .addHelpText("after", HELP_TEXT)
-  .option(
-    "-m, --model <model>",
-    "LLM model to use",
-    "claude-haiku-4-5-20251001",
-  )
+  .option("-m, --model <model>", "LLM model to use")
   .option(
     "-c, --concurrency <number>",
     "Number of parallel LLM requests",
@@ -53,12 +51,16 @@ export const indexCommand = new Command("index")
     await runCommand(
       cmd.parent!.opts(),
       { needsApiKey: true, dbMustExist: false, needsLock: true },
-      async ({ format, git, apiKey, db }) => {
+      async ({ format, git, apiKey, db, config }) => {
+        const aiEnabled = isAiEnabled(config)
+        const model = opts.model ?? config.indexModel
         const commits = new CommitRepository(db)
         const aggregates = new AggregateRepository(db)
         const search = new SearchService(db)
-        const llm = new LLMService(apiKey, opts.model)
+        const llm = aiEnabled ? new LLMService(apiKey, model) : null
         const measurer = new MeasurerService(git, commits)
+        const aiStartDate =
+          typeof config.ai === "string" ? config.ai : undefined
         const enricher = new EnricherService(
           git,
           llm,
@@ -66,19 +68,23 @@ export const indexCommand = new Command("index")
           aggregates,
           search,
           measurer,
-          opts.model,
+          model,
           opts.concurrency,
+          config.indexStartDate ?? undefined,
+          aiStartDate,
         )
 
-        db.prepare(
-          "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
-        ).run("model_used", opts.model)
+        if (aiEnabled) {
+          db.prepare(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+          ).run("model_used", model)
+        }
 
         if (format === "json") {
           try {
             let result
-            if (opts.batch) {
-              const batchLLM = new BatchLLMService(apiKey, opts.model)
+            if (opts.batch && aiEnabled) {
+              const batchLLM = new BatchLLMService(apiKey, model)
               const batchJobs = new BatchJobRepository(db)
               result = await enricher.runBatch(batchLLM, batchJobs, () => {})
             } else {
@@ -103,7 +109,7 @@ export const indexCommand = new Command("index")
                       (result.totalEnriched / result.totalCommits) * 100,
                     )
                   : 0,
-              model: opts.model,
+              model: aiEnabled ? model : null,
               batch_id: "batchId" in result ? (result.batchId ?? null) : null,
             })
           } catch (err) {
@@ -114,8 +120,8 @@ export const indexCommand = new Command("index")
             process.exit(1)
           }
         } else {
-          if (opts.batch) {
-            const batchLLM = new BatchLLMService(apiKey, opts.model)
+          if (opts.batch && aiEnabled) {
+            const batchLLM = new BatchLLMService(apiKey, model)
             const batchJobs = new BatchJobRepository(db)
             const instance = render(
               <BatchIndexCommand

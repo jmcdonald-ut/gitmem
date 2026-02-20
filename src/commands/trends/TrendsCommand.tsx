@@ -2,6 +2,7 @@ import React from "react"
 import { Box, Text } from "ink"
 import type { TrendPeriod, TrendSummary } from "@/types"
 import { CLASSIFICATION_COLORS, CLASSIFICATION_KEYS } from "@/types"
+import type { AiCoverage } from "@/config"
 
 /** Props for the TrendsCommand component. */
 interface TrendsCommandProps {
@@ -15,6 +16,8 @@ interface TrendsCommandProps {
   periods: TrendPeriod[]
   /** Computed trend summary, or null if insufficient data. */
   trend: TrendSummary | null
+  /** AI coverage status for disclaimer display. */
+  aiCoverage?: AiCoverage
 }
 
 const DIRECTION_DISPLAY: Record<string, { arrow: string; color: string }> = {
@@ -33,6 +36,7 @@ export function TrendsCommand({
   window,
   periods,
   trend,
+  aiCoverage,
 }: TrendsCommandProps) {
   if (periods.length === 0) {
     return (
@@ -51,6 +55,8 @@ export function TrendsCommand({
       <Text>
         <Text color="cyan">{path}</Text> ({type}, {window})
       </Text>
+
+      <AiCoverageDisclaimer aiCoverage={aiCoverage} />
 
       {trend && (
         <>
@@ -115,4 +121,34 @@ export function TrendsCommand({
       })}
     </Box>
   )
+}
+
+function AiCoverageDisclaimer({ aiCoverage }: { aiCoverage?: AiCoverage }) {
+  if (!aiCoverage) return null
+
+  if (aiCoverage.status === "disabled") {
+    return (
+      <>
+        <Text> </Text>
+        <Text color="yellow">
+          AI enrichment is disabled. Classification data is not available.
+        </Text>
+      </>
+    )
+  }
+
+  if (aiCoverage.status === "partial") {
+    const pct = Math.round((aiCoverage.enriched / aiCoverage.total) * 100)
+    return (
+      <>
+        <Text> </Text>
+        <Text color="yellow">
+          AI classifications reflect {aiCoverage.enriched} of {aiCoverage.total}{" "}
+          commits ({pct}%).
+        </Text>
+      </>
+    )
+  }
+
+  return null
 }

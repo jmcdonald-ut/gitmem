@@ -3,6 +3,7 @@ import React from "react"
 import { render } from "ink-testing-library"
 import { TrendsCommand } from "@commands/trends/TrendsCommand"
 import type { TrendPeriod, TrendSummary } from "@/types"
+import type { AiCoverage } from "@/config"
 
 const makePeriod = (overrides: Partial<TrendPeriod> = {}): TrendPeriod => ({
   period: "2025-03",
@@ -238,5 +239,64 @@ describe("TrendsCommand", () => {
 
     expect(output).toContain("Bug-fix trend:")
     expect(output).toContain("decreasing")
+  })
+
+  test("shows disclaimer when AI is disabled", () => {
+    const aiCoverage: AiCoverage = { status: "disabled" }
+    const { lastFrame } = render(
+      <TrendsCommand
+        path="src/main.ts"
+        type="file"
+        window="monthly"
+        periods={[makePeriod()]}
+        trend={null}
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("AI enrichment is disabled")
+    expect(output).toContain("Classification data is not available")
+  })
+
+  test("shows disclaimer when AI coverage is partial", () => {
+    const aiCoverage: AiCoverage = {
+      status: "partial",
+      enriched: 75,
+      total: 200,
+      aiConfig: "2024-06-01",
+    }
+    const { lastFrame } = render(
+      <TrendsCommand
+        path="src/main.ts"
+        type="file"
+        window="monthly"
+        periods={[makePeriod()]}
+        trend={null}
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).toContain("AI classifications reflect 75 of 200")
+    expect(output).toContain("38%")
+  })
+
+  test("shows no disclaimer when AI coverage is full", () => {
+    const aiCoverage: AiCoverage = { status: "full" }
+    const { lastFrame } = render(
+      <TrendsCommand
+        path="src/main.ts"
+        type="file"
+        window="monthly"
+        periods={[makePeriod()]}
+        trend={null}
+        aiCoverage={aiCoverage}
+      />,
+    )
+    const output = lastFrame()
+
+    expect(output).not.toContain("AI enrichment is disabled")
+    expect(output).not.toContain("AI classifications reflect")
   })
 })
