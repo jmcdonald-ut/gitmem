@@ -35,6 +35,50 @@ function FileLink({
   )
 }
 
+function ContributorsList({
+  contributors,
+}: {
+  contributors: { name: string; commits: number }[]
+}) {
+  if (contributors.length === 0) return null
+  return (
+    <>
+      <h3>Contributors</h3>
+      {contributors.map((c) => (
+        <div key={c.name} className="list-item">
+          <span>{c.name}</span>
+          <span className="list-value">{c.commits} commits</span>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function CoupledFilesList({
+  coupled,
+  heading,
+  onNavigate,
+}: {
+  coupled: { file: string; count: number; ratio: number }[]
+  heading: string
+  onNavigate: (path: string) => void
+}) {
+  if (coupled.length === 0) return null
+  return (
+    <>
+      <h3>{heading}</h3>
+      {coupled.map((c) => (
+        <div key={c.file} className="list-item">
+          <span className="list-file">
+            <FileLink filePath={c.file} maxChars={40} onNavigate={onNavigate} />
+          </span>
+          <span className="list-value">{(c.ratio * 100).toFixed(0)}%</span>
+        </div>
+      ))}
+    </>
+  )
+}
+
 export function DetailsPanel({
   data,
   totalTracked,
@@ -167,38 +211,12 @@ export function DetailsPanel({
           </>
         )}
 
-        {data.contributors.length > 0 && (
-          <>
-            <h3>Contributors</h3>
-            {data.contributors.map((c) => (
-              <div key={c.name} className="list-item">
-                <span>{c.name}</span>
-                <span className="list-value">{c.commits} commits</span>
-              </div>
-            ))}
-          </>
-        )}
-
-        {data.coupled.length > 0 && (
-          <>
-            <h3>External Coupling</h3>
-            {data.coupled.map((c) => (
-              <div key={c.file} className="list-item">
-                <span className="list-file">
-                  <FileLink
-                    filePath={c.file}
-                    maxChars={40}
-                    onNavigate={onNavigate}
-                  />
-                </span>
-                <span className="list-value">
-                  {(c.ratio * 100).toFixed(0)}%
-                </span>
-              </div>
-            ))}
-          </>
-        )}
-
+        <ContributorsList contributors={data.contributors} />
+        <CoupledFilesList
+          coupled={data.coupled}
+          heading="External Coupling"
+          onNavigate={onNavigate}
+        />
         <TrendIndicator trend={data.trendSummary} />
       </div>
     )
@@ -245,36 +263,12 @@ export function DetailsPanel({
         <div className="loading">No index data for this file</div>
       )}
 
-      {data.contributors.length > 0 && (
-        <>
-          <h3>Contributors</h3>
-          {data.contributors.map((c) => (
-            <div key={c.name} className="list-item">
-              <span>{c.name}</span>
-              <span className="list-value">{c.commits} commits</span>
-            </div>
-          ))}
-        </>
-      )}
-
-      {data.coupled.length > 0 && (
-        <>
-          <h3>Coupled Files</h3>
-          {data.coupled.map((c) => (
-            <div key={c.file} className="list-item">
-              <span className="list-file">
-                <FileLink
-                  filePath={c.file}
-                  maxChars={40}
-                  onNavigate={onNavigate}
-                />
-              </span>
-              <span className="list-value">{(c.ratio * 100).toFixed(0)}%</span>
-            </div>
-          ))}
-        </>
-      )}
-
+      <ContributorsList contributors={data.contributors} />
+      <CoupledFilesList
+        coupled={data.coupled}
+        heading="Coupled Files"
+        onNavigate={onNavigate}
+      />
       <TrendIndicator trend={data.trendSummary} />
     </div>
   )
