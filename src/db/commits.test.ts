@@ -300,7 +300,7 @@ describe("CommitRepository", () => {
     expect(results[1].hash).toBe("aaa")
   })
 
-  test("getRecentCommitsForFile excludes unenriched commits", () => {
+  test("getRecentCommitsForFile includes unenriched commits with empty classification", () => {
     repo.insertRawCommits([
       makeCommit("aaa", {
         files: [
@@ -326,8 +326,9 @@ describe("CommitRepository", () => {
     repo.updateEnrichment("aaa", "feature", "Initial setup", "haiku-4.5")
 
     const results = repo.getRecentCommitsForFile("src/main.ts")
-    expect(results).toHaveLength(1)
-    expect(results[0].hash).toBe("aaa")
+    expect(results).toHaveLength(2)
+    expect(results[0].classification).toBe("feature")
+    expect(results[1].classification).toBe("")
   })
 
   test("getRecentCommitsForFile respects limit", () => {

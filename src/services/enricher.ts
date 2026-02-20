@@ -17,33 +17,39 @@ const MAX_BATCH_BYTES = 200 * 1024 * 1024 // 200 MB, leaving margin from the 256
  */
 export class EnricherService {
   private git: IGitService
-  private llm: ILLMService
+  private llm: ILLMService | null
   private commits: CommitRepository
   private aggregates: AggregateRepository
   private search: SearchService
   private measurer: MeasurerService | null
   private model: string
   private concurrency: number
+  private indexStartDate?: string
+  private aiStartDate?: string
 
   /**
    * @param git - Git repository service.
-   * @param llm - LLM enrichment service.
+   * @param llm - LLM enrichment service (null to skip enrichment).
    * @param commits - Commit database repository.
    * @param aggregates - Aggregate statistics repository.
    * @param search - Full-text search service.
    * @param measurer - Complexity measurement service.
    * @param model - Model identifier stored with enrichment results.
    * @param concurrency - Number of parallel LLM requests per window.
+   * @param indexStartDate - Only discover commits on or after this date.
+   * @param aiStartDate - Only enrich commits on or after this date.
    */
   constructor(
     git: IGitService,
-    llm: ILLMService,
+    llm: ILLMService | null,
     commits: CommitRepository,
     aggregates: AggregateRepository,
     search: SearchService,
     measurer: MeasurerService | null = null,
     model: string = "claude-haiku-4-5-20251001",
     concurrency: number = 8,
+    indexStartDate?: string,
+    aiStartDate?: string,
   ) {
     this.git = git
     this.llm = llm
@@ -53,6 +59,8 @@ export class EnricherService {
     this.measurer = measurer
     this.model = model
     this.concurrency = concurrency
+    this.indexStartDate = indexStartDate
+    this.aiStartDate = aiStartDate
   }
 
   /**
@@ -72,70 +80,75 @@ export class EnricherService {
   }> {
     const { newHashes } = await this.discoverAndInsert(onProgress)
 
-    // Phase 2: Enrich unenriched commits with parallel sliding window
-    const unenriched = this.commits.getUnenrichedCommits()
-    const total = unenriched.length
     let enrichedThisRun = 0
     const enrichedHashes: string[] = []
 
-    if (total > 0) {
-      // Pre-fetch all diffs and file lists in one batch call
-      const unenrichedHashes = unenriched.map((c) => c.hash)
-      const diffMap = await this.git.getDiffBatch(unenrichedHashes)
-      const filesMap = this.commits.getCommitFilesByHashes(unenrichedHashes)
+    // Phase 2: Enrich unenriched commits with parallel sliding window (skip when LLM is null)
+    if (this.llm) {
+      const unenriched = this.aiStartDate
+        ? this.commits.getUnenrichedCommitsSince(this.aiStartDate)
+        : this.commits.getUnenrichedCommits()
+      const total = unenriched.length
 
-      for (let i = 0; i < unenriched.length; i += this.concurrency) {
-        if (signal?.aborted) break
+      if (total > 0) {
+        // Pre-fetch all diffs and file lists in one batch call
+        const unenrichedHashes = unenriched.map((c) => c.hash)
+        const diffMap = await this.git.getDiffBatch(unenrichedHashes)
+        const filesMap = this.commits.getCommitFilesByHashes(unenrichedHashes)
 
-        const window = unenriched.slice(i, i + this.concurrency)
-        onProgress({
-          phase: "enriching",
-          current: i + 1,
-          total,
-          currentHash: window[0].hash,
-        })
+        for (let i = 0; i < unenriched.length; i += this.concurrency) {
+          if (signal?.aborted) break
 
-        const settled = await Promise.allSettled(
-          window.map(async (commit) => {
-            const diff = diffMap.get(commit.hash) ?? ""
-            const mergeResult = this.tryMergeCommitEnrichment(
-              commit.message,
-              diff,
-            )
-            if (mergeResult) {
-              return { commit, result: mergeResult }
-            }
-            return {
-              commit,
-              result: await this.llm.enrichCommit(
-                {
-                  hash: commit.hash,
-                  authorName: commit.author_name,
-                  authorEmail: commit.author_email,
-                  committedAt: commit.committed_at,
-                  message: commit.message,
-                  files: filesMap.get(commit.hash) ?? [],
-                },
+          const window = unenriched.slice(i, i + this.concurrency)
+          onProgress({
+            phase: "enriching",
+            current: i + 1,
+            total,
+            currentHash: window[0].hash,
+          })
+
+          const settled = await Promise.allSettled(
+            window.map(async (commit) => {
+              const diff = diffMap.get(commit.hash) ?? ""
+              const mergeResult = this.tryMergeCommitEnrichment(
+                commit.message,
                 diff,
-              ),
-            }
-          }),
-        )
+              )
+              if (mergeResult) {
+                return { commit, result: mergeResult }
+              }
+              return {
+                commit,
+                result: await this.llm!.enrichCommit(
+                  {
+                    hash: commit.hash,
+                    authorName: commit.author_name,
+                    authorEmail: commit.author_email,
+                    committedAt: commit.committed_at,
+                    message: commit.message,
+                    files: filesMap.get(commit.hash) ?? [],
+                  },
+                  diff,
+                ),
+              }
+            }),
+          )
 
-        // Sequential DB writes for fulfilled results
-        for (const outcome of settled) {
-          if (outcome.status === "fulfilled") {
-            const { commit, result } = outcome.value
-            this.commits.updateEnrichment(
-              commit.hash,
-              result.classification,
-              result.summary,
-              this.model,
-            )
-            enrichedThisRun++
-            enrichedHashes.push(commit.hash)
-          } else {
-            console.error(`Failed to enrich commit: ${outcome.reason}`)
+          // Sequential DB writes for fulfilled results
+          for (const outcome of settled) {
+            if (outcome.status === "fulfilled") {
+              const { commit, result } = outcome.value
+              this.commits.updateEnrichment(
+                commit.hash,
+                result.classification,
+                result.summary,
+                this.model,
+              )
+              enrichedThisRun++
+              enrichedHashes.push(commit.hash)
+            } else {
+              console.error(`Failed to enrich commit: ${outcome.reason}`)
+            }
           }
         }
       }
@@ -144,6 +157,7 @@ export class EnricherService {
     this.rebuildAggregatesAndIndex(
       [...new Set([...enrichedHashes, ...newHashes])],
       enrichedHashes,
+      newHashes,
       onProgress,
     )
 
@@ -183,37 +197,40 @@ export class EnricherService {
   }> {
     const { newHashes } = await this.discoverAndInsert(onProgress)
 
-    let enrichedThisRun: number
+    let enrichedThisRun: number = 0
     const enrichedHashes: string[] = []
 
-    const pendingBatch = batchJobs.getPendingBatchByType("index")
+    if (this.llm) {
+      const pendingBatch = batchJobs.getPendingBatchByType("index")
 
-    if (pendingBatch) {
-      const result = await this.handlePendingBatch(
-        pendingBatch,
-        batchLLM,
-        batchJobs,
-        onProgress,
-        newHashes,
-      )
-      if (result.earlyReturn) return result.earlyReturn
-      enrichedThisRun = result.enrichedThisRun
-      enrichedHashes.push(...result.enrichedHashes)
-    } else {
-      const result = await this.submitNewBatch(
-        batchLLM,
-        batchJobs,
-        onProgress,
-        newHashes,
-      )
-      if (result.earlyReturn) return result.earlyReturn
-      enrichedThisRun = result.enrichedThisRun
-      enrichedHashes.push(...result.enrichedHashes)
+      if (pendingBatch) {
+        const result = await this.handlePendingBatch(
+          pendingBatch,
+          batchLLM,
+          batchJobs,
+          onProgress,
+          newHashes,
+        )
+        if (result.earlyReturn) return result.earlyReturn
+        enrichedThisRun = result.enrichedThisRun
+        enrichedHashes.push(...result.enrichedHashes)
+      } else {
+        const result = await this.submitNewBatch(
+          batchLLM,
+          batchJobs,
+          onProgress,
+          newHashes,
+        )
+        if (result.earlyReturn) return result.earlyReturn
+        enrichedThisRun = result.enrichedThisRun
+        enrichedHashes.push(...result.enrichedHashes)
+      }
     }
 
     this.rebuildAggregatesAndIndex(
       [...new Set([...enrichedHashes, ...newHashes])],
       enrichedHashes,
+      newHashes,
       onProgress,
     )
 
@@ -236,7 +253,10 @@ export class EnricherService {
   ): Promise<{ newHashes: string[] }> {
     onProgress({ phase: "discovering", current: 0, total: 0 })
     const branch = await this.git.getDefaultBranch()
-    const allHashes = await this.git.getCommitHashes(branch)
+    const allHashes = await this.git.getCommitHashes(
+      branch,
+      this.indexStartDate ?? undefined,
+    )
     const indexedHashes = this.commits.getIndexedHashes()
 
     const newHashes = allHashes.filter((h) => !indexedHashes.has(h))
@@ -359,7 +379,9 @@ export class EnricherService {
     let enrichedThisRun = 0
     const enrichedHashes: string[] = []
 
-    const unenriched = this.commits.getUnenrichedCommits()
+    const unenriched = this.aiStartDate
+      ? this.commits.getUnenrichedCommitsSince(this.aiStartDate)
+      : this.commits.getUnenrichedCommits()
     if (unenriched.length > 0) {
       const unenrichedHashes = unenriched.map((c) => c.hash)
       const diffMap = await this.git.getDiffBatch(unenrichedHashes)
@@ -442,6 +464,7 @@ export class EnricherService {
   private rebuildAggregatesAndIndex(
     affectedHashes: string[],
     enrichedHashes: string[],
+    newHashes: string[],
     onProgress: (progress: IndexProgress) => void,
   ): void {
     if (affectedHashes.length > 0) {
@@ -451,7 +474,9 @@ export class EnricherService {
       this.aggregates.rebuildFileCouplingIncremental(affectedHashes)
 
       onProgress({ phase: "indexing", current: 0, total: 0 })
-      this.search.indexNewCommits(enrichedHashes)
+      // Index enriched commits, plus new unenriched commits (message search still works)
+      const ftsHashes = [...new Set([...enrichedHashes, ...newHashes])]
+      this.search.indexNewCommits(ftsHashes)
     }
   }
 

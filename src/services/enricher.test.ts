@@ -1086,6 +1086,159 @@ describe("EnricherService", () => {
     const chunks = enricher.chunkBatchRequests([])
     expect(chunks).toHaveLength(0)
   })
+
+  // --- null LLM tests ---
+
+  test("run with null LLM skips enrichment but still discovers and aggregates", async () => {
+    const enricher = new EnricherService(
+      mockGit,
+      null,
+      commits,
+      aggregates,
+      search,
+    )
+
+    const phases: string[] = []
+    const result = await enricher.run((p) => phases.push(p.phase))
+
+    expect(result.discoveredThisRun).toBe(3)
+    expect(result.enrichedThisRun).toBe(0)
+    expect(result.totalEnriched).toBe(0)
+    expect(result.totalCommits).toBe(3)
+    // Should still aggregate and index (FTS works for unenriched commits)
+    expect(phases).toContain("discovering")
+    expect(phases).toContain("aggregating")
+    expect(phases).toContain("indexing")
+    expect(phases).toContain("done")
+    expect(phases).not.toContain("enriching")
+  })
+
+  test("run with null LLM makes unenriched commits searchable by message", async () => {
+    const enricher = new EnricherService(
+      mockGit,
+      null,
+      commits,
+      aggregates,
+      search,
+    )
+
+    await enricher.run(() => {})
+
+    // Unenriched commits should be in FTS and searchable by message
+    const results = search.search("commit aaa")
+    expect(results.length).toBeGreaterThanOrEqual(1)
+    expect(results[0].hash).toBe("aaa")
+    expect(results[0].classification).toBe("")
+  })
+
+  test("runBatch with null LLM skips batch submission", async () => {
+    const batchJobs = new BatchJobRepository(db)
+    const mockBatchLLM = {
+      submitBatch: mock(() => Promise.resolve({})),
+      getBatchStatus: mock(() => Promise.resolve({})),
+      getBatchResults: mock(() => Promise.resolve([])),
+    } as unknown as BatchLLMService
+
+    const enricher = new EnricherService(
+      mockGit,
+      null,
+      commits,
+      aggregates,
+      search,
+    )
+
+    const phases: string[] = []
+    const result = await enricher.runBatch(
+      batchLLM(mockBatchLLM),
+      batchJobs,
+      (p) => phases.push(p.phase),
+    )
+
+    expect(result.discoveredThisRun).toBe(3)
+    expect(result.enrichedThisRun).toBe(0)
+    expect(mockBatchLLM.submitBatch).not.toHaveBeenCalled()
+    expect(phases).toContain("aggregating")
+    expect(phases).toContain("done")
+  })
+
+  // --- date filtering tests ---
+
+  test("run with aiStartDate only enriches commits after the date", async () => {
+    const datedGit: IGitService = {
+      ...mockGit,
+      getCommitHashes: mock(() => Promise.resolve(["old1", "new1", "new2"])),
+      getCommitInfoBatch: mock((hashes: string[]) =>
+        Promise.resolve(
+          hashes.map((hash) => ({
+            hash,
+            authorName: "Test",
+            authorEmail: "test@example.com",
+            committedAt: hash.startsWith("old")
+              ? "2023-06-01T00:00:00Z"
+              : "2024-06-01T00:00:00Z",
+            message: `commit ${hash}`,
+            files: [
+              {
+                filePath: "src/main.ts",
+                changeType: "M",
+                additions: 10,
+                deletions: 5,
+              },
+            ],
+          })),
+        ),
+      ),
+      getDiffBatch: mock((hashes: string[]) => {
+        const map = new Map<string, string>()
+        for (const h of hashes) map.set(h, "diff content")
+        return Promise.resolve(map)
+      }),
+      getTotalCommitCount: mock(() => Promise.resolve(3)),
+    }
+
+    const enricher = new EnricherService(
+      datedGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+      null,
+      "claude-haiku-4-5-20251001",
+      8,
+      undefined,
+      "2024-01-01",
+    )
+
+    const result = await enricher.run(() => {})
+
+    // All 3 discovered, but only 2 enriched (the ones after 2024-01-01)
+    expect(result.discoveredThisRun).toBe(3)
+    expect(result.enrichedThisRun).toBe(2)
+    expect(result.totalCommits).toBe(3)
+
+    // old1 should still be in FTS (searchable by message)
+    const oldResults = search.search("commit old1")
+    expect(oldResults.length).toBeGreaterThanOrEqual(1)
+    expect(oldResults[0].classification).toBe("")
+  })
+
+  test("run with indexStartDate passes it to git.getCommitHashes", async () => {
+    const enricher = new EnricherService(
+      mockGit,
+      mockLLM,
+      commits,
+      aggregates,
+      search,
+      null,
+      "claude-haiku-4-5-20251001",
+      8,
+      "2024-01-01",
+    )
+
+    await enricher.run(() => {})
+
+    expect(mockGit.getCommitHashes).toHaveBeenCalledWith("main", "2024-01-01")
+  })
 })
 
 /** Helper to cast mock as BatchLLMService */

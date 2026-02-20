@@ -225,7 +225,7 @@ describe("SearchService", () => {
     expect(utilsResults).toHaveLength(0)
   })
 
-  test("indexNewCommits skips unenriched commits", () => {
+  test("indexNewCommits indexes unenriched commits by message", () => {
     commits.insertRawCommits([
       {
         hash: "aaa",
@@ -237,11 +237,12 @@ describe("SearchService", () => {
       },
     ])
 
-    // Don't enrich it, then try to index
+    // Don't enrich it, then index — should still be searchable by message
     search.indexNewCommits(["aaa"])
 
     const results = search.search("unenriched")
-    expect(results).toHaveLength(0)
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("aaa")
   })
 
   test("indexNewCommits with empty hashes is a no-op", () => {

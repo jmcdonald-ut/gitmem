@@ -108,7 +108,7 @@ describe("AggregateRepository", () => {
     expect(main!.total_deletions).toBe(8)
   })
 
-  test("rebuildFileStats only counts enriched commits", () => {
+  test("rebuildFileStats includes unenriched commits with zero classification counts", () => {
     commits.insertRawCommits([
       {
         hash: "unenriched",
@@ -129,7 +129,11 @@ describe("AggregateRepository", () => {
     aggregates.rebuildFileStats()
 
     const stats = aggregates.getFileStats("src/foo.ts")
-    expect(stats).toBeNull()
+    expect(stats).not.toBeNull()
+    expect(stats!.total_changes).toBe(1)
+    expect(stats!.total_additions).toBe(10)
+    expect(stats!.bug_fix_count).toBe(0)
+    expect(stats!.feature_count).toBe(0)
   })
 
   test("rebuildFileContributors computes correct contributors", () => {
@@ -699,7 +703,7 @@ describe("AggregateRepository", () => {
     expect(periods[1].period).toBe("2024-02")
   })
 
-  test("getTrendsForFile only counts enriched commits", () => {
+  test("getTrendsForFile includes unenriched commits with zero classification counts", () => {
     commits.insertRawCommits([
       {
         hash: "unenriched",
@@ -720,7 +724,11 @@ describe("AggregateRepository", () => {
 
     const window = "monthly" as const
     const periods = aggregates.getTrendsForFile("src/foo.ts", window, 12)
-    expect(periods).toHaveLength(0)
+    expect(periods).toHaveLength(1)
+    expect(periods[0].total_changes).toBe(1)
+    expect(periods[0].additions).toBe(10)
+    expect(periods[0].bug_fix_count).toBe(0)
+    expect(periods[0].feature_count).toBe(0)
   })
 
   test("getTrendsForFile returns empty for unknown file", () => {
@@ -1052,6 +1060,47 @@ describe("AggregateRepository", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       aggregates.getTrendsForDirectory("src/", "invalid" as any, 12),
     ).toThrow('Invalid window "invalid"')
+  })
+
+  test("getAllFileStats returns all rows", () => {
+    seedData()
+    aggregates.rebuildFileStats()
+
+    const allStats = aggregates.getAllFileStats()
+    expect(allStats).toHaveLength(3)
+    const paths = allStats.map((s) => s.file_path).sort()
+    expect(paths).toEqual(["src/main.ts", "src/new.ts", "src/utils.ts"])
+  })
+
+  test("getAllFileStats filters by exclusion categories", () => {
+    // Seed with a test file path that matches test patterns
+    commits.insertRawCommits([
+      {
+        hash: "tst",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "add test",
+        files: [
+          {
+            filePath: "src/__tests__/foo.test.ts",
+            changeType: "A",
+            additions: 10,
+            deletions: 0,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("tst", "test", "Added test", "haiku-4.5")
+    aggregates.rebuildFileStats()
+
+    // Without exclusion: should include test file
+    const all = aggregates.getAllFileStats()
+    expect(all.some((s) => s.file_path.includes("test"))).toBe(true)
+
+    // With test exclusion
+    const filtered = aggregates.getAllFileStats(["test"])
+    expect(filtered.every((s) => !s.file_path.includes("test"))).toBe(true)
   })
 
   test("getTrendsForFile includes additions and deletions", () => {
