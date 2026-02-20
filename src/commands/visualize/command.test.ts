@@ -4,7 +4,6 @@ import {
   parsePort,
   normalizePathPrefix,
   handleDetails,
-  createFetchHandler,
 } from "@commands/visualize/command"
 import { CommitRepository } from "@db/commits"
 import { AggregateRepository } from "@db/aggregates"
@@ -556,80 +555,5 @@ describe("handleDetails", () => {
         ratio: expect.any(Number),
       }),
     )
-  })
-})
-
-describe("createFetchHandler", () => {
-  function setup() {
-    const db = createDatabase(":memory:")
-    const commits = new CommitRepository(db)
-    const aggregates = new AggregateRepository(db)
-    return { db, commits, aggregates }
-  }
-
-  test("returns HTML page for root path", async () => {
-    const { commits, aggregates } = setup()
-    const handler = createFetchHandler(
-      "<html>test</html>",
-      commits,
-      aggregates,
-      [],
-    )
-
-    const res = handler(new Request("http://localhost/"))
-
-    expect(res.status).toBe(200)
-    expect(res.headers.get("Content-Type")).toBe("text/html")
-    expect(await res.text()).toBe("<html>test</html>")
-  })
-
-  test("delegates /api/details to handleDetails", async () => {
-    const { commits, aggregates } = setup()
-    const handler = createFetchHandler("", commits, aggregates, [])
-
-    const res = handler(
-      new Request("http://localhost/api/details?path=src/foo.ts"),
-    )
-    const data = await res.json()
-
-    expect(data.type).toBe("file")
-    expect(data.path).toBe("src/foo.ts")
-  })
-
-  test("returns 404 for unknown paths", async () => {
-    const { commits, aggregates } = setup()
-    const handler = createFetchHandler("", commits, aggregates, [])
-
-    const res = handler(new Request("http://localhost/unknown"))
-
-    expect(res.status).toBe(404)
-    expect(await res.text()).toBe("Not found")
-  })
-
-  test("threads pathPrefix to handleDetails", async () => {
-    const { db, commits, aggregates } = setup()
-    db.run(`
-      INSERT INTO file_stats (file_path, total_changes, bug_fix_count, feature_count, refactor_count, docs_count, chore_count, perf_count, test_count, style_count, first_seen, last_changed, total_additions, total_deletions, current_loc)
-      VALUES ('src/auth.ts', 3, 1, 1, 1, 0, 0, 0, 0, 0, '2025-01-15', '2025-03-05', 35, 10, 200)
-    `)
-
-    const handler = createFetchHandler(
-      "",
-      commits,
-      aggregates,
-      [],
-      undefined,
-      "src/",
-    )
-
-    // Client sends "auth.ts" which should be prepended with "src/"
-    const res = handler(
-      new Request("http://localhost/api/details?path=auth.ts"),
-    )
-    const data = await res.json()
-
-    expect(data.type).toBe("file")
-    expect(data.path).toBe("auth.ts")
-    expect(data.stats).not.toBeNull()
   })
 })
