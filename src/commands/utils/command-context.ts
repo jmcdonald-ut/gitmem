@@ -1,12 +1,12 @@
 import type { Database } from "bun:sqlite"
 import type { OutputFormat } from "@/types"
 import type { GitmemConfig } from "@/config"
-import { loadConfig, isAiEnabled } from "@/config"
+import { loadConfig, isAiEnabled, DEFAULTS } from "@/config"
 import { GitService } from "@services/git"
 import { createDatabase } from "@db/database"
 import { resolveFormat, formatOutput } from "@/output"
 import { resolve, join } from "path"
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "fs"
+import { existsSync, writeFileSync, unlinkSync } from "fs"
 import { openSync, closeSync } from "fs"
 import { constants } from "fs"
 
@@ -27,12 +27,12 @@ export interface CommandRequirements {
   dbMustExist?: boolean
   /** Whether this command performs writes and needs an exclusive lock. */
   needsLock?: boolean
+  /** Whether this command requires an initialized config. Defaults to true. */
+  needsConfig?: boolean
 }
 
 export function getDbPath(): string {
-  const dir = resolve(process.cwd(), ".gitmem")
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  return join(dir, "index.db")
+  return join(resolve(process.cwd(), ".gitmem"), "index.db")
 }
 
 function getLockPath(): string {
@@ -91,16 +91,20 @@ export async function runCommand(
 
   const gitmemDir = resolve(cwd, ".gitmem")
   let config: GitmemConfig
-  try {
-    config = loadConfig(gitmemDir)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    if (format === "json") {
-      formatOutput("json", { success: false, error: message })
-    } else {
-      console.error(`Error: ${message}`)
+  if (requirements.needsConfig === false) {
+    config = { ...DEFAULTS }
+  } else {
+    try {
+      config = loadConfig(gitmemDir)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (format === "json") {
+        formatOutput("json", { success: false, error: message })
+      } else {
+        console.error(`Error: ${message}`)
+      }
+      process.exit(1)
     }
-    process.exit(1)
   }
 
   let apiKey = ""

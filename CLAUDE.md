@@ -41,6 +41,7 @@ src/
       command.tsx      # Commander definition, options, help text, action handler
       <Name>.tsx       # Ink React component for terminal UI (most commands)
       <Name>.test.tsx  # Component tests (co-located)
+    init/              # Initialize gitmem in a repository
     index/             # Also has BatchIndexCommand.tsx for --batch mode
     check/             # Also has BatchCheckCommand.tsx for --batch mode
     visualize/         # HTTP server (no Ink component): hierarchy.ts, page.ts
@@ -75,6 +76,7 @@ src/
 
 | Command | Alias | Description |
 |---------|-------|-------------|
+| `init` | — | Initialize gitmem: create `.gitmem/config.json` and empty database |
 | `index` | `i` | Run the 5-phase enrichment pipeline (`--batch` for async Batches API) |
 | `query` | `q` | FTS5 full-text search over indexed commits (no API calls) |
 | `hotspots` | `h` | Most-changed files with classification breakdown |
@@ -90,6 +92,8 @@ src/
 Several commands (`hotspots`, `coupling`, `visualize`) support file-filter flags (`--include-tests`, `--include-docs`, `--include-generated`, `--all`) via `file-filter.ts`. By default, test, docs, and generated files are excluded.
 
 ## Architecture
+
+Run `gitmem init` to create `.gitmem/config.json` and an empty database. All other commands (except `schema` and `generate`) require initialization.
 
 The indexing pipeline has 5 phases:
 1. **Discover** - Extract commit metadata from git (bulk via `getCommitInfoBatch`)
@@ -112,7 +116,7 @@ Data is stored in `.gitmem/index.db`. Write commands acquire a file lock (`.gitm
 
 ## Configuration
 
-Settings are stored in `.gitmem/config.json` (auto-created with defaults on first run):
+Settings are stored in `.gitmem/config.json` (created by `gitmem init`):
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|

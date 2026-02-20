@@ -65,7 +65,7 @@ const skillCommand = new Command("skill")
   .action(async (opts, cmd) => {
     await runCommand(
       cmd.optsWithGlobals(),
-      { needsGit: true, needsDb: false },
+      { needsGit: true, needsDb: false, needsConfig: false },
       async ({ format, git }) => {
         const repoRoot = await git.getRepoRoot()
         const result = generateSkill({
