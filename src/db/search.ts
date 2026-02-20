@@ -95,9 +95,9 @@ export class SearchService {
       this.db
         .query(
           `INSERT INTO commits_fts (hash, message, classification, summary)
-          SELECT hash, message, classification, summary
+          SELECT hash, message, COALESCE(classification, ''), COALESCE(summary, '')
           FROM commits
-          WHERE hash IN (${placeholders}) AND enriched_at IS NOT NULL`,
+          WHERE hash IN (${placeholders})`,
         )
         .run(...chunk)
     }
@@ -108,9 +108,8 @@ export class SearchService {
     this.db.run("DELETE FROM commits_fts")
     this.db.run(`
       INSERT INTO commits_fts (hash, message, classification, summary)
-      SELECT hash, message, classification, summary
+      SELECT hash, message, COALESCE(classification, ''), COALESCE(summary, '')
       FROM commits
-      WHERE enriched_at IS NOT NULL
     `)
   }
 }

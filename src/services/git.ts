@@ -171,10 +171,14 @@ export class GitService implements IGitService {
   /**
    * Returns all commit hashes on the given branch in reverse chronological order.
    * @param branch - Branch name to list commits from.
+   * @param after - Optional date string; only include commits on or after this date.
    */
-  async getCommitHashes(branch: string): Promise<string[]> {
-    const result =
-      await Bun.$`git -C ${this.cwd} log ${branch} --format=%H`.quiet()
+  async getCommitHashes(branch: string, after?: string): Promise<string[]> {
+    const args = ["git", "-C", this.cwd, "log", branch, "--format=%H"]
+    if (after) {
+      args.push(`--after=${after}`)
+    }
+    const result = await Bun.$`${args}`.quiet()
     return result
       .text()
       .trim()

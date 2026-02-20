@@ -208,7 +208,6 @@ export class AggregateRepository {
       JOIN commits c ON c.hash = cf.commit_hash
       LEFT JOIN latest_loc ll ON ll.file_path = cf.file_path AND ll.rn = 1
       LEFT JOIN latest_complexity lc ON lc.file_path = cf.file_path AND lc.rn = 1
-      WHERE c.enriched_at IS NOT NULL
       GROUP BY cf.file_path
     `)
   }
@@ -334,7 +333,7 @@ export class AggregateRepository {
           JOIN commits c ON c.hash = cf.commit_hash
           LEFT JOIN latest_loc ll ON ll.file_path = cf.file_path AND ll.rn = 1
           LEFT JOIN latest_complexity lc ON lc.file_path = cf.file_path AND lc.rn = 1
-          WHERE c.enriched_at IS NOT NULL AND cf.file_path IN (${placeholders})
+          WHERE cf.file_path IN (${placeholders})
           GROUP BY cf.file_path`,
         )
         .run(...chunk, ...chunk, ...chunk)
@@ -787,7 +786,7 @@ export class AggregateRepository {
            AVG(CASE WHEN cf.lines_of_code > 0 THEN cf.lines_of_code END) as avg_loc
          FROM commit_files cf
          JOIN commits c ON c.hash = cf.commit_hash
-         WHERE c.enriched_at IS NOT NULL AND cf.file_path = ?
+         WHERE cf.file_path = ?
          GROUP BY period
          ORDER BY period DESC
          LIMIT ?`,
@@ -833,7 +832,7 @@ export class AggregateRepository {
            AVG(CASE WHEN cf.lines_of_code > 0 THEN cf.lines_of_code END) as avg_loc
          FROM commit_files cf
          JOIN commits c ON c.hash = cf.commit_hash
-         WHERE c.enriched_at IS NOT NULL AND cf.file_path LIKE ? || '%'
+         WHERE cf.file_path LIKE ? || '%'
          GROUP BY period
          ORDER BY period DESC
          LIMIT ?`,

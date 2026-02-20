@@ -65,6 +65,19 @@ export class CommitRepository {
   }
 
   /**
+   * Returns unenriched commits on or after the given date, ordered by date descending.
+   * @param date - ISO date string (YYYY-MM-DD) to filter by committed_at.
+   */
+  getUnenrichedCommitsSince(date: string): CommitRow[] {
+    return this.db
+      .query<
+        CommitRow,
+        [string]
+      >("SELECT * FROM commits WHERE enriched_at IS NULL AND committed_at >= ? ORDER BY committed_at DESC")
+      .all(date)
+  }
+
+  /**
    * Stores LLM enrichment results for a commit.
    * @param hash - The commit hash to update.
    * @param classification - The assigned classification label.
@@ -282,10 +295,10 @@ export class CommitRepository {
   getRecentCommitsForFile(filePath: string, limit: number = 5): RecentCommit[] {
     return this.db
       .query<RecentCommit, [string, number]>(
-        `SELECT c.hash, c.classification, c.summary, c.committed_at
+        `SELECT c.hash, COALESCE(c.classification, '') as classification, COALESCE(c.summary, '') as summary, c.committed_at
          FROM commits c
          JOIN commit_files cf ON cf.commit_hash = c.hash
-         WHERE cf.file_path = ? AND c.enriched_at IS NOT NULL
+         WHERE cf.file_path = ?
          ORDER BY c.committed_at DESC
          LIMIT ?`,
       )
@@ -384,10 +397,10 @@ export class CommitRepository {
   ): RecentCommit[] {
     return this.db
       .query<RecentCommit, [string, number]>(
-        `SELECT DISTINCT c.hash, c.classification, c.summary, c.committed_at
+        `SELECT DISTINCT c.hash, COALESCE(c.classification, '') as classification, COALESCE(c.summary, '') as summary, c.committed_at
          FROM commits c
          JOIN commit_files cf ON cf.commit_hash = c.hash
-         WHERE cf.file_path LIKE ? || '%' AND c.enriched_at IS NOT NULL
+         WHERE cf.file_path LIKE ? || '%'
          ORDER BY c.committed_at DESC
          LIMIT ?`,
       )
