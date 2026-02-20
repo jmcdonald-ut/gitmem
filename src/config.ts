@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
 import { join } from "path"
+import { z } from "zod"
 
 /** Controls whether AI enrichment is used and for which commits. */
 export type AiConfigValue = boolean | string
@@ -35,7 +36,7 @@ export const DEFAULTS: GitmemConfig = {
   checkModel: "claude-sonnet-4-5-20250929",
 }
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const isoDate = z.iso.date()
 
 /**
  * Loads config from `.gitmem/config.json`, creating it with defaults if missing.
@@ -73,15 +74,15 @@ export function loadConfig(gitmemDir: string): GitmemConfig {
     if (ai === true || ai === false) {
       config.ai = ai
     } else if (typeof ai === "string") {
-      if (!DATE_RE.test(ai)) {
+      if (!isoDate.safeParse(ai).success) {
         throw new Error(
-          `Invalid config: "ai" must be true, false, or a "YYYY-MM-DD" date string, got "${ai}"`,
+          `Invalid config: "ai" must be true, false, or a valid "YYYY-MM-DD" date string, got "${ai}"`,
         )
       }
       config.ai = ai
     } else {
       throw new Error(
-        `Invalid config: "ai" must be true, false, or a "YYYY-MM-DD" date string`,
+        `Invalid config: "ai" must be true, false, or a valid "YYYY-MM-DD" date string`,
       )
     }
   }
@@ -92,15 +93,15 @@ export function loadConfig(gitmemDir: string): GitmemConfig {
     if (isd === null) {
       config.indexStartDate = null
     } else if (typeof isd === "string") {
-      if (!DATE_RE.test(isd)) {
+      if (!isoDate.safeParse(isd).success) {
         throw new Error(
-          `Invalid config: "indexStartDate" must be null or a "YYYY-MM-DD" date string, got "${isd}"`,
+          `Invalid config: "indexStartDate" must be null or a valid "YYYY-MM-DD" date string, got "${isd}"`,
         )
       }
       config.indexStartDate = isd
     } else {
       throw new Error(
-        `Invalid config: "indexStartDate" must be null or a "YYYY-MM-DD" date string`,
+        `Invalid config: "indexStartDate" must be null or a valid "YYYY-MM-DD" date string`,
       )
     }
   }

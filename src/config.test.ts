@@ -109,7 +109,7 @@ describe("loadConfig", () => {
     writeFileSync(join(gitmemDir, "config.json"), JSON.stringify({ ai: 42 }))
 
     expect(() => loadConfig(gitmemDir)).toThrow(
-      'must be true, false, or a "YYYY-MM-DD"',
+      'must be true, false, or a valid "YYYY-MM-DD"',
     )
   })
 
@@ -122,7 +122,20 @@ describe("loadConfig", () => {
     )
 
     expect(() => loadConfig(gitmemDir)).toThrow(
-      'must be true, false, or a "YYYY-MM-DD"',
+      'must be true, false, or a valid "YYYY-MM-DD"',
+    )
+  })
+
+  test("throws on semantically invalid ai date", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(
+      join(gitmemDir, "config.json"),
+      JSON.stringify({ ai: "2024-13-45" }),
+    )
+
+    expect(() => loadConfig(gitmemDir)).toThrow(
+      'must be true, false, or a valid "YYYY-MM-DD"',
     )
   })
 
@@ -135,7 +148,7 @@ describe("loadConfig", () => {
     )
 
     expect(() => loadConfig(gitmemDir)).toThrow(
-      'must be null or a "YYYY-MM-DD"',
+      'must be null or a valid "YYYY-MM-DD"',
     )
   })
 
@@ -182,7 +195,20 @@ describe("loadConfig", () => {
     )
 
     expect(() => loadConfig(gitmemDir)).toThrow(
-      'must be null or a "YYYY-MM-DD"',
+      'must be null or a valid "YYYY-MM-DD"',
+    )
+  })
+
+  test("throws on semantically invalid indexStartDate", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(
+      join(gitmemDir, "config.json"),
+      JSON.stringify({ indexStartDate: "2024-02-30" }),
+    )
+
+    expect(() => loadConfig(gitmemDir)).toThrow(
+      'must be null or a valid "YYYY-MM-DD"',
     )
   })
 
