@@ -294,7 +294,7 @@ describe("handleDetails", () => {
     expect(data.trendSummary).not.toBeNull()
   })
 
-  test("returns 500 with error message when an exception occurs", async () => {
+  test("returns 500 with generic error message when an exception occurs", async () => {
     const { db, commits, aggregates } = setup()
     db.close()
 
@@ -302,13 +302,11 @@ describe("handleDetails", () => {
 
     expect(res.status).toBe(500)
     const data = await res.json()
-    expect(data.error).toBeTypeOf("string")
-    expect(data.error.length).toBeGreaterThan(0)
+    expect(data.error).toBe("Internal server error")
   })
 
-  test("returns 500 with 'Unknown error' for non-Error throws", async () => {
+  test("returns 500 with generic error for non-Error throws", async () => {
     const { commits, aggregates } = setup()
-    // Force a non-Error throw by making getTotalCommitCount throw a string
     const origMethod = commits.getTotalCommitCount.bind(commits)
     commits.getTotalCommitCount = () => {
       throw "something went wrong"
@@ -318,7 +316,7 @@ describe("handleDetails", () => {
 
     expect(res.status).toBe(500)
     const data = await res.json()
-    expect(data.error).toBe("Unknown error")
+    expect(data.error).toBe("Internal server error")
 
     commits.getTotalCommitCount = origMethod
   })

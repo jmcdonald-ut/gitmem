@@ -217,10 +217,10 @@ export function handleDetails(
       trendSummary,
     })
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 },
-    )
+    if (err instanceof Error) {
+      console.error("Details API error:", err.message)
+    }
+    return Response.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
@@ -305,6 +305,13 @@ export const visualizeCommand = new Command("visualize")
           ? undefined
           : new Set(allTrackedFiles)
 
+        const securityHeaders = {
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY",
+          "Content-Security-Policy":
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
+        }
+
         const server = Bun.serve({
           hostname: "127.0.0.1",
           port: opts.port,
@@ -314,14 +321,17 @@ export const visualizeCommand = new Command("visualize")
           fetch(req) {
             const url = new URL(req.url)
             if (url.pathname === "/api/hierarchy") {
-              return Response.json({
-                ...hierarchyData,
-                repoName,
-                pathPrefix,
-              })
+              return Response.json(
+                {
+                  ...hierarchyData,
+                  repoName,
+                  pathPrefix,
+                },
+                { headers: securityHeaders },
+              )
             }
             if (url.pathname === "/api/details") {
-              return handleDetails(
+              const res = handleDetails(
                 url,
                 commits,
                 aggregates,
@@ -329,8 +339,15 @@ export const visualizeCommand = new Command("visualize")
                 detailsTrackedFiles,
                 pathPrefix,
               )
+              for (const [k, v] of Object.entries(securityHeaders)) {
+                res.headers.set(k, v)
+              }
+              return res
             }
-            return new Response("Not found", { status: 404 })
+            return new Response("Not found", {
+              status: 404,
+              headers: securityHeaders,
+            })
           },
         })
 
