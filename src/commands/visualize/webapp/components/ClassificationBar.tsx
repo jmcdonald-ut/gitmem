@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import { COLORS } from "../lib/colors"
+import type { ClassificationCounts } from "../types"
 
 const TYPES = [
   { key: "bug_fix_count", label: "bug-fix", color: COLORS["bug-fix"] },
@@ -11,17 +12,6 @@ const TYPES = [
   { key: "test_count", label: "test", color: COLORS["test"] },
   { key: "style_count", label: "style", color: COLORS["style"] },
 ] as const
-
-export interface ClassificationCounts {
-  bug_fix_count: number
-  feature_count: number
-  refactor_count: number
-  docs_count: number
-  chore_count: number
-  perf_count: number
-  test_count: number
-  style_count: number
-}
 
 interface ClassificationBarProps {
   stats: ClassificationCounts
