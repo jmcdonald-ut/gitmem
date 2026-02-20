@@ -8,7 +8,7 @@ import {
   type WindowKey,
 } from "@db/aggregates"
 import { buildHierarchy } from "@commands/visualize/hierarchy"
-import { generatePage } from "@commands/visualize/page"
+import homepage from "@commands/visualize/webapp/index.html"
 import {
   isExcluded,
   resolveExcludedCategories,
@@ -239,33 +239,6 @@ export function handleDetails(
   }
 }
 
-export function createFetchHandler(
-  html: string,
-  commits: CommitRepository,
-  aggregates: AggregateRepository,
-  exclude: FileCategory[],
-  trackedFiles?: Set<string>,
-  pathPrefix = "",
-): (req: Request) => Response {
-  return (req: Request) => {
-    const url = new URL(req.url)
-    if (url.pathname === "/")
-      return new Response(html, {
-        headers: { "Content-Type": "text/html" },
-      })
-    if (url.pathname === "/api/details")
-      return handleDetails(
-        url,
-        commits,
-        aggregates,
-        exclude,
-        trackedFiles,
-        pathPrefix,
-      )
-    return new Response("Not found", { status: 404 })
-  }
-}
-
 const HELP_TEXT = `
 Launches a browser-based visualization of repository hotspots,
 file coupling, and change patterns using an interactive circle-packing diagram.
@@ -338,9 +311,11 @@ export const visualizeCommand = new Command("visualize")
               ]),
             ]
           : strippedTrackedFiles
-        const hierarchy = buildHierarchy(filesForHierarchy, strippedStatsMap)
+        const hierarchyData = buildHierarchy(
+          filesForHierarchy,
+          strippedStatsMap,
+        )
         const repoName = basename(cwd)
-        const html = generatePage(hierarchy, repoName, pathPrefix)
         const detailsTrackedFiles = opts.includeDeleted
           ? undefined
           : new Set(allTrackedFiles)
@@ -348,21 +323,37 @@ export const visualizeCommand = new Command("visualize")
         const server = Bun.serve({
           hostname: "127.0.0.1",
           port: opts.port,
-          fetch: createFetchHandler(
-            html,
-            commits,
-            aggregates,
-            exclude,
-            detailsTrackedFiles,
-            pathPrefix,
-          ),
+          routes: {
+            "/": homepage,
+          },
+          fetch(req) {
+            const url = new URL(req.url)
+            if (url.pathname === "/api/hierarchy") {
+              return Response.json({
+                ...hierarchyData,
+                repoName,
+                pathPrefix,
+              })
+            }
+            if (url.pathname === "/api/details") {
+              return handleDetails(
+                url,
+                commits,
+                aggregates,
+                exclude,
+                detailsTrackedFiles,
+                pathPrefix,
+              )
+            }
+            return new Response("Not found", { status: 404 })
+          },
         })
 
         const scopeLabel = pathPrefix ? ` (${pathPrefix})` : ""
         console.log(`Visualize${scopeLabel}: http://localhost:${server.port}`)
-        if (hierarchy.unindexedCount > 0) {
+        if (hierarchyData.unindexedCount > 0) {
           console.log(
-            `${hierarchy.unindexedCount} files not yet indexed. Run \`gitmem index\` for full data.`,
+            `${hierarchyData.unindexedCount} files not yet indexed. Run \`gitmem index\` for full data.`,
           )
         }
 
