@@ -1,13 +1,23 @@
 /// <reference lib="dom" />
 import type { HierarchyResult } from "../hierarchy"
 import type { TrendSummary } from "@/types"
-import type { ClassificationCounts } from "./components/ClassificationBar"
 
 export type { HierarchyResult, HierarchyNode } from "../hierarchy"
 
 export interface HierarchyResponse extends HierarchyResult {
   repoName: string
   pathPrefix: string
+}
+
+export interface ClassificationCounts {
+  bug_fix_count: number
+  feature_count: number
+  refactor_count: number
+  docs_count: number
+  chore_count: number
+  perf_count: number
+  test_count: number
+  style_count: number
 }
 
 export interface BaseStats extends ClassificationCounts {
