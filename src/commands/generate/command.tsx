@@ -53,7 +53,7 @@ const skillCommand = new Command("skill")
   .addHelpText("after", SKILL_HELP_TEXT)
   .action(async (opts, cmd) => {
     await runCommand(
-      cmd.parent!.parent!.opts(),
+      cmd.optsWithGlobals(),
       { needsGit: true, needsDb: false },
       async ({ format, git }) => {
         const repoRoot = await git.getRepoRoot()
