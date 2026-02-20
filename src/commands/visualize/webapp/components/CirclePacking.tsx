@@ -35,12 +35,9 @@ export function CirclePacking({
   onFocusChange,
 }: CirclePackingProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
-  const [tooltip, setTooltip] = useState<{
-    data: TooltipData
-    x: number
-    y: number
-  } | null>(null)
+  const [tooltipData, setTooltipData] = useState<TooltipData | null>(null)
   const animationRef = useRef<number>(0)
   const [isAnimating, setIsAnimating] = useState(false)
 
@@ -90,17 +87,29 @@ export function CirclePacking({
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    let timeout: ReturnType<typeof setTimeout>
     const obs = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (entry) {
-        setDimensions({
-          width: entry.contentRect.width || 800,
-          height: entry.contentRect.height || 600,
-        })
+        clearTimeout(timeout)
+        timeout = setTimeout(() => {
+          setDimensions({
+            width: entry.contentRect.width || 800,
+            height: entry.contentRect.height || 600,
+          })
+        }, 150)
       }
     })
     obs.observe(el)
-    return () => obs.disconnect()
+    return () => {
+      clearTimeout(timeout)
+      obs.disconnect()
+    }
+  }, [])
+
+  // Cancel animation on unmount
+  useEffect(() => {
+    return () => cancelAnimationFrame(animationRef.current)
   }, [])
 
   // Zoom animation — reads start view from ref to avoid re-creating on every frame
@@ -146,16 +155,23 @@ export function CirclePacking({
     zoomTo(target)
   }, [focusPath, root, nodeByPath, zoomTo])
 
-  const handleCircleClick = useCallback(
-    (e: MouseEvent, node: PackedNode) => {
+  // Circle click via event delegation on <g>
+  const handleGClick = useCallback(
+    (e: MouseEvent<SVGGElement>) => {
+      const circle = (e.target as Element).closest("circle")
+      if (!circle) return
       e.stopPropagation()
+      const path = circle.getAttribute("data-path")
+      if (path === null) return
+      const node = nodeByPath.get(path)
+      if (!node) return
+
       if (
         node.x === root.x &&
         node.y === root.y &&
         node.r === root.r &&
         focusPath === ""
       ) {
-        // Already at root, clicking root again — just select root
         onSelect("")
         return
       }
@@ -163,16 +179,13 @@ export function CirclePacking({
       const currentFocus =
         focusPath === "" ? root : (nodeByPath.get(focusPath) ?? root)
       if (currentFocus === node) {
-        // Clicking the focused node: zoom out to parent
         const parent = (node.parent as PackedNode | null) || root
         onFocusChange(parent === root ? "" : parent.data.path)
         onSelect(parent === root ? "" : parent.data.path)
       } else if (node.children) {
-        // Directory: zoom in
         onFocusChange(node.data.path)
         onSelect(node.data.path)
       } else {
-        // Leaf: zoom to parent, show file details
         const parent = (node.parent as PackedNode | null) || root
         onFocusChange(parent === root ? "" : parent.data.path)
         onSelect(node.data.path)
@@ -191,40 +204,42 @@ export function CirclePacking({
     }
   }, [focusPath, root, nodeByPath, onFocusChange, onSelect])
 
-  const handleMouseEnter = useCallback((e: MouseEvent, node: PackedNode) => {
-    if (!node.data.path) return
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setTooltip({
-      data: {
+  // Tooltip via event delegation — position updates use refs (no re-render)
+  const handleCircleOver = useCallback(
+    (e: MouseEvent<SVGGElement>) => {
+      const circle = (e.target as Element).closest("circle")
+      if (!circle) return
+      const path = circle.getAttribute("data-path")
+      if (!path) return
+      const node = nodeByPath.get(path)
+      if (!node) return
+      setTooltipData({
         path: node.data.path || node.data.name,
         isLeaf: !node.children,
         loc: node.data.loc,
         changes: node.data.changes,
         score: node.data.score,
         indexed: node.data.indexed,
-      },
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    })
+      })
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect || !tooltipRef.current) return
+      tooltipRef.current.style.left = `${e.clientX - rect.left + 12}px`
+      tooltipRef.current.style.top = `${e.clientY - rect.top - 10}px`
+    },
+    [nodeByPath],
+  )
+
+  const handleCircleOut = useCallback((e: MouseEvent<SVGGElement>) => {
+    const related = e.relatedTarget as Element | null
+    if (related?.closest?.("circle")) return
+    setTooltipData(null)
   }, [])
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handleCircleMove = useCallback((e: MouseEvent<SVGGElement>) => {
     const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setTooltip((prev) =>
-      prev
-        ? {
-            ...prev,
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-          }
-        : null,
-    )
-  }, [])
-
-  const handleMouseLeave = useCallback(() => {
-    setTooltip(null)
+    if (!rect || !tooltipRef.current) return
+    tooltipRef.current.style.left = `${e.clientX - rect.left + 12}px`
+    tooltipRef.current.style.top = `${e.clientY - rect.top - 10}px`
   }, [])
 
   const k = (Math.min(dimensions.width, dimensions.height) / view[2]) * 0.95
@@ -232,7 +247,7 @@ export function CirclePacking({
   // Single transform on <g> instead of per-circle position recalculation
   const transform = `translate(${dimensions.width / 2}, ${dimensions.height / 2}) scale(${k}) translate(${-view[0]}, ${-view[1]})`
 
-  // Memoize circles — props use layout positions (not view), so they're stable during animation
+  // Circle elements only depend on layout — no callbacks attached per-circle
   const circleElements = useMemo(
     () =>
       allNodes.map((node) => {
@@ -249,6 +264,7 @@ export function CirclePacking({
           <circle
             key={key}
             data-testid={`circle-${key}`}
+            data-path={node.data.path}
             cx={node.x}
             cy={node.y}
             r={node.r}
@@ -257,33 +273,35 @@ export function CirclePacking({
             strokeWidth={sw}
             vectorEffect="non-scaling-stroke"
             cursor="pointer"
-            onClick={(e) => handleCircleClick(e, node)}
-            onMouseEnter={(e) => handleMouseEnter(e, node)}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
           />
         )
       }),
-    [
-      allNodes,
-      handleCircleClick,
-      handleMouseEnter,
-      handleMouseMove,
-      handleMouseLeave,
-    ],
+    [allNodes],
   )
 
-  // Skip expensive overlap resolution during animation
-  const visibleLabels = isAnimating
-    ? null
-    : resolveOverlaps(
-        leafNodes,
-        view,
-        k,
-        dimensions.width,
-        dimensions.height,
-        selectedPath,
-      )
+  // Memoize label overlap resolution — skipped during animation
+  const visibleLabels = useMemo(
+    () =>
+      isAnimating
+        ? null
+        : resolveOverlaps(
+            leafNodes,
+            view,
+            k,
+            dimensions.width,
+            dimensions.height,
+            selectedPath,
+          ),
+    [
+      isAnimating,
+      leafNodes,
+      view,
+      k,
+      dimensions.width,
+      dimensions.height,
+      selectedPath,
+    ],
+  )
 
   return (
     <div className="viz-container" ref={containerRef}>
@@ -292,7 +310,15 @@ export function CirclePacking({
         preserveAspectRatio="xMidYMid meet"
         onClick={handleSvgClick}
       >
-        <g transform={transform}>{circleElements}</g>
+        <g
+          transform={transform}
+          onClick={handleGClick}
+          onMouseOver={handleCircleOver}
+          onMouseOut={handleCircleOut}
+          onMouseMove={handleCircleMove}
+        >
+          {circleElements}
+        </g>
         {visibleLabels && (
           <g>
             {leafNodes.map((node) => {
@@ -319,16 +345,12 @@ export function CirclePacking({
           </g>
         )}
       </svg>
-      <Tooltip
-        data={tooltip?.data ?? null}
-        x={tooltip?.x ?? 0}
-        y={tooltip?.y ?? 0}
-      />
+      <Tooltip ref={tooltipRef} data={tooltipData} />
     </div>
   )
 }
 
-function resolveOverlaps(
+export function resolveOverlaps(
   leafNodes: PackedNode[],
   view: [number, number, number],
   k: number,

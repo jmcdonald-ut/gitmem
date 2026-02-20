@@ -2,8 +2,10 @@
 import "../test-setup"
 import { describe, test, expect, mock, afterEach } from "bun:test"
 import { render, fireEvent, cleanup } from "@testing-library/react"
-import { CirclePacking } from "./CirclePacking"
+import { CirclePacking, resolveOverlaps } from "./CirclePacking"
 import type { HierarchyResult } from "../types"
+import { hierarchy as d3hierarchy, pack as d3pack } from "d3-hierarchy"
+import type { HierarchyNode } from "../types"
 
 afterEach(cleanup)
 
@@ -156,7 +158,7 @@ describe("CirclePacking", () => {
     expect(onSelect).toHaveBeenCalledWith("")
   })
 
-  test("shows tooltip on mouse enter and hides on mouse leave", () => {
+  test("shows tooltip on mouse over and hides on mouse out", () => {
     const onSelect = mock(() => {})
     const onFocusChange = mock(() => {})
     const { getByTestId, container } = render(
@@ -170,12 +172,89 @@ describe("CirclePacking", () => {
     )
 
     const circle = getByTestId("circle-a.ts")
-    fireEvent.mouseEnter(circle, { clientX: 100, clientY: 100 })
+    fireEvent.mouseOver(circle, { clientX: 100, clientY: 100 })
     expect(container.querySelector(".tooltip.visible")).toBeTruthy()
 
     fireEvent.mouseMove(circle, { clientX: 150, clientY: 150 })
 
-    fireEvent.mouseLeave(circle)
+    fireEvent.mouseOut(circle)
     expect(container.querySelector(".tooltip.visible")).toBeNull()
+  })
+})
+
+describe("resolveOverlaps", () => {
+  test("returns empty set when no labels are large enough", () => {
+    const h = d3hierarchy<HierarchyNode>({
+      name: "",
+      path: "",
+      indexed: true,
+      children: [
+        { name: "a.ts", path: "a.ts", indexed: true, loc: 1, score: 0 },
+      ],
+    })
+      .sum((d) => (d.children ? 0 : d.loc || 1))
+      .sort((a, b) => (b.value || 0) - (a.value || 0))
+
+    const packed = d3pack<HierarchyNode>().size([100, 100]).padding(3)(h)
+    const leaves = packed.descendants().filter((d) => !d.children)
+
+    // k=0.1 makes all circles very small (screenR <= 18)
+    const result = resolveOverlaps(leaves, [50, 50, 100], 0.1, 100, 100, null)
+    expect(result.size).toBe(0)
+  })
+
+  test("keeps non-overlapping labels", () => {
+    const h = d3hierarchy<HierarchyNode>({
+      name: "",
+      path: "",
+      indexed: true,
+      children: [
+        { name: "a.ts", path: "a.ts", indexed: true, loc: 100, score: 0 },
+        { name: "b.ts", path: "b.ts", indexed: true, loc: 100, score: 0 },
+      ],
+    })
+      .sum((d) => (d.children ? 0 : d.loc || 1))
+      .sort((a, b) => (b.value || 0) - (a.value || 0))
+
+    const packed = d3pack<HierarchyNode>().size([800, 600]).padding(3)(h)
+    const leaves = packed.descendants().filter((d) => !d.children)
+
+    // Large k to make circles big enough for labels
+    const result = resolveOverlaps(
+      leaves,
+      [packed.x, packed.y, packed.r * 2],
+      10,
+      800,
+      600,
+      null,
+    )
+    expect(result.size).toBeGreaterThan(0)
+  })
+
+  test("prioritizes selected node label", () => {
+    const h = d3hierarchy<HierarchyNode>({
+      name: "",
+      path: "",
+      indexed: true,
+      children: [
+        { name: "a.ts", path: "a.ts", indexed: true, loc: 100, score: 0 },
+        { name: "b.ts", path: "b.ts", indexed: true, loc: 100, score: 0 },
+      ],
+    })
+      .sum((d) => (d.children ? 0 : d.loc || 1))
+      .sort((a, b) => (b.value || 0) - (a.value || 0))
+
+    const packed = d3pack<HierarchyNode>().size([800, 600]).padding(3)(h)
+    const leaves = packed.descendants().filter((d) => !d.children)
+
+    const result = resolveOverlaps(
+      leaves,
+      [packed.x, packed.y, packed.r * 2],
+      10,
+      800,
+      600,
+      "a.ts",
+    )
+    expect(result.has("a.ts")).toBe(true)
   })
 })
