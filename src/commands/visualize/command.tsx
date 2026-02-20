@@ -40,6 +40,63 @@ export function parsePort(value: string): number {
   return n
 }
 
+function buildDirectoryResponse(
+  dirPath: string,
+  displayPath: string,
+  aggregates: AggregateRepository,
+  exclude: FileCategory[],
+  trackedFiles: Set<string> | undefined,
+  pathPrefix: string,
+  fetchLimit: number,
+  window: WindowKey,
+  trendLimit: number,
+) {
+  const dirStats = aggregates.getDirectoryStats(dirPath)
+  const fileCount = aggregates.getDirectoryFileCount(dirPath)
+  const contributors = aggregates.getDirectoryContributors(dirPath, 5)
+  const rawCoupled = aggregates.getCoupledFilesForDirectory(
+    dirPath,
+    fetchLimit,
+    exclude,
+  )
+  const coupled = trackedFiles
+    ? rawCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
+    : rawCoupled
+  const rawHotspots = aggregates.getHotspots({
+    pathPrefix: dirPath,
+    sort: "combined",
+    limit: fetchLimit,
+    exclude,
+  })
+  const hotspots = trackedFiles
+    ? filterByTrackedFiles(rawHotspots, trackedFiles, 5)
+    : rawHotspots
+  const trends = aggregates.getTrendsForDirectory(dirPath, window, trendLimit)
+  const trendSummary = computeTrend(trends)
+
+  return {
+    type: "directory" as const,
+    path: displayPath,
+    fileCount,
+    stats: dirStats,
+    hotspots: hotspots.map((h) => ({
+      file: stripPrefix(h.file_path, pathPrefix),
+      changes: h.total_changes,
+      score: h.combined_score ?? 0,
+    })),
+    contributors: contributors.map((c) => ({
+      name: c.author_name,
+      commits: c.commit_count,
+    })),
+    coupled: coupled.map((c) => ({
+      file: stripPrefix(c.file, pathPrefix),
+      count: c.co_change_count,
+      ratio: c.coupling_ratio,
+    })),
+    trendSummary,
+  }
+}
+
 export function handleDetails(
   url: URL,
   commits: CommitRepository,
@@ -56,55 +113,19 @@ export function handleDetails(
   try {
     // When scoped, root click maps to a directory request for the prefix
     if (pathPrefix && (!rawPath || rawPath === "/")) {
-      const dirPath = pathPrefix
-      const dirStats = aggregates.getDirectoryStats(dirPath)
-      const fileCount = aggregates.getDirectoryFileCount(dirPath)
-      const contributors = aggregates.getDirectoryContributors(dirPath, 5)
-      const rawCoupled = aggregates.getCoupledFilesForDirectory(
-        dirPath,
-        fetchLimit,
-        exclude,
+      return Response.json(
+        buildDirectoryResponse(
+          pathPrefix,
+          pathPrefix,
+          aggregates,
+          exclude,
+          trackedFiles,
+          pathPrefix,
+          fetchLimit,
+          window,
+          trendLimit,
+        ),
       )
-      const coupled = trackedFiles
-        ? rawCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
-        : rawCoupled
-      const rawHotspots = aggregates.getHotspots({
-        pathPrefix: dirPath,
-        sort: "combined",
-        limit: fetchLimit,
-        exclude,
-      })
-      const hotspots = trackedFiles
-        ? filterByTrackedFiles(rawHotspots, trackedFiles, 5)
-        : rawHotspots
-      const trends = aggregates.getTrendsForDirectory(
-        dirPath,
-        window,
-        trendLimit,
-      )
-      const trendSummary = computeTrend(trends)
-
-      return Response.json({
-        type: "directory",
-        path: dirPath,
-        fileCount,
-        stats: dirStats,
-        hotspots: hotspots.map((h) => ({
-          file: stripPrefix(h.file_path, pathPrefix),
-          changes: h.total_changes,
-          score: (h as { combined_score?: number }).combined_score ?? 0,
-        })),
-        contributors: contributors.map((c) => ({
-          name: c.author_name,
-          commits: c.commit_count,
-        })),
-        coupled: coupled.map((c) => ({
-          file: stripPrefix(c.file, pathPrefix),
-          count: c.co_change_count,
-          ratio: c.coupling_ratio,
-        })),
-        trendSummary,
-      })
     }
 
     if (!rawPath || rawPath === "/") {
@@ -137,7 +158,7 @@ export function handleDetails(
         hotspots: hotspots.map((h) => ({
           file: h.file_path,
           changes: h.total_changes,
-          score: (h as { combined_score?: number }).combined_score ?? 0,
+          score: h.combined_score ?? 0,
         })),
         coupledPairs: coupledPairs.map((p) => ({
           fileA: p.file_a,
@@ -151,55 +172,19 @@ export function handleDetails(
     const filePath = pathPrefix + rawPath
 
     if (filePath.endsWith("/")) {
-      // Directory level
-      const dirStats = aggregates.getDirectoryStats(filePath)
-      const fileCount = aggregates.getDirectoryFileCount(filePath)
-      const contributors = aggregates.getDirectoryContributors(filePath, 5)
-      const rawCoupled = aggregates.getCoupledFilesForDirectory(
-        filePath,
-        fetchLimit,
-        exclude,
+      return Response.json(
+        buildDirectoryResponse(
+          filePath,
+          stripPrefix(filePath, pathPrefix),
+          aggregates,
+          exclude,
+          trackedFiles,
+          pathPrefix,
+          fetchLimit,
+          window,
+          trendLimit,
+        ),
       )
-      const coupled = trackedFiles
-        ? rawCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
-        : rawCoupled
-      const rawHotspots = aggregates.getHotspots({
-        pathPrefix: filePath,
-        sort: "combined",
-        limit: fetchLimit,
-        exclude,
-      })
-      const hotspots = trackedFiles
-        ? filterByTrackedFiles(rawHotspots, trackedFiles, 5)
-        : rawHotspots
-      const trends = aggregates.getTrendsForDirectory(
-        filePath,
-        window,
-        trendLimit,
-      )
-      const trendSummary = computeTrend(trends)
-
-      return Response.json({
-        type: "directory",
-        path: stripPrefix(filePath, pathPrefix),
-        fileCount,
-        stats: dirStats,
-        hotspots: hotspots.map((h) => ({
-          file: stripPrefix(h.file_path, pathPrefix),
-          changes: h.total_changes,
-          score: (h as { combined_score?: number }).combined_score ?? 0,
-        })),
-        contributors: contributors.map((c) => ({
-          name: c.author_name,
-          commits: c.commit_count,
-        })),
-        coupled: coupled.map((c) => ({
-          file: stripPrefix(c.file, pathPrefix),
-          count: c.co_change_count,
-          ratio: c.coupling_ratio,
-        })),
-        trendSummary,
-      })
     }
 
     // File level
