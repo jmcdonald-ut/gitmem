@@ -58,7 +58,11 @@ Examples:
   gitmem generate skill --force
   gitmem generate skill --out ./custom/skill-dir`
 
-const skillCommand = new Command<[], {}, GitmemCommandOpts>("skill")
+const skillCommand = new Command<
+  [],
+  Omit<GenerateSkillOptions, "repoRoot">,
+  GitmemCommandOpts
+>("skill")
   .description("Generate a Claude Code skill file for this repository")
   .option("-f, --force", "Overwrite existing skill file")
   .option("-o, --out <path>", "Output directory for the skill file")

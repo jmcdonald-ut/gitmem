@@ -1,5 +1,6 @@
-import { Command } from "commander"
+import { Command } from "@commander-js/extra-typings"
 import React from "react"
+import z from "zod"
 import { render } from "ink"
 import { resolve, join } from "path"
 import { runCommand } from "@commands/utils/command-context"
@@ -35,6 +36,20 @@ Examples:
   gitmem check --batch --sample 20
   gitmem check --sample 10 --model claude-sonnet-4-5-20250929`
 
+const hashInputSchema = z.object({
+  batch: z.undefined(),
+  hash: z.hex().min(4),
+  sample: z.undefined(),
+})
+
+const sampleInputSchema = z.object({
+  batch: z.boolean().optional(),
+  hash: z.undefined(),
+  sample: z.number().int().positive(),
+})
+
+const inputSchema = z.union([hashInputSchema, sampleInputSchema])
+
 export const checkCommand = new Command("check")
   .argument("[hash]", "Commit hash to evaluate")
   .description("Evaluate enrichment quality via LLM-as-judge")
@@ -57,15 +72,15 @@ export const checkCommand = new Command("check")
     "Use Anthropic Message Batches API (50% cost reduction)",
   )
   .action(async (hash, opts, cmd) => {
-    if (!hash && !opts.sample) {
-      console.error("Error: provide a commit hash or use --sample <N>")
+    const parsedInput = inputSchema.safeParse({ ...opts, hash })
+    if (parsedInput.error) {
+      console.error(
+        "Error: provide either a commit hash or use --sample <N> (--batch optional with --sample)",
+      )
       process.exit(1)
     }
 
-    if (opts.batch && !opts.sample) {
-      console.error("Error: --batch requires --sample <N>")
-      process.exit(1)
-    }
+    const input = parsedInput.data
 
     await runCommand(
       cmd.parent!.opts(),
@@ -99,7 +114,7 @@ export const checkCommand = new Command("check")
             `check-${new Date().toISOString().replace(/[:.]/g, "")}.json`,
           )
 
-        if (opts.batch) {
+        if (input.batch) {
           const batchJudge = new BatchJudgeService(apiKey, model)
           const batchJobs = new BatchJobRepository(db)
 
@@ -107,7 +122,7 @@ export const checkCommand = new Command("check")
             const result = await checker.checkSampleBatch(
               batchJudge,
               batchJobs,
-              opts.sample,
+              input.sample,
               outputPath,
               () => {},
             )
@@ -118,7 +133,7 @@ export const checkCommand = new Command("check")
                 checker={checker}
                 batchJudge={batchJudge}
                 batchJobs={batchJobs}
-                sampleSize={opts.sample}
+                sampleSize={input.sample}
                 outputPath={outputPath}
               />,
             )
@@ -126,28 +141,28 @@ export const checkCommand = new Command("check")
             instance.unmount()
           }
         } else if (format === "json") {
-          if (opts.sample) {
+          if (input.sample !== undefined) {
             const { results, summary } = await checker.checkSample(
-              opts.sample,
+              input.sample,
               () => {},
             )
             formatOutput("json", { results, summary })
           } else {
-            const result = await checker.checkOne(hash, () => {})
+            const result = await checker.checkOne(input.hash, () => {})
             if (!result) {
               console.error(
-                `Error: commit ${hash} not found or not yet enriched`,
+                `Error: commit ${input.hash} not found or not yet enriched`,
               )
               process.exit(1)
             }
             formatOutput("json", result)
           }
         } else {
-          if (opts.sample) {
+          if (input.sample !== undefined) {
             const instance = render(
               <CheckCommand
                 checker={checker}
-                sampleSize={opts.sample}
+                sampleSize={input.sample}
                 outputPath={outputPath}
               />,
             )
@@ -155,7 +170,7 @@ export const checkCommand = new Command("check")
             instance.unmount()
           } else {
             const instance = render(
-              <CheckCommand checker={checker} hash={hash} />,
+              <CheckCommand checker={checker} hash={input.hash} />,
             )
             await instance.waitUntilExit()
             instance.unmount()
