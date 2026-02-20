@@ -1,4 +1,4 @@
-import { Command } from "commander"
+import { Command } from "@commander-js/extra-typings"
 import { basename } from "path"
 import { runCommand } from "@commands/utils/command-context"
 import { CommitRepository } from "@db/commits"

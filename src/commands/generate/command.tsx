@@ -1,4 +1,4 @@
-import { Command } from "commander"
+import { Command } from "@commander-js/extra-typings"
 import React from "react"
 import { render } from "ink"
 import { join, relative } from "path"
@@ -7,6 +7,7 @@ import { runCommand } from "@commands/utils/command-context"
 import { formatOutput } from "@/output"
 import { getSkillContent } from "@commands/generate/skill-content"
 import { GenerateSkillCommand } from "@commands/generate/GenerateSkillCommand"
+import { GitmemCommandOpts } from "@commands/gitmem"
 
 export interface GenerateSkillOptions {
   repoRoot: string
@@ -57,7 +58,7 @@ Examples:
   gitmem generate skill --force
   gitmem generate skill --out ./custom/skill-dir`
 
-const skillCommand = new Command("skill")
+const skillCommand = new Command<[], {}, GitmemCommandOpts>("skill")
   .description("Generate a Claude Code skill file for this repository")
   .option("-f, --force", "Overwrite existing skill file")
   .option("-o, --out <path>", "Output directory for the skill file")

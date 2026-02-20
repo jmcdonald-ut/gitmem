@@ -1,4 +1,4 @@
-import { Command } from "commander"
+import { Command } from "@commander-js/extra-typings"
 import React from "react"
 import { render } from "ink"
 import { statSync } from "fs"
