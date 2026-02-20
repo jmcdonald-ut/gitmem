@@ -3,8 +3,10 @@ import type { HierarchyResult } from "@commands/visualize/hierarchy"
 export function generatePage(
   hierarchy: HierarchyResult,
   repoName: string,
+  pathPrefix = "",
 ): string {
   const dataJson = JSON.stringify(hierarchy).replace(/<\//g, "<\\/")
+  const titleSuffix = pathPrefix ? ` (${escapeHtml(pathPrefix)})` : ""
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -14,7 +16,7 @@ export function generatePage(
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
-<title>${escapeHtml(repoName)} — gitmem visualize</title>
+<title>${escapeHtml(repoName)}${titleSuffix} — gitmem visualize</title>
 <style>
 :root {
   --bg: #102A43;
@@ -80,6 +82,13 @@ body {
 }
 
 .breadcrumb span:hover { text-decoration: underline; }
+
+.breadcrumb .prefix-segment {
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.breadcrumb .prefix-segment:hover { text-decoration: none; }
 
 .banner {
   background: var(--bg-tertiary);
@@ -274,6 +283,7 @@ body {
 (function() {
   const hierarchyData = ${dataJson};
   const repoName = ${JSON.stringify(repoName)};
+  const pathPrefix = ${JSON.stringify(pathPrefix)};
   const root = hierarchyData.root;
   const vizEl = document.getElementById("viz");
   const tooltipEl = document.getElementById("tooltip");
@@ -503,6 +513,13 @@ body {
 
   function updateBreadcrumb(path) {
     let html = '<span data-path="">' + esc(repoName) + '</span>';
+    // Show prefix segments as muted non-clickable text
+    if (pathPrefix) {
+      const prefixParts = pathPrefix.replace(/\\/$/, "").split("/");
+      for (let i = 0; i < prefixParts.length; i++) {
+        html += ' / <span class="prefix-segment">' + esc(prefixParts[i]) + '</span>';
+      }
+    }
     if (!path) {
       breadcrumbEl.innerHTML = html;
       bindBreadcrumbClicks();

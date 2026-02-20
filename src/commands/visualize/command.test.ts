@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite"
 import { describe, test, expect } from "bun:test"
 import {
   parsePort,
+  normalizePathPrefix,
   handleDetails,
   createFetchHandler,
 } from "@commands/visualize/command"
@@ -37,6 +38,36 @@ describe("parsePort", () => {
 
   test("rejects empty string", () => {
     expect(() => parsePort("")).toThrow("port must be between 0 and 65535")
+  })
+})
+
+describe("normalizePathPrefix", () => {
+  test("adds trailing slash to directory path", () => {
+    expect(normalizePathPrefix("src/commands")).toBe("src/commands/")
+  })
+
+  test("preserves existing trailing slash", () => {
+    expect(normalizePathPrefix("src/commands/")).toBe("src/commands/")
+  })
+
+  test("removes leading ./", () => {
+    expect(normalizePathPrefix("./src/commands/")).toBe("src/commands/")
+  })
+
+  test("removes leading /", () => {
+    expect(normalizePathPrefix("/src/")).toBe("src/")
+  })
+
+  test("returns empty string for empty input", () => {
+    expect(normalizePathPrefix("")).toBe("")
+  })
+
+  test("returns empty string for dot", () => {
+    expect(normalizePathPrefix(".")).toBe("")
+  })
+
+  test("returns empty string for ./", () => {
+    expect(normalizePathPrefix("./")).toBe("")
   })
 })
 
@@ -388,6 +419,113 @@ describe("handleDetails", () => {
     expect(data.coupledPairs.length).toBe(1)
   })
 
+  test("root path with pathPrefix returns directory response for prefix", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    const res = handleDetails(
+      makeUrl("/"),
+      commits,
+      aggregates,
+      [],
+      undefined,
+      "src/",
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("directory")
+    expect(data.path).toBe("src/")
+    expect(data.fileCount).toBe(3)
+    expect(data.hotspots.length).toBeGreaterThan(0)
+  })
+
+  test("directory request with pathPrefix prepends prefix to DB query", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    // Client sends "services/" but DB has "src/services/"
+    db.run(`
+      INSERT INTO file_stats (file_path, total_changes, bug_fix_count, feature_count, refactor_count, docs_count, chore_count, perf_count, test_count, style_count, first_seen, last_changed, total_additions, total_deletions)
+      VALUES ('src/services/auth.ts', 5, 2, 1, 1, 0, 1, 0, 0, 0, '2025-01-01', '2025-06-01', 100, 20)
+    `)
+
+    const res = handleDetails(
+      makeUrl("services/"),
+      commits,
+      aggregates,
+      [],
+      undefined,
+      "src/",
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("directory")
+    // Response path should be stripped of prefix
+    expect(data.path).toBe("services/")
+  })
+
+  test("file request with pathPrefix prepends prefix to DB query", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    // Client sends "auth.ts" but DB has "src/auth.ts"
+    const res = handleDetails(
+      makeUrl("auth.ts"),
+      commits,
+      aggregates,
+      [],
+      undefined,
+      "src/",
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("file")
+    expect(data.path).toBe("auth.ts")
+    expect(data.stats).not.toBeNull()
+    expect(data.stats.current_loc).toBe(200)
+  })
+
+  test("pathPrefix strips prefix from hotspot and coupled file paths", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    const res = handleDetails(
+      makeUrl("/"),
+      commits,
+      aggregates,
+      [],
+      undefined,
+      "src/",
+    )
+    const data = await res.json()
+
+    // Hotspot file paths should have prefix stripped
+    for (const h of data.hotspots) {
+      expect(h.file).not.toMatch(/^src\//)
+    }
+  })
+
+  test("empty pathPrefix behaves identically to no pathPrefix", async () => {
+    const { db, commits, aggregates } = setup()
+    seedData(db)
+
+    const resDefault = handleDetails(makeUrl(""), commits, aggregates, [])
+    const resEmpty = handleDetails(
+      makeUrl(""),
+      commits,
+      aggregates,
+      [],
+      undefined,
+      "",
+    )
+    const dataDefault = await resDefault.json()
+    const dataEmpty = await resEmpty.json()
+
+    expect(dataDefault.type).toBe("root")
+    expect(dataEmpty.type).toBe("root")
+    expect(dataDefault.totalCommits).toBe(dataEmpty.totalCommits)
+  })
+
   test("directory details include coupled files from outside the directory", async () => {
     const { db, commits, aggregates } = setup()
 
@@ -466,5 +604,32 @@ describe("createFetchHandler", () => {
 
     expect(res.status).toBe(404)
     expect(await res.text()).toBe("Not found")
+  })
+
+  test("threads pathPrefix to handleDetails", async () => {
+    const { db, commits, aggregates } = setup()
+    db.run(`
+      INSERT INTO file_stats (file_path, total_changes, bug_fix_count, feature_count, refactor_count, docs_count, chore_count, perf_count, test_count, style_count, first_seen, last_changed, total_additions, total_deletions, current_loc)
+      VALUES ('src/auth.ts', 3, 1, 1, 1, 0, 0, 0, 0, 0, '2025-01-15', '2025-03-05', 35, 10, 200)
+    `)
+
+    const handler = createFetchHandler(
+      "",
+      commits,
+      aggregates,
+      [],
+      undefined,
+      "src/",
+    )
+
+    // Client sends "auth.ts" which should be prepended with "src/"
+    const res = handler(
+      new Request("http://localhost/api/details?path=auth.ts"),
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("file")
+    expect(data.path).toBe("auth.ts")
+    expect(data.stats).not.toBeNull()
   })
 })

@@ -93,25 +93,32 @@ Usage: gitmem [options] [command]
 AI-powered git history index
 
 Options:
-  -V, --version                output the version number
-  --format <format>            Output format (text or json) (default: "text")
-  --json                       Shorthand for --format json
-  -h, --help                   display help for command
+  -V, --version                   output the version number
+  --format <format>               Output format (text or json) (default: "text")
+  --json                          Shorthand for --format json
+  -h, --help                      display help for command
 
 Commands:
-  init [options]               Initialize gitmem in the current repository
-  index|i [options]            Analyze new commits via Claude API and rebuild search index
-  status|s                     Show index health, coverage, and database statistics
-  query|q [options] <query>    Full-text search over enriched commits (no API calls)
-  check [options] [hash]       Evaluate enrichment quality via LLM-as-judge
-  hotspots|h [options]         Show most-changed files with classification breakdown
-  stats [options] <path>       Show detailed change statistics for a file or directory
-  coupling|c [options] [path]  Show files that frequently change together
-  trends|t [options] <path>    Show change velocity and classification mix over time
-  schema                       Display database schema documentation
-  visualize|viz [options]      Open an interactive visualization of the repository
-  generate                     Generate project files
-  help [command]               display help for command
+  init [options]                  Initialize gitmem in the current repository
+  index|i [options]               Analyze new commits via Claude API and rebuild
+                                  search index
+  status|s                        Show index health, coverage, and database
+                                  statistics
+  query|q [options] <query>       Full-text search over indexed commits (no API
+                                  calls)
+  check [options] [hash]          Evaluate enrichment quality via LLM-as-judge
+  hotspots|h [options]            Show most-changed files with classification
+                                  breakdown
+  stats [options] <path>          Show detailed change statistics for a file or
+                                  directory
+  coupling|c [options] [path]     Show files that frequently change together
+  trends|t [options] <path>       Show change velocity and classification mix
+                                  over time
+  schema                          Display database schema documentation
+  visualize|viz [options] [path]  Open an interactive visualization of the
+                                  repository
+  generate                        Generate project files
+  help [command]                  display help for command
 
 Getting started:
   1. Initialize gitmem:              gitmem init

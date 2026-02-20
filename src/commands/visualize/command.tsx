@@ -17,6 +17,21 @@ import {
   type FileCategory,
 } from "@services/file-filter"
 
+export function normalizePathPrefix(input: string): string {
+  let p = input
+  // Remove leading ./ or /
+  p = p.replace(/^\.\//, "").replace(/^\//, "")
+  // "." means whole repo
+  if (p === "." || p === "") return ""
+  // Ensure trailing /
+  if (!p.endsWith("/")) p += "/"
+  return p
+}
+
+function stripPrefix(filePath: string, prefix: string): string {
+  return filePath.startsWith(prefix) ? filePath.slice(prefix.length) : filePath
+}
+
 export function parsePort(value: string): number {
   const n = parseInt(value, 10)
   if (isNaN(n) || n < 0 || n > 65535) {
@@ -31,15 +46,69 @@ export function handleDetails(
   aggregates: AggregateRepository,
   exclude: FileCategory[],
   trackedFiles?: Set<string>,
+  pathPrefix = "",
 ): Response {
-  const filePath = url.searchParams.get("path") ?? ""
+  const rawPath = url.searchParams.get("path") ?? ""
   const window: WindowKey = "monthly"
   const trendLimit = 12
   const fetchLimit = trackedFiles ? 10000 : 5
 
   try {
-    if (!filePath || filePath === "/") {
-      // Root level
+    // When scoped, root click maps to a directory request for the prefix
+    if (pathPrefix && (!rawPath || rawPath === "/")) {
+      const dirPath = pathPrefix
+      const dirStats = aggregates.getDirectoryStats(dirPath)
+      const fileCount = aggregates.getDirectoryFileCount(dirPath)
+      const contributors = aggregates.getDirectoryContributors(dirPath, 5)
+      const rawCoupled = aggregates.getCoupledFilesForDirectory(
+        dirPath,
+        fetchLimit,
+        exclude,
+      )
+      const coupled = trackedFiles
+        ? rawCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
+        : rawCoupled
+      const rawHotspots = aggregates.getHotspots({
+        pathPrefix: dirPath,
+        sort: "combined",
+        limit: fetchLimit,
+        exclude,
+      })
+      const hotspots = trackedFiles
+        ? filterByTrackedFiles(rawHotspots, trackedFiles, 5)
+        : rawHotspots
+      const trends = aggregates.getTrendsForDirectory(
+        dirPath,
+        window,
+        trendLimit,
+      )
+      const trendSummary = computeTrend(trends)
+
+      return Response.json({
+        type: "directory",
+        path: dirPath,
+        fileCount,
+        stats: dirStats,
+        hotspots: hotspots.map((h) => ({
+          file: stripPrefix(h.file_path, pathPrefix),
+          changes: h.total_changes,
+          score: (h as { combined_score?: number }).combined_score ?? 0,
+        })),
+        contributors: contributors.map((c) => ({
+          name: c.author_name,
+          commits: c.commit_count,
+        })),
+        coupled: coupled.map((c) => ({
+          file: stripPrefix(c.file, pathPrefix),
+          count: c.co_change_count,
+          ratio: c.coupling_ratio,
+        })),
+        trendSummary,
+      })
+    }
+
+    if (!rawPath || rawPath === "/") {
+      // Root level (no pathPrefix)
       const totalCommits = commits.getTotalCommitCount()
       const enrichedCommits = commits.getEnrichedCommitCount()
       const rawHotspots = aggregates.getHotspots({
@@ -79,6 +148,8 @@ export function handleDetails(
       })
     }
 
+    const filePath = pathPrefix + rawPath
+
     if (filePath.endsWith("/")) {
       // Directory level
       const dirStats = aggregates.getDirectoryStats(filePath)
@@ -110,11 +181,11 @@ export function handleDetails(
 
       return Response.json({
         type: "directory",
-        path: filePath,
+        path: stripPrefix(filePath, pathPrefix),
         fileCount,
         stats: dirStats,
         hotspots: hotspots.map((h) => ({
-          file: h.file_path,
+          file: stripPrefix(h.file_path, pathPrefix),
           changes: h.total_changes,
           score: (h as { combined_score?: number }).combined_score ?? 0,
         })),
@@ -123,7 +194,7 @@ export function handleDetails(
           commits: c.commit_count,
         })),
         coupled: coupled.map((c) => ({
-          file: c.file,
+          file: stripPrefix(c.file, pathPrefix),
           count: c.co_change_count,
           ratio: c.coupling_ratio,
         })),
@@ -147,14 +218,14 @@ export function handleDetails(
 
     return Response.json({
       type: "file",
-      path: filePath,
+      path: stripPrefix(filePath, pathPrefix),
       stats: fileStats,
       contributors: contributors.map((c) => ({
         name: c.author_name,
         commits: c.commit_count,
       })),
       coupled: coupled.map((c) => ({
-        file: c.file,
+        file: stripPrefix(c.file, pathPrefix),
         count: c.co_change_count,
         ratio: c.coupling_ratio,
       })),
@@ -174,6 +245,7 @@ export function createFetchHandler(
   aggregates: AggregateRepository,
   exclude: FileCategory[],
   trackedFiles?: Set<string>,
+  pathPrefix = "",
 ): (req: Request) => Response {
   return (req: Request) => {
     const url = new URL(req.url)
@@ -182,7 +254,14 @@ export function createFetchHandler(
         headers: { "Content-Type": "text/html" },
       })
     if (url.pathname === "/api/details")
-      return handleDetails(url, commits, aggregates, exclude, trackedFiles)
+      return handleDetails(
+        url,
+        commits,
+        aggregates,
+        exclude,
+        trackedFiles,
+        pathPrefix,
+      )
     return new Response("Not found", { status: 404 })
   }
 }
@@ -195,11 +274,14 @@ The server runs until you press Ctrl+C.
 
 Examples:
   gitmem visualize
+  gitmem visualize src/commands/
+  gitmem viz src/services/ --include-tests
   gitmem viz --port 3000`
 
 export const visualizeCommand = new Command("visualize")
   .alias("viz")
   .description("Open an interactive visualization of the repository")
+  .argument("[path]", "Scope visualization to a subdirectory")
   .addHelpText("after", HELP_TEXT)
   .option("-p, --port <number>", "Server port (0 for auto)", parsePort, 0)
   .option("--include-tests", "Include test files (excluded by default)")
@@ -210,28 +292,55 @@ export const visualizeCommand = new Command("visualize")
   )
   .option("--all", "Include all files (no exclusions)")
   .option("--include-deleted", "Include files no longer in the working tree")
-  .action(async (opts, cmd) => {
+  .action(async (path, opts, cmd) => {
     await runCommand(
       cmd.parent!.opts(),
       { needsApiKey: false },
       async ({ db, git, cwd }) => {
+        const pathPrefix = path ? normalizePathPrefix(path) : ""
         const exclude = resolveExcludedCategories(opts)
         const allTrackedFiles = await git.getTrackedFiles()
         const trackedFiles =
           exclude.length > 0
             ? allTrackedFiles.filter((f) => !isExcluded(f, exclude))
             : allTrackedFiles
+
+        // Filter to files under the path prefix
+        const scopedTrackedFiles = pathPrefix
+          ? trackedFiles.filter((f) => f.startsWith(pathPrefix))
+          : trackedFiles
+
+        if (pathPrefix && scopedTrackedFiles.length === 0) {
+          console.error(
+            `No tracked files found under "${pathPrefix}". Check the path and try again.`,
+          )
+          return
+        }
+
         const commits = new CommitRepository(db)
         const aggregates = new AggregateRepository(db)
         const allStats = aggregates.getAllFileStats(exclude)
-        const statsMap = new Map(allStats.map((s) => [s.file_path, s]))
+        const scopedStats = pathPrefix
+          ? allStats.filter((s) => s.file_path.startsWith(pathPrefix))
+          : allStats
+        const strippedStatsMap = new Map(
+          scopedStats.map((s) => [stripPrefix(s.file_path, pathPrefix), s]),
+        )
 
+        const strippedTrackedFiles = scopedTrackedFiles.map((f) =>
+          stripPrefix(f, pathPrefix),
+        )
         const filesForHierarchy = opts.includeDeleted
-          ? [...new Set([...trackedFiles, ...allStats.map((s) => s.file_path)])]
-          : trackedFiles
-        const hierarchy = buildHierarchy(filesForHierarchy, statsMap)
+          ? [
+              ...new Set([
+                ...strippedTrackedFiles,
+                ...scopedStats.map((s) => stripPrefix(s.file_path, pathPrefix)),
+              ]),
+            ]
+          : strippedTrackedFiles
+        const hierarchy = buildHierarchy(filesForHierarchy, strippedStatsMap)
         const repoName = basename(cwd)
-        const html = generatePage(hierarchy, repoName)
+        const html = generatePage(hierarchy, repoName, pathPrefix)
         const detailsTrackedFiles = opts.includeDeleted
           ? undefined
           : new Set(allTrackedFiles)
@@ -245,10 +354,12 @@ export const visualizeCommand = new Command("visualize")
             aggregates,
             exclude,
             detailsTrackedFiles,
+            pathPrefix,
           ),
         })
 
-        console.log(`Visualize: http://localhost:${server.port}`)
+        const scopeLabel = pathPrefix ? ` (${pathPrefix})` : ""
+        console.log(`Visualize${scopeLabel}: http://localhost:${server.port}`)
         if (hierarchy.unindexedCount > 0) {
           console.log(
             `${hierarchy.unindexedCount} files not yet indexed. Run \`gitmem index\` for full data.`,

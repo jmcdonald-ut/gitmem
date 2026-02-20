@@ -89,6 +89,33 @@ describe("generatePage", () => {
     expect(html).toContain('"name":"a.ts"')
   })
 
+  test("includes pathPrefix in title when scoped", () => {
+    const html = generatePage(minimalHierarchy, "my-repo", "src/commands/")
+    expect(html).toContain(
+      "<title>my-repo (src/commands/) — gitmem visualize</title>",
+    )
+  })
+
+  test("omits pathPrefix from title when empty", () => {
+    const html = generatePage(minimalHierarchy, "my-repo", "")
+    expect(html).toContain("<title>my-repo — gitmem visualize</title>")
+  })
+
+  test("embeds pathPrefix as JS variable", () => {
+    const html = generatePage(minimalHierarchy, "repo", "src/commands/")
+    expect(html).toContain('const pathPrefix = "src/commands/";')
+  })
+
+  test("embeds empty pathPrefix as JS variable when not scoped", () => {
+    const html = generatePage(minimalHierarchy, "repo")
+    expect(html).toContain('const pathPrefix = "";')
+  })
+
+  test("includes prefix-segment CSS class for muted breadcrumb", () => {
+    const html = generatePage(minimalHierarchy, "repo", "src/commands/")
+    expect(html).toContain(".prefix-segment")
+  })
+
   test("escapes </script> in embedded JSON to prevent injection", () => {
     const hierarchy: HierarchyResult = {
       root: {
