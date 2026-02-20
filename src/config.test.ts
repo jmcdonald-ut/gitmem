@@ -5,6 +5,8 @@ import { tmpdir } from "os"
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
 import {
   loadConfig,
+  configExists,
+  createConfig,
   getAiCoverage,
   isAiEnabled,
   DEFAULTS,
@@ -23,26 +25,20 @@ describe("loadConfig", () => {
     await rm(tempDir, { recursive: true })
   })
 
-  test("creates config with defaults when file does not exist", () => {
+  test("throws when config file does not exist", () => {
     const gitmemDir = join(tempDir, ".gitmem")
-    const config = loadConfig(gitmemDir)
 
-    expect(config).toEqual(DEFAULTS)
-    expect(existsSync(join(gitmemDir, "config.json"))).toBe(true)
-
-    const written = JSON.parse(
-      readFileSync(join(gitmemDir, "config.json"), "utf-8"),
+    expect(() => loadConfig(gitmemDir)).toThrow(
+      "gitmem is not initialized. Run `gitmem init` first.",
     )
-    expect(written.ai).toBe(true)
-    expect(written.indexStartDate).toBeNull()
-    expect(written.indexModel).toBe("claude-haiku-4-5-20251001")
-    expect(written.checkModel).toBe("claude-sonnet-4-5-20250929")
   })
 
-  test("creates .gitmem directory if it does not exist", () => {
+  test("throws when directory does not exist", () => {
     const gitmemDir = join(tempDir, "nested", ".gitmem")
-    loadConfig(gitmemDir)
-    expect(existsSync(gitmemDir)).toBe(true)
+
+    expect(() => loadConfig(gitmemDir)).toThrow(
+      "gitmem is not initialized. Run `gitmem init` first.",
+    )
   })
 
   test("reads existing config", () => {
@@ -238,6 +234,148 @@ describe("loadConfig", () => {
     writeFileSync(join(gitmemDir, "config.json"), '"just a string"')
 
     expect(() => loadConfig(gitmemDir)).toThrow("must be a JSON object")
+  })
+})
+
+describe("configExists", () => {
+  let tempDir: string
+
+  beforeEach(async () => {
+    const raw = await mkdtemp(join(tmpdir(), "gitmem-config-test-"))
+    tempDir = await Bun.$`realpath ${raw}`.text().then((t) => t.trim())
+  })
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true })
+  })
+
+  test("returns false when config does not exist", () => {
+    expect(configExists(join(tempDir, ".gitmem"))).toBe(false)
+  })
+
+  test("returns true when config exists", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(join(gitmemDir, "config.json"), "{}")
+    expect(configExists(gitmemDir)).toBe(true)
+  })
+})
+
+describe("createConfig", () => {
+  let tempDir: string
+
+  beforeEach(async () => {
+    const raw = await mkdtemp(join(tmpdir(), "gitmem-config-test-"))
+    tempDir = await Bun.$`realpath ${raw}`.text().then((t) => t.trim())
+  })
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true })
+  })
+
+  test("creates config with defaults", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    const config = createConfig(gitmemDir)
+
+    expect(config).toEqual(DEFAULTS)
+    expect(existsSync(join(gitmemDir, "config.json"))).toBe(true)
+
+    const written = JSON.parse(
+      readFileSync(join(gitmemDir, "config.json"), "utf-8"),
+    )
+    expect(written).toEqual(DEFAULTS)
+  })
+
+  test("creates .gitmem directory if it does not exist", () => {
+    const gitmemDir = join(tempDir, "nested", ".gitmem")
+    createConfig(gitmemDir)
+    expect(existsSync(gitmemDir)).toBe(true)
+  })
+
+  test("applies overrides", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    const config = createConfig(gitmemDir, {
+      ai: false,
+      indexStartDate: "2024-01-01",
+      indexModel: "custom-model",
+    })
+
+    expect(config.ai).toBe(false)
+    expect(config.indexStartDate).toBe("2024-01-01")
+    expect(config.indexModel).toBe("custom-model")
+    expect(config.checkModel).toBe(DEFAULTS.checkModel)
+  })
+
+  test("applies ai date override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    const config = createConfig(gitmemDir, { ai: "2024-06-01" })
+    expect(config.ai).toBe("2024-06-01")
+  })
+
+  test("throws when already initialized", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(join(gitmemDir, "config.json"), "{}")
+
+    expect(() => createConfig(gitmemDir)).toThrow(
+      "Already initialized. Edit .gitmem/config.json to change settings.",
+    )
+  })
+
+  test("throws on invalid ai date", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() => createConfig(gitmemDir, { ai: "not-a-date" })).toThrow(
+      'must be true, false, or a valid "YYYY-MM-DD"',
+    )
+  })
+
+  test("throws on invalid indexStartDate", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() =>
+      createConfig(gitmemDir, { indexStartDate: "bad" as string }),
+    ).toThrow('must be null or a valid "YYYY-MM-DD"')
+  })
+
+  test("throws on non-boolean non-string ai override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() =>
+      createConfig(gitmemDir, { ai: 42 as unknown as boolean }),
+    ).toThrow('must be true, false, or a valid "YYYY-MM-DD"')
+  })
+
+  test("accepts null indexStartDate override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    const config = createConfig(gitmemDir, { indexStartDate: null })
+    expect(config.indexStartDate).toBeNull()
+  })
+
+  test("throws on non-null non-string indexStartDate override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() =>
+      createConfig(gitmemDir, {
+        indexStartDate: 123 as unknown as string,
+      }),
+    ).toThrow('must be null or a valid "YYYY-MM-DD"')
+  })
+
+  test("throws on empty indexModel override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() => createConfig(gitmemDir, { indexModel: "" })).toThrow(
+      "non-empty string",
+    )
+  })
+
+  test("throws on empty checkModel override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() => createConfig(gitmemDir, { checkModel: "" })).toThrow(
+      "non-empty string",
+    )
+  })
+
+  test("applies checkModel override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    const config = createConfig(gitmemDir, { checkModel: "custom-judge" })
+    expect(config.checkModel).toBe("custom-judge")
   })
 })
 

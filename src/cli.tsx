@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander"
+import { initCommand } from "@commands/init/command"
 import { indexCommand } from "@commands/index/command"
 import { statusCommand } from "@commands/status/command"
 import { queryCommand } from "@commands/query/command"
@@ -14,9 +15,10 @@ import { generateCommand } from "@commands/generate/command"
 
 const HELP_TEXT = `
 Getting started:
-  1. Export your Anthropic API key:  export ANTHROPIC_API_KEY=sk-ant-...
-  2. Run the indexer:                gitmem index
-  3. Search your history:            gitmem query "auth bug"
+  1. Initialize gitmem:              gitmem init
+  2. Export your Anthropic API key:  export ANTHROPIC_API_KEY=sk-ant-...
+  3. Run the indexer:                gitmem index
+  4. Search your history:            gitmem query "auth bug"
 
 Global options --format json and --json work with every command.
 Run gitmem schema for database table documentation.`
@@ -29,6 +31,7 @@ const program = new Command()
   .option("--json", "Shorthand for --format json")
   .addHelpText("after", HELP_TEXT)
 
+program.addCommand(initCommand)
 program.addCommand(indexCommand)
 program.addCommand(statusCommand)
 program.addCommand(queryCommand)

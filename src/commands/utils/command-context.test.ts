@@ -11,12 +11,23 @@ import { Database } from "bun:sqlite"
 import { mkdtemp, rm, realpath } from "fs/promises"
 import { join } from "path"
 import { tmpdir } from "os"
+import { mkdirSync, writeFileSync } from "fs"
 import {
   runCommand,
   getDbPath,
   type CommandContext,
 } from "@commands/utils/command-context"
 import { createDatabase } from "@db/database"
+import { DEFAULTS } from "@/config"
+
+function createTestConfig(dir: string, overrides?: Record<string, unknown>) {
+  const gitmemDir = join(dir, ".gitmem")
+  mkdirSync(gitmemDir, { recursive: true })
+  writeFileSync(
+    join(gitmemDir, "config.json"),
+    JSON.stringify({ ...DEFAULTS, ...overrides }),
+  )
+}
 
 describe("getDbPath", () => {
   let originalCwd: string
@@ -38,10 +49,10 @@ describe("getDbPath", () => {
     expect(result).toBe(join(tempDir, ".gitmem", "index.db"))
   })
 
-  test("creates .gitmem directory if it does not exist", async () => {
+  test("returns path without creating directory", async () => {
     const result = getDbPath()
     const { existsSync } = await import("fs")
-    expect(existsSync(join(tempDir, ".gitmem"))).toBe(true)
+    expect(existsSync(join(tempDir, ".gitmem"))).toBe(false)
     expect(result.endsWith("index.db")).toBe(true)
   })
 })
@@ -81,10 +92,39 @@ describe("runCommand", () => {
     expect(errorSpy).toHaveBeenCalledWith("Error: not a git repository")
   })
 
-  test("exits with 1 when API key missing and needsApiKey is true", async () => {
-    // Set up a git repo so git check passes
+  test("exits with error when config does not exist", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
+
+    await expect(
+      runCommand({}, { needsDb: false }, async () => {}),
+    ).rejects.toThrow("process.exit(1)")
+
+    expect(exitCode).toBe(1)
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Error: gitmem is not initialized. Run `gitmem init` first.",
+    )
+  })
+
+  test("skips config check when needsConfig is false", async () => {
+    // No git repo, no config — should still work
+    const handler = mock(async () => {})
+
+    await runCommand(
+      {},
+      { needsGit: false, needsDb: false, needsConfig: false },
+      handler,
+    )
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    const calls = handler.mock.calls as unknown as [[CommandContext]]
+    expect(calls[0][0].config).toEqual(DEFAULTS)
+  })
+
+  test("exits with 1 when API key missing and needsApiKey is true", async () => {
+    const { $ } = await import("bun")
+    await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const originalKey = process.env.ANTHROPIC_API_KEY
     delete process.env.ANTHROPIC_API_KEY
@@ -108,6 +148,7 @@ describe("runCommand", () => {
   test("exits with 1 when db does not exist and dbMustExist is true", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     await expect(
       runCommand({}, { needsApiKey: false }, async () => {}),
@@ -122,6 +163,7 @@ describe("runCommand", () => {
   test("creates db when dbMustExist is false", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const handler = mock(async () => {})
 
@@ -137,11 +179,9 @@ describe("runCommand", () => {
   test("closes db even when handler throws", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
-    // Create the db file so dbMustExist check passes
     const dbPath = join(tempDir, ".gitmem", "index.db")
-    const { mkdirSync } = await import("fs")
-    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
     const tempDb = createDatabase(dbPath)
     tempDb.close()
 
@@ -161,10 +201,9 @@ describe("runCommand", () => {
   test("resolves format correctly from program opts", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const dbPath = join(tempDir, ".gitmem", "index.db")
-    const { mkdirSync } = await import("fs")
-    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
     const tempDb = createDatabase(dbPath)
     tempDb.close()
 
@@ -180,7 +219,11 @@ describe("runCommand", () => {
     // No git repo — would fail if git check ran
     const handler = mock(async () => {})
 
-    await runCommand({}, { needsGit: false, needsDb: false }, handler)
+    await runCommand(
+      {},
+      { needsGit: false, needsDb: false, needsConfig: false },
+      handler,
+    )
 
     expect(handler).toHaveBeenCalledTimes(1)
   })
@@ -188,6 +231,7 @@ describe("runCommand", () => {
   test("skips db when needsDb is false", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const handler = mock(async () => {})
 
@@ -203,6 +247,7 @@ describe("runCommand", () => {
   test("passes API key to handler when needsApiKey is true", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const originalKey = process.env.ANTHROPIC_API_KEY
     process.env.ANTHROPIC_API_KEY = "test-key-123"
@@ -227,10 +272,9 @@ describe("runCommand", () => {
     const { $ } = await import("bun")
     const { existsSync } = await import("fs")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const dbPath = join(tempDir, ".gitmem", "index.db")
-    const { mkdirSync } = await import("fs")
-    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
     const tempDb = createDatabase(dbPath)
     tempDb.close()
 
@@ -249,10 +293,9 @@ describe("runCommand", () => {
     const { $ } = await import("bun")
     const { existsSync } = await import("fs")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const dbPath = join(tempDir, ".gitmem", "index.db")
-    const { mkdirSync } = await import("fs")
-    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
     const tempDb = createDatabase(dbPath)
     tempDb.close()
 
@@ -269,10 +312,10 @@ describe("runCommand", () => {
 
   test("rethrows non-EEXIST errors from lock acquisition", async () => {
     const { $ } = await import("bun")
-    const { mkdirSync, chmodSync } = await import("fs")
+    const { chmodSync } = await import("fs")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
-    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
     const dbPath = join(tempDir, ".gitmem", "index.db")
     const tempDb = createDatabase(dbPath)
     tempDb.close()
@@ -296,11 +339,10 @@ describe("runCommand", () => {
 
   test("exits with 1 when lock file already exists", async () => {
     const { $ } = await import("bun")
-    const { writeFileSync, mkdirSync } = await import("fs")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const dbPath = join(tempDir, ".gitmem", "index.db")
-    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
     const tempDb = createDatabase(dbPath)
     tempDb.close()
 
@@ -321,6 +363,7 @@ describe("runCommand", () => {
   test("passes config to handler", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
+    createTestConfig(tempDir)
 
     const handler = mock(async () => {})
 
@@ -336,15 +379,10 @@ describe("runCommand", () => {
 
   test("skips API key check when AI is disabled", async () => {
     const { $ } = await import("bun")
-    const { mkdirSync, writeFileSync } = await import("fs")
     await $`git init ${tempDir}`.quiet()
 
     // Write config with ai: false
-    mkdirSync(join(tempDir, ".gitmem"), { recursive: true })
-    writeFileSync(
-      join(tempDir, ".gitmem", "config.json"),
-      JSON.stringify({ ai: false }),
-    )
+    createTestConfig(tempDir, { ai: false })
 
     const originalKey = process.env.ANTHROPIC_API_KEY
     delete process.env.ANTHROPIC_API_KEY
@@ -367,7 +405,6 @@ describe("runCommand", () => {
 
   test("exits with error on invalid config", async () => {
     const { $ } = await import("bun")
-    const { mkdirSync, writeFileSync } = await import("fs")
     await $`git init ${tempDir}`.quiet()
 
     mkdirSync(join(tempDir, ".gitmem"), { recursive: true })

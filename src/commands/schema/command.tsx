@@ -21,7 +21,7 @@ export const schemaCommand = new Command("schema")
   .action(async (_opts, cmd) => {
     await runCommand(
       cmd.parent!.opts(),
-      { needsGit: false, needsDb: false },
+      { needsGit: false, needsDb: false, needsConfig: false },
       async ({ format }) => {
         if (formatOutput(format, { tables: SCHEMA })) return
 

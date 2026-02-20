@@ -30,7 +30,7 @@ export const queryCommand = new Command("query")
     "--classification <type>",
     "Filter by classification (bug-fix, feature, refactor, docs, chore, perf, test, style)",
   )
-  .description("Full-text search over enriched commits (no API calls)")
+  .description("Full-text search over indexed commits (no API calls)")
   .addHelpText("after", HELP_TEXT)
   .action(async (query, opts, cmd) => {
     await runCommand(

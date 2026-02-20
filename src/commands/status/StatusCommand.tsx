@@ -61,7 +61,8 @@ export function StatusCommand({ status }: StatusCommandProps) {
           <Text bold>Config:</Text>
           <Text> AI: {aiDisplay}</Text>
           <Text>
-            {"  "}Index start date: {config.indexStartDate ?? "all history"}
+            {" "}
+            Index start date: {config.indexStartDate ?? "all history"}
           </Text>
           <Text> Index model: {config.indexModel}</Text>
           <Text> Check model: {config.checkModel}</Text>

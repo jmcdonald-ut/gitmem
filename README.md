@@ -7,7 +7,8 @@ gitmem indexes your git history with LLM-powered commit classification, then sur
 </div>
 
 ```sh
-# Index your repo (enriches commits via a LLM)
+# Initialize and index your repo (enriches commits via a LLM)
+gitmem init --ai true
 gitmem index
 
 # Use the index to surface patterns and insights
@@ -58,9 +59,12 @@ bun run build   # Compile to standalone binary at build/gitmem
 
 The produced binary can be found at `build/gitmem`. Add it to your path or copy it into a shared bin folder.
 
-AI enrichment is enabled by default and requires an Anthropic API key. It can be disabled or date-limited in `.gitmem/config.json` (auto-created on first run), in which case no API key is needed.
+AI enrichment is enabled by default and requires an Anthropic API key. It can be disabled or date-limited in `.gitmem/config.json` (created by `gitmem init`), in which case no API key is needed.
 
 ```sh
+# Initialize gitmem in your repository
+gitmem init
+
 # One-time use
 ANTHROPIC_API_KEY="sk-ant-..." gitmem index
 
@@ -95,9 +99,10 @@ Options:
   -h, --help                   display help for command
 
 Commands:
+  init [options]               Initialize gitmem in the current repository
   index|i [options]            Analyze new commits via Claude API and rebuild search index
   status|s                     Show index health, coverage, and database statistics
-  query|q [options] <query>    Full-text search over indexed commits (no API calls)
+  query|q [options] <query>    Full-text search over enriched commits (no API calls)
   check [options] [hash]       Evaluate enrichment quality via LLM-as-judge
   hotspots|h [options]         Show most-changed files with classification breakdown
   stats [options] <path>       Show detailed change statistics for a file or directory
@@ -109,9 +114,10 @@ Commands:
   help [command]               display help for command
 
 Getting started:
-  1. Export your Anthropic API key:  export ANTHROPIC_API_KEY=sk-ant-...
-  2. Run the indexer:                gitmem index
-  3. Search your history:            gitmem query "auth bug"
+  1. Initialize gitmem:              gitmem init
+  2. Export your Anthropic API key:  export ANTHROPIC_API_KEY=sk-ant-...
+  3. Run the indexer:                gitmem index
+  4. Search your history:            gitmem query "auth bug"
 
 Global options --format json and --json work with every command.
 Run gitmem schema for database table documentation.

@@ -38,20 +38,111 @@ export const DEFAULTS: GitmemConfig = {
 
 const isoDate = z.iso.date()
 
+/** Returns true when `.gitmem/config.json` exists. */
+export function configExists(gitmemDir: string): boolean {
+  return existsSync(join(gitmemDir, "config.json"))
+}
+
 /**
- * Loads config from `.gitmem/config.json`, creating it with defaults if missing.
+ * Creates `.gitmem/config.json` with defaults merged with optional overrides.
+ * Creates the `.gitmem/` directory if it does not exist.
+ * Throws if config already exists or if overrides contain invalid values.
+ */
+export function createConfig(
+  gitmemDir: string,
+  overrides?: Partial<GitmemConfig>,
+): GitmemConfig {
+  if (configExists(gitmemDir)) {
+    throw new Error(
+      "Already initialized. Edit .gitmem/config.json to change settings.",
+    )
+  }
+
+  const config: GitmemConfig = { ...DEFAULTS }
+
+  if (overrides) {
+    if (overrides.ai !== undefined) {
+      const ai = overrides.ai
+      if (ai === true || ai === false) {
+        config.ai = ai
+      } else if (typeof ai === "string") {
+        if (!isoDate.safeParse(ai).success) {
+          throw new Error(
+            `Invalid config: "ai" must be true, false, or a valid "YYYY-MM-DD" date string, got "${ai}"`,
+          )
+        }
+        config.ai = ai
+      } else {
+        throw new Error(
+          `Invalid config: "ai" must be true, false, or a valid "YYYY-MM-DD" date string`,
+        )
+      }
+    }
+
+    if (overrides.indexStartDate !== undefined) {
+      const isd = overrides.indexStartDate
+      if (isd === null) {
+        config.indexStartDate = null
+      } else if (typeof isd === "string") {
+        if (!isoDate.safeParse(isd).success) {
+          throw new Error(
+            `Invalid config: "indexStartDate" must be null or a valid "YYYY-MM-DD" date string, got "${isd}"`,
+          )
+        }
+        config.indexStartDate = isd
+      } else {
+        throw new Error(
+          `Invalid config: "indexStartDate" must be null or a valid "YYYY-MM-DD" date string`,
+        )
+      }
+    }
+
+    if (overrides.indexModel !== undefined) {
+      if (
+        typeof overrides.indexModel !== "string" ||
+        overrides.indexModel === ""
+      ) {
+        throw new Error(
+          `Invalid config: "indexModel" must be a non-empty string`,
+        )
+      }
+      config.indexModel = overrides.indexModel
+    }
+
+    if (overrides.checkModel !== undefined) {
+      if (
+        typeof overrides.checkModel !== "string" ||
+        overrides.checkModel === ""
+      ) {
+        throw new Error(
+          `Invalid config: "checkModel" must be a non-empty string`,
+        )
+      }
+      config.checkModel = overrides.checkModel
+    }
+  }
+
+  if (!existsSync(gitmemDir)) {
+    mkdirSync(gitmemDir, { recursive: true })
+  }
+  writeFileSync(
+    join(gitmemDir, "config.json"),
+    JSON.stringify(config, null, 2) + "\n",
+  )
+
+  return config
+}
+
+/**
+ * Loads config from `.gitmem/config.json`.
  * Missing keys are backfilled from defaults in memory only.
- * Throws on invalid config values.
+ * Throws when config file does not exist or contains invalid values.
  */
 export function loadConfig(gitmemDir: string): GitmemConfig {
   const configPath = join(gitmemDir, "config.json")
 
   if (!existsSync(configPath)) {
-    if (!existsSync(gitmemDir)) {
-      mkdirSync(gitmemDir, { recursive: true })
-    }
-    writeFileSync(configPath, JSON.stringify(DEFAULTS, null, 2) + "\n")
-    return { ...DEFAULTS }
+    throw new Error("gitmem is not initialized. Run `gitmem init` first.")
   }
 
   let raw: unknown
