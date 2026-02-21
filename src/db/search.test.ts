@@ -266,6 +266,113 @@ describe("SearchService", () => {
     expect(results).toHaveLength(2)
   })
 
+  test("searchWithScope delegates to search when scope is empty", () => {
+    search.indexCommit("aaa", "fix login bug", "bug-fix", "Fixed login")
+    const results = search.searchWithScope("login", 20, undefined, {
+      include: [],
+      exclude: [],
+    })
+    expect(results).toHaveLength(1)
+  })
+
+  test("searchWithScope filters by file scope", () => {
+    // Insert commits with file data
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "fix login bug",
+        files: [
+          {
+            filePath: "src/auth.ts",
+            changeType: "M" as const,
+            additions: 5,
+            deletions: 2,
+          },
+        ],
+      },
+      {
+        hash: "bbb",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-02T00:00:00Z",
+        message: "fix database bug",
+        files: [
+          {
+            filePath: "lib/db.ts",
+            changeType: "M" as const,
+            additions: 3,
+            deletions: 1,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("aaa", "bug-fix", "Fixed login", "haiku-4.5")
+    commits.updateEnrichment("bbb", "bug-fix", "Fixed db", "haiku-4.5")
+    search.indexNewCommits(["aaa", "bbb"])
+
+    // Scope to src/ only
+    const results = search.searchWithScope("fix", 20, undefined, {
+      include: ["src/"],
+      exclude: [],
+    })
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("aaa")
+  })
+
+  test("searchWithScope with classification and scope", () => {
+    commits.insertRawCommits([
+      {
+        hash: "aaa",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "fix auth bug",
+        files: [
+          {
+            filePath: "src/auth.ts",
+            changeType: "M" as const,
+            additions: 5,
+            deletions: 2,
+          },
+        ],
+      },
+      {
+        hash: "bbb",
+        authorName: "Test",
+        authorEmail: "test@example.com",
+        committedAt: "2024-01-02T00:00:00Z",
+        message: "auth refactor",
+        files: [
+          {
+            filePath: "src/auth.ts",
+            changeType: "M" as const,
+            additions: 10,
+            deletions: 5,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("aaa", "bug-fix", "Fixed auth", "haiku-4.5")
+    commits.updateEnrichment("bbb", "refactor", "Refactored auth", "haiku-4.5")
+    search.indexNewCommits(["aaa", "bbb"])
+
+    const results = search.searchWithScope("auth", 20, "bug-fix", {
+      include: ["src/"],
+      exclude: [],
+    })
+    expect(results).toHaveLength(1)
+    expect(results[0].hash).toBe("aaa")
+  })
+
+  test("searchWithScope delegates to search when scope is undefined", () => {
+    search.indexCommit("aaa", "fix login bug", "bug-fix", "Fixed login")
+    const results = search.searchWithScope("login", 20, undefined, undefined)
+    expect(results).toHaveLength(1)
+  })
+
   test("search throws InvalidQueryError on unbalanced parentheses", () => {
     expect(() => search.search("auth(")).toThrow(InvalidQueryError)
     expect(() => search.search("auth(")).toThrow(/Invalid search query/)
