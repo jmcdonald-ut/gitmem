@@ -2,7 +2,6 @@ import { describe, expect, mock, test } from "bun:test"
 import { render } from "ink-testing-library"
 import React from "react"
 
-import type { CheckBatchResult, CheckProgress } from "@/types"
 import {
   BatchCheckCommand,
   batchCheckPhaseLabel,
@@ -11,6 +10,7 @@ import { waitForFrame } from "@commands/utils/test-utils"
 import type { BatchJobRepository } from "@db/batch-jobs"
 import type { BatchJudgeService } from "@services/batch-judge"
 import type { CheckerService } from "@services/checker"
+import type { CheckBatchResult, CheckProgress } from "@services/types"
 
 function createMockChecker(
   behavior: "submitted" | "in_progress" | "complete" | "empty" | "error",

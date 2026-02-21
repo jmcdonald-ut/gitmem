@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk"
 
-import type { CommitInfo, EvalVerdict, IJudgeService } from "@/types"
+import type { CommitInfo } from "@/types"
 import {
   EVAL_OUTPUT_CONFIG,
   JUDGE_SYSTEM_PROMPT,
   buildJudgeUserMessage,
   parseEvalResponse,
 } from "@services/judge-shared"
+import type { EvalVerdict, IJudgeService } from "@services/types"
 
 /** Evaluates commit enrichment quality using the Anthropic API. */
 export class JudgeService implements IJudgeService {

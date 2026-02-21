@@ -1,12 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 
-import type {
-  CommitInfo,
-  IGitService,
-  ILLMService,
-  IndexProgress,
-} from "@/types"
+import type { CommitInfo } from "@/types"
 import { AggregateRepository } from "@db/aggregates"
 import { BatchJobRepository } from "@db/batch-jobs"
 import { CommitRepository } from "@db/commits"
@@ -14,6 +9,7 @@ import { createDatabase } from "@db/database"
 import { SearchService } from "@db/search"
 import type { BatchLLMService } from "@services/batch-llm"
 import { EnricherService } from "@services/enricher"
+import type { IGitService, ILLMService, IndexProgress } from "@services/types"
 
 describe("EnricherService", () => {
   let db: Database

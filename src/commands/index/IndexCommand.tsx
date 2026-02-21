@@ -2,8 +2,8 @@ import { Box, Text, useApp } from "ink"
 import Spinner from "ink-spinner"
 import React, { useEffect, useState } from "react"
 
-import type { IndexProgress } from "@/types"
 import type { EnricherService } from "@services/enricher"
+import type { IndexProgress } from "@services/types"
 
 /** Props for the IndexCommand component. */
 interface IndexCommandProps {

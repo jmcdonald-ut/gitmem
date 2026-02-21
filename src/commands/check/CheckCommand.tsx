@@ -2,8 +2,8 @@ import { Box, Text, useApp } from "ink"
 import Spinner from "ink-spinner"
 import React, { useEffect, useState } from "react"
 
-import type { CheckProgress, EvalResult, EvalSummary } from "@/types"
 import type { CheckerService } from "@services/checker"
+import type { CheckProgress, EvalResult, EvalSummary } from "@services/types"
 
 /** Props for single-commit check mode. */
 interface SingleCheckProps {

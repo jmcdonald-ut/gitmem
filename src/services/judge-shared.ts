@@ -1,8 +1,9 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod"
 import { z } from "zod"
 
-import type { CommitInfo, EvalVerdict } from "@/types"
+import type { CommitInfo } from "@/types"
 import { CLASSIFICATIONS } from "@/types"
+import type { EvalVerdict } from "@services/types"
 
 const VerdictSchema = z.object({
   pass: z.boolean(),

@@ -1,10 +1,11 @@
 import type { Database } from "bun:sqlite"
 import { beforeEach, describe, expect, mock, test } from "bun:test"
 
-import type { CommitInfo, IGitService, IndexProgress } from "@/types"
+import type { CommitInfo } from "@/types"
 import { CommitRepository } from "@db/commits"
 import { createDatabase } from "@db/database"
 import { MeasurerService } from "@services/measurer"
+import type { IGitService, IndexProgress } from "@services/types"
 
 describe("MeasurerService", () => {
   let db: Database

@@ -2,10 +2,10 @@ import { Box, Text, useApp } from "ink"
 import Spinner from "ink-spinner"
 import React, { useEffect, useState } from "react"
 
-import type { IndexProgress } from "@/types"
 import type { BatchJobRepository } from "@db/batch-jobs"
 import type { BatchLLMService } from "@services/batch-llm"
 import type { EnricherService } from "@services/enricher"
+import type { IndexProgress } from "@services/types"
 
 interface BatchIndexCommandProps {
   enricher: EnricherService

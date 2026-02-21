@@ -4,10 +4,10 @@ import { render } from "ink"
 import React from "react"
 
 import { formatOutput } from "@/output"
-import type { StatusInfo } from "@/types"
 import { StatusCommand } from "@commands/status/StatusCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { CommitRepository } from "@db/commits"
+import type { StatusInfo } from "@services/types"
 
 const HELP_TEXT = `
 Displays coverage percentage, enriched/total commit counts, last index

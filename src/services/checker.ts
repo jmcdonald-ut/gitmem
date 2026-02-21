@@ -1,3 +1,8 @@
+import type { BatchJobRepository } from "@db/batch-jobs"
+import type { CommitRepository } from "@db/commits"
+import type { CommitRow } from "@db/types"
+import type { CheckBatchRequest } from "@services/batch-judge"
+import { reconcileClassificationVerdict } from "@services/judge-shared"
 import type {
   CheckBatchResult,
   CheckProgress,
@@ -6,12 +11,7 @@ import type {
   IBatchJudgeService,
   IGitService,
   IJudgeService,
-} from "@/types"
-import type { BatchJobRepository } from "@db/batch-jobs"
-import type { CommitRepository } from "@db/commits"
-import type { CommitRow } from "@db/types"
-import type { CheckBatchRequest } from "@services/batch-judge"
-import { reconcileClassificationVerdict } from "@services/judge-shared"
+} from "@services/types"
 
 /**
  * Orchestrates the quality check workflow: fetches enriched commits,

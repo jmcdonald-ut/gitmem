@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk"
 
-import type { BatchStatusResult } from "@/types"
+import type { BatchStatusResult } from "@services/types"
 
 /**
  * Retrieves the current status of a batch from the Anthropic API.

@@ -1,6 +1,6 @@
-import type { IGitService, IndexProgress } from "@/types"
 import type { CommitRepository } from "@db/commits"
 import { computeComplexity, isBinary, isGenerated } from "@services/complexity"
+import type { IGitService, IndexProgress } from "@services/types"
 
 /** Orchestrates complexity measurement for commit files. */
 export class MeasurerService {

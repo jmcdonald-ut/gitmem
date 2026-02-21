@@ -2,7 +2,6 @@ import { describe, expect, mock, test } from "bun:test"
 import { render } from "ink-testing-library"
 import React from "react"
 
-import type { IndexProgress } from "@/types"
 import {
   BatchIndexCommand,
   batchPhaseLabel,
@@ -11,6 +10,7 @@ import { waitForFrame } from "@commands/utils/test-utils"
 import type { BatchJobRepository } from "@db/batch-jobs"
 import type { BatchLLMService } from "@services/batch-llm"
 import type { EnricherService } from "@services/enricher"
+import type { IndexProgress } from "@services/types"
 
 function createMockEnricher(
   behavior: "submitted" | "in_progress" | "complete" | "error",

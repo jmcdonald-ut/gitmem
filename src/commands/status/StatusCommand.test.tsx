@@ -3,8 +3,8 @@ import { render } from "ink-testing-library"
 import React from "react"
 
 import { DEFAULTS } from "@/config"
-import type { StatusInfo } from "@/types"
 import { StatusCommand } from "@commands/status/StatusCommand"
+import type { StatusInfo } from "@services/types"
 
 describe("StatusCommand", () => {
   test("displays full status info", () => {

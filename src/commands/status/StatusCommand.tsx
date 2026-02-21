@@ -1,7 +1,7 @@
 import { Box, Text } from "ink"
 import React from "react"
 
-import type { StatusInfo } from "@/types"
+import type { StatusInfo } from "@services/types"
 
 /** Props for the StatusCommand component. */
 interface StatusCommandProps {

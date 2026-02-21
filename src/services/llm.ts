@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk"
 
-import type { CommitInfo, EnrichmentResult, ILLMService } from "@/types"
+import type { CommitInfo, EnrichmentResult } from "@/types"
 import {
   ENRICHMENT_OUTPUT_CONFIG,
   SYSTEM_PROMPT,
   buildUserMessage,
   parseEnrichmentResponse,
 } from "@services/llm-shared"
+import type { ILLMService } from "@services/types"
 
 /** Classifies and summarizes git commits using the Anthropic API. */
 export class LLMService implements ILLMService {
