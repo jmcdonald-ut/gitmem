@@ -80,19 +80,19 @@ export function buildHierarchy(
       indexed &&
       maxChanges > 0 &&
       maxComplexity > 0 &&
-      stats!.current_complexity != null
+      stats.current_complexity != null
     ) {
       score =
-        (stats!.total_changes / maxChanges) *
-        (stats!.current_complexity / maxComplexity)
+        (stats.total_changes / maxChanges) *
+        (stats.current_complexity / maxComplexity)
     }
 
     const leaf: HierarchyNode = {
       name: fileName,
       path: filePath,
-      loc: indexed && stats!.current_loc != null ? stats!.current_loc : 1,
+      loc: indexed && stats.current_loc != null ? stats.current_loc : 1,
       score,
-      changes: indexed ? stats!.total_changes : 0,
+      changes: indexed ? stats.total_changes : 0,
       indexed,
     }
     current.children!.push(leaf)

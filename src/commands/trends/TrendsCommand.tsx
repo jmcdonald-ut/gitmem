@@ -90,9 +90,9 @@ export function TrendsCommand({
 
       <Text> </Text>
       {periods.map((p) => {
-        const nonZero = CLASSIFICATION_KEYS.filter(
-          (c) => (p[c.key] as number) > 0,
-        ).sort((a, b) => (p[b.key] as number) - (p[a.key] as number))
+        const nonZero = CLASSIFICATION_KEYS.filter((c) => p[c.key] > 0).sort(
+          (a, b) => p[b.key] - p[a.key],
+        )
 
         return (
           <Box key={p.period} marginLeft={2}>
@@ -112,7 +112,7 @@ export function TrendsCommand({
               {nonZero.map((c, i) => (
                 <Text key={c.label}>
                   <Text color={CLASSIFICATION_COLORS[c.label]}>
-                    {c.label}: {p[c.key] as number}
+                    {c.label}: {p[c.key]}
                   </Text>
                   {i < nonZero.length - 1 ? "  " : ""}
                 </Text>

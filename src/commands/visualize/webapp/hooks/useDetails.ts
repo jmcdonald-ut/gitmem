@@ -35,8 +35,8 @@ export function useDetails(path: string | null) {
         setError(null)
         setLoading(false)
       })
-      .catch((err) => {
-        if (err.name !== "AbortError") {
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name !== "AbortError") {
           setError(err.message)
           setData(null)
           setLoading(false)

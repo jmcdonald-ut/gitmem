@@ -41,7 +41,9 @@ export function BatchCheckCommand({
         setProgress(p),
       )
       .then(setResult)
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : String(err)),
+      )
   }, [checker, batchJudge, batchJobs, sampleSize, outputPath])
 
   useEffect(() => {

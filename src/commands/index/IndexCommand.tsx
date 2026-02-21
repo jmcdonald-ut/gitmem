@@ -3,7 +3,7 @@ import Spinner from "ink-spinner"
 import React, { useEffect, useState } from "react"
 
 import type { IndexProgress } from "@/types"
-import { EnricherService } from "@services/enricher"
+import type { EnricherService } from "@services/enricher"
 
 /** Props for the IndexCommand component. */
 interface IndexCommandProps {
@@ -35,7 +35,9 @@ export function IndexCommand({ enricher }: IndexCommandProps) {
     enricher
       .run((p) => setProgress(p), controller.signal)
       .then(setResult)
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : String(err)),
+      )
 
     return () => controller.abort()
   }, [enricher])

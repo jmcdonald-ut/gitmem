@@ -388,7 +388,7 @@ export const visualizeCommand = new Command("visualize")
 
         await new Promise<void>((resolve) => {
           const shutdown = () => {
-            server.stop()
+            void server.stop()
             resolve()
           }
           process.once("SIGINT", shutdown)

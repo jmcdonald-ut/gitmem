@@ -43,7 +43,7 @@ export const initCommand = new Command("init")
     await runCommand(
       cmd.parent!.opts(),
       { needsConfig: false, needsDb: false },
-      async ({ format, cwd }) => {
+      ({ format, cwd }) => {
         const gitmemDir = resolve(cwd, ".gitmem")
 
         const overrides: Partial<GitmemConfig> = {}

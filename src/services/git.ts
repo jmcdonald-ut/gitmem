@@ -409,8 +409,8 @@ export class GitService implements IGitService {
     // Write all refs to stdin
     const input =
       entries.map((e) => `${e.hash}:${e.filePath}`).join("\n") + "\n"
-    proc.stdin.write(input)
-    proc.stdin.end()
+    void proc.stdin.write(input)
+    void proc.stdin.end()
 
     // Read all stdout as a single buffer
     const output = Buffer.from(await new Response(proc.stdout).arrayBuffer())

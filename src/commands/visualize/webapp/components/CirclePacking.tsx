@@ -180,14 +180,14 @@ export function CirclePacking({
       const currentFocus =
         focusPath === "" ? root : (nodeByPath.get(focusPath) ?? root)
       if (currentFocus === node) {
-        const parent = (node.parent as PackedNode | null) || root
+        const parent = node.parent || root
         onFocusChange(parent === root ? "" : parent.data.path)
         onSelect(parent === root ? "" : parent.data.path)
       } else if (node.children) {
         onFocusChange(node.data.path)
         onSelect(node.data.path)
       } else {
-        const parent = (node.parent as PackedNode | null) || root
+        const parent = node.parent || root
         onFocusChange(parent === root ? "" : parent.data.path)
         onSelect(node.data.path)
       }
@@ -199,7 +199,7 @@ export function CirclePacking({
     const currentFocus =
       focusPath === "" ? root : (nodeByPath.get(focusPath) ?? root)
     if (currentFocus !== root) {
-      const parent = (currentFocus.parent as PackedNode | null) || root
+      const parent = currentFocus.parent || root
       onFocusChange(parent === root ? "" : parent.data.path)
       onSelect(parent === root ? "" : parent.data.path)
     }

@@ -57,10 +57,8 @@ export function HotspotsCommand({
         <Text color="gray">No hotspots found.</Text>
       ) : (
         hotspots.map((file) => {
-          const tags = CLASSIFICATION_KEYS.filter(
-            (c) => (file[c.key] as number) > 0,
-          )
-            .sort((a, b) => (file[b.key] as number) - (file[a.key] as number))
+          const tags = CLASSIFICATION_KEYS.filter((c) => file[c.key] > 0)
+            .sort((a, b) => file[b.key] - file[a.key])
             .slice(0, 3)
 
           return (
@@ -89,7 +87,7 @@ export function HotspotsCommand({
                 {tags.map((t) => (
                   <Text key={t.label}>
                     <Text color={CLASSIFICATION_COLORS[t.label]}>
-                      [{t.label}: {file[t.key] as number}]
+                      [{t.label}: {file[t.key]}]
                     </Text>{" "}
                   </Text>
                 ))}

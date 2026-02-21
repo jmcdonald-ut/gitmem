@@ -28,7 +28,7 @@ export const statsCommand = new Command("stats")
   .description("Show detailed change statistics for a file or directory")
   .addHelpText("after", HELP_TEXT)
   .action(async (path, opts, cmd) => {
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, db, config }) => {
+    await runCommand(cmd.parent!.opts(), {}, ({ format, db, config }) => {
       const aggregates = new AggregateRepository(db)
       const commits = new CommitRepository(db)
       const aiCoverage = getAiCoverage(

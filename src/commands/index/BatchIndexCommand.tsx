@@ -41,7 +41,9 @@ export function BatchIndexCommand({
     enricher
       .runBatch(batchLLM, batchJobs, (p) => setProgress(p))
       .then(setResult)
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : String(err)),
+      )
   }, [enricher, batchLLM, batchJobs])
 
   useEffect(() => {

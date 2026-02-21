@@ -23,7 +23,7 @@ export const schemaCommand = new Command("schema")
     await runCommand(
       cmd.parent!.opts(),
       { needsGit: false, needsDb: false, needsConfig: false },
-      async ({ format }) => {
+      ({ format }) => {
         if (formatOutput(format, { tables: SCHEMA })) return
 
         render(<SchemaCommand tables={SCHEMA} />).unmount()

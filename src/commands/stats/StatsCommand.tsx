@@ -49,8 +49,8 @@ export function StatsCommand({
   const deletions = stats.total_deletions
 
   const nonZeroClassifications = CLASSIFICATION_KEYS.filter(
-    (c) => (stats[c.key] as number) > 0,
-  ).sort((a, b) => (stats[b.key] as number) - (stats[a.key] as number))
+    (c) => stats[c.key] > 0,
+  ).sort((a, b) => stats[b.key] - stats[a.key])
 
   return (
     <Box flexDirection="column">
@@ -117,7 +117,7 @@ export function StatsCommand({
               {nonZeroClassifications.map((c, i) => (
                 <Text key={c.label}>
                   <Text color={CLASSIFICATION_COLORS[c.label]}>
-                    {c.label}: {stats[c.key] as number}
+                    {c.label}: {stats[c.key]}
                   </Text>
                   {i < nonZeroClassifications.length - 1 ? "  " : ""}
                 </Text>

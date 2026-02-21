@@ -3,7 +3,7 @@ import Spinner from "ink-spinner"
 import React, { useEffect, useState } from "react"
 
 import type { CheckProgress, EvalResult, EvalSummary } from "@/types"
-import { CheckerService } from "@services/checker"
+import type { CheckerService } from "@services/checker"
 
 /** Props for single-commit check mode. */
 interface SingleCheckProps {
@@ -48,10 +48,12 @@ export function CheckCommand(props: CheckCommandProps) {
         .checkSample(props.sampleSize, setProgress)
         .then(({ results, summary }) => {
           const output = JSON.stringify(results, null, 2)
-          Bun.write(props.outputPath, output)
+          void Bun.write(props.outputPath, output)
           setBatchResult({ summary, outputPath: props.outputPath })
         })
-        .catch((err) => setError(err.message))
+        .catch((err: unknown) =>
+          setError(err instanceof Error ? err.message : String(err)),
+        )
     } else {
       props.checker
         .checkOne(props.hash, setProgress)
@@ -62,7 +64,9 @@ export function CheckCommand(props: CheckCommandProps) {
             setNotFound(true)
           }
         })
-        .catch((err) => setError(err.message))
+        .catch((err: unknown) =>
+          setError(err instanceof Error ? err.message : String(err)),
+        )
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.checker])

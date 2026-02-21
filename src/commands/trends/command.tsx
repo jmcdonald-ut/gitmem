@@ -49,7 +49,7 @@ export const trendsCommand = new Command("trends")
       process.exit(1)
     }
 
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, db, config }) => {
+    await runCommand(cmd.parent!.opts(), {}, ({ format, db, config }) => {
       const commits = new CommitRepository(db)
       const aggregates = new AggregateRepository(db)
       const aiCoverage = getAiCoverage(

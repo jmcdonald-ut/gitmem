@@ -19,8 +19,8 @@ export function useHierarchy() {
         setData(d)
         setLoading(false)
       })
-      .catch((err) => {
-        if (err.name !== "AbortError") {
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name !== "AbortError") {
           setError(err.message)
           setLoading(false)
         }

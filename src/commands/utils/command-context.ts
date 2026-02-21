@@ -76,7 +76,7 @@ function releaseLock(lockPath: string): void {
 export async function runCommand(
   programOpts: { format?: string; json?: boolean },
   requirements: CommandRequirements,
-  handler: (ctx: CommandContext) => Promise<void>,
+  handler: (ctx: CommandContext) => void | Promise<void>,
 ): Promise<void> {
   const format = resolveFormat(programOpts)
   const cwd = process.cwd()
