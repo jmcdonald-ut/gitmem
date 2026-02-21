@@ -7,7 +7,7 @@ import React from "react"
 import { formatOutput } from "@/output"
 import { GenerateSkillCommand } from "@commands/generate/GenerateSkillCommand"
 import { getSkillContent } from "@commands/generate/skill-content"
-import { GitmemCommandOpts } from "@commands/gitmem"
+import type { GitmemCommandOpts } from "@commands/gitmem"
 import { runCommand } from "@commands/utils/command-context"
 
 export interface GenerateSkillOptions {

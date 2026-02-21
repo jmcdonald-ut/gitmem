@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite"
+import type { Database } from "bun:sqlite"
 import { beforeEach, describe, expect, test } from "bun:test"
 
 import type { CommitInfo } from "@/types"

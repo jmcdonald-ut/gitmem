@@ -1,3 +1,5 @@
+import type { GitmemConfig } from "@/config"
+
 /** Output format for CLI commands. */
 export type OutputFormat = "text" | "json"
 
@@ -522,5 +524,5 @@ export interface StatusInfo {
   /** Database file size in bytes. */
   dbSize: number
   /** Effective configuration, if loaded. */
-  config?: import("@/config").GitmemConfig
+  config?: GitmemConfig
 }
