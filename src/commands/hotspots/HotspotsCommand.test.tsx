@@ -1,9 +1,10 @@
-import { describe, test, expect } from "bun:test"
-import React from "react"
+import { describe, expect, test } from "bun:test"
 import { render } from "ink-testing-library"
-import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
-import type { FileStatsRow } from "@/types"
+import React from "react"
+
 import type { AiCoverage } from "@/config"
+import type { FileStatsRow } from "@/types"
+import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
 
 const makeRow = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({
   file_path: "src/main.ts",

@@ -1,12 +1,13 @@
 import { Command } from "@commander-js/extra-typings"
-import React from "react"
 import { render } from "ink"
 import { resolve } from "path"
-import { runCommand } from "@commands/utils/command-context"
+import React from "react"
+
+import { type GitmemConfig, createConfig } from "@/config"
 import { formatOutput } from "@/output"
-import { createConfig, type GitmemConfig } from "@/config"
-import { createDatabase } from "@db/database"
 import { InitCommand } from "@commands/init/InitCommand"
+import { runCommand } from "@commands/utils/command-context"
+import { createDatabase } from "@db/database"
 
 function parseAiValue(value: string): boolean | string {
   if (value === "true") return true

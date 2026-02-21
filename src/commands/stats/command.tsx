@@ -1,13 +1,14 @@
 import { Command } from "@commander-js/extra-typings"
-import React from "react"
 import { render } from "ink"
+import React from "react"
+
+import { getAiCoverage } from "@/config"
+import { formatOutput } from "@/output"
+import { StatsCommand } from "@commands/stats/StatsCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
-import { formatOutput } from "@/output"
-import { getAiCoverage } from "@/config"
 import { AggregateRepository } from "@db/aggregates"
 import { CommitRepository } from "@db/commits"
-import { StatsCommand } from "@commands/stats/StatsCommand"
 
 const HELP_TEXT = `
 File mode: classification breakdown, top contributors, recent commits.

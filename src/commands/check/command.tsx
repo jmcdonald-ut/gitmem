@@ -1,19 +1,20 @@
 import { Command } from "@commander-js/extra-typings"
+import { render } from "ink"
+import { join, resolve } from "path"
 import React from "react"
 import z from "zod"
-import { render } from "ink"
-import { resolve, join } from "path"
+
+import { isAiEnabled } from "@/config"
+import { formatOutput } from "@/output"
+import { BatchCheckCommand } from "@commands/check/BatchCheckCommand"
+import { CheckCommand } from "@commands/check/CheckCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
-import { formatOutput } from "@/output"
-import { isAiEnabled } from "@/config"
-import { CommitRepository } from "@db/commits"
 import { BatchJobRepository } from "@db/batch-jobs"
-import { JudgeService } from "@services/judge"
+import { CommitRepository } from "@db/commits"
 import { BatchJudgeService } from "@services/batch-judge"
 import { CheckerService } from "@services/checker"
-import { CheckCommand } from "@commands/check/CheckCommand"
-import { BatchCheckCommand } from "@commands/check/BatchCheckCommand"
+import { JudgeService } from "@services/judge"
 
 const HELP_TEXT = `
 Requires ANTHROPIC_API_KEY environment variable.

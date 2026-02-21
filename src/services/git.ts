@@ -1,4 +1,4 @@
-import type { CommitInfo, CommitFile, IGitService } from "@/types"
+import type { CommitFile, CommitInfo, IGitService } from "@/types"
 
 /**
  * Truncates a unified diff to fit within maxChars while preserving breadth

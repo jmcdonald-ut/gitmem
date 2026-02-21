@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
+
 import { COLORS, scoreColor } from "@visualize-app/lib/colors"
 
 describe("COLORS", () => {

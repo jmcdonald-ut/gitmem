@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react"
 import { Box, Text, useApp } from "ink"
 import Spinner from "ink-spinner"
-import type { CheckProgress, CheckBatchResult, EvalSummary } from "@/types"
-import type { CheckerService } from "@services/checker"
-import type { BatchJudgeService } from "@services/batch-judge"
+import React, { useEffect, useState } from "react"
+
+import type { CheckBatchResult, CheckProgress, EvalSummary } from "@/types"
 import type { BatchJobRepository } from "@db/batch-jobs"
+import type { BatchJudgeService } from "@services/batch-judge"
+import type { CheckerService } from "@services/checker"
 
 interface BatchCheckCommandProps {
   checker: CheckerService

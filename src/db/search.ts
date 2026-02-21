@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite"
+
 import type { SearchResult } from "@/types"
 
 /** Error thrown when a user-provided FTS5 query has invalid syntax. */

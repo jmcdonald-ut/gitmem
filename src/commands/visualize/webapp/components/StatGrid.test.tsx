@@ -1,8 +1,9 @@
 /// <reference lib="dom" />
-import "@visualize-app/test-setup"
-import { describe, test, expect, afterEach } from "bun:test"
-import { render, cleanup } from "@testing-library/react"
+import { cleanup, render } from "@testing-library/react"
+import { afterEach, describe, expect, test } from "bun:test"
+
 import { StatGrid } from "@visualize-app/components/StatGrid"
+import "@visualize-app/test-setup"
 
 afterEach(cleanup)
 

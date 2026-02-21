@@ -1,14 +1,15 @@
 import type { Database } from "bun:sqlite"
-import type { OutputFormat } from "@/types"
-import type { GitmemConfig } from "@/config"
-import { loadConfig, isAiEnabled, DEFAULTS } from "@/config"
-import { GitService } from "@services/git"
-import { createDatabase } from "@db/database"
-import { resolveFormat, formatOutput } from "@/output"
-import { resolve, join } from "path"
-import { existsSync, writeFileSync, unlinkSync } from "fs"
-import { openSync, closeSync } from "fs"
+import { existsSync, unlinkSync, writeFileSync } from "fs"
+import { closeSync, openSync } from "fs"
 import { constants } from "fs"
+import { join, resolve } from "path"
+
+import type { GitmemConfig } from "@/config"
+import { DEFAULTS, isAiEnabled, loadConfig } from "@/config"
+import { formatOutput, resolveFormat } from "@/output"
+import type { OutputFormat } from "@/types"
+import { createDatabase } from "@db/database"
+import { GitService } from "@services/git"
 
 export interface CommandContext {
   format: OutputFormat

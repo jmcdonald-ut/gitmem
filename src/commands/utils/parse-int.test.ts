@@ -1,6 +1,6 @@
+import { parsePositiveInt } from "./parse-int"
 import { describe, expect, test } from "bun:test"
 import { InvalidArgumentError } from "commander"
-import { parsePositiveInt } from "./parse-int"
 
 describe("parsePositiveInt", () => {
   test("parses valid positive integers", () => {

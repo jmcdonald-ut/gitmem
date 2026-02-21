@@ -1,12 +1,13 @@
 /// <reference lib="dom" />
-import "@visualize-app/test-setup"
-import { describe, test, expect, mock, afterEach } from "bun:test"
-import { render, fireEvent, cleanup } from "@testing-library/react"
+import { cleanup, fireEvent, render } from "@testing-library/react"
+import { afterEach, describe, expect, mock, test } from "bun:test"
+
 import { DetailsPanel } from "@visualize-app/components/DetailsPanel"
+import "@visualize-app/test-setup"
 import type {
-  RootDetails,
   DirectoryDetails,
   FileDetails,
+  RootDetails,
 } from "@visualize-app/types"
 
 afterEach(cleanup)

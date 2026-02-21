@@ -1,8 +1,9 @@
-import { describe, test, expect, beforeEach } from "bun:test"
-import { createDatabase } from "@db/database"
-import { CommitRepository } from "@db/commits"
-import type { CommitInfo } from "@/types"
 import { Database } from "bun:sqlite"
+import { beforeEach, describe, expect, test } from "bun:test"
+
+import type { CommitInfo } from "@/types"
+import { CommitRepository } from "@db/commits"
+import { createDatabase } from "@db/database"
 
 describe("CommitRepository", () => {
   let db: Database

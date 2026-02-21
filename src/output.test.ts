@@ -1,5 +1,6 @@
-import { describe, test, expect, spyOn } from "bun:test"
-import { resolveFormat, formatOutput } from "@/output"
+import { describe, expect, spyOn, test } from "bun:test"
+
+import { formatOutput, resolveFormat } from "@/output"
 
 describe("resolveFormat", () => {
   test("defaults to text when no options provided", () => {

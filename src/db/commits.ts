@@ -1,9 +1,10 @@
 import { Database } from "bun:sqlite"
+
 import type {
-  CommitInfo,
-  CommitRow,
   CommitFile,
   CommitFileRow,
+  CommitInfo,
+  CommitRow,
   RecentCommit,
 } from "@/types"
 

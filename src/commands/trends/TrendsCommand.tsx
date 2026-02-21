@@ -1,9 +1,10 @@
-import React from "react"
 import { Box, Text } from "ink"
+import React from "react"
+
+import type { AiCoverage } from "@/config"
 import type { TrendPeriod, TrendSummary } from "@/types"
 import { CLASSIFICATION_COLORS, CLASSIFICATION_KEYS } from "@/types"
 import { AiCoverageDisclaimer } from "@commands/utils/AiCoverageDisclaimer"
-import type { AiCoverage } from "@/config"
 
 /** Props for the TrendsCommand component. */
 interface TrendsCommandProps {

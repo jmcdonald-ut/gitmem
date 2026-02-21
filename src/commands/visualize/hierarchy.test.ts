@@ -1,6 +1,7 @@
-import { describe, test, expect } from "bun:test"
-import { buildHierarchy } from "@commands/visualize/hierarchy"
+import { describe, expect, test } from "bun:test"
+
 import type { FileStatsRow } from "@/types"
+import { buildHierarchy } from "@commands/visualize/hierarchy"
 
 function makeStats(
   filePath: string,

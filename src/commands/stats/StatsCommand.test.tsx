@@ -1,9 +1,10 @@
-import { describe, test, expect } from "bun:test"
-import React from "react"
+import { describe, expect, test } from "bun:test"
 import { render } from "ink-testing-library"
-import { StatsCommand } from "@commands/stats/StatsCommand"
-import type { FileStatsRow, FileContributorRow, RecentCommit } from "@/types"
+import React from "react"
+
 import type { AiCoverage } from "@/config"
+import type { FileContributorRow, FileStatsRow, RecentCommit } from "@/types"
+import { StatsCommand } from "@commands/stats/StatsCommand"
 
 const makeStats = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({
   file_path: "src/main.ts",

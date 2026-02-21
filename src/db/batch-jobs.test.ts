@@ -1,7 +1,8 @@
-import { describe, test, expect, beforeEach } from "bun:test"
-import { createDatabase } from "@db/database"
-import { BatchJobRepository } from "@db/batch-jobs"
 import { Database } from "bun:sqlite"
+import { beforeEach, describe, expect, test } from "bun:test"
+
+import { BatchJobRepository } from "@db/batch-jobs"
+import { createDatabase } from "@db/database"
 
 describe("BatchJobRepository", () => {
   let db: Database

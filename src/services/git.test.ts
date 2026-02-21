@@ -1,8 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { GitService, truncateDiff } from "@services/git"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "fs/promises"
-import { join } from "path"
 import { tmpdir } from "os"
+import { join } from "path"
+
+import { GitService, truncateDiff } from "@services/git"
 
 describe("truncateDiff", () => {
   const fileSection = (name: string, lines: number) => {

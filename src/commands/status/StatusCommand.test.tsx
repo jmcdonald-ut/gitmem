@@ -1,9 +1,10 @@
-import { describe, test, expect } from "bun:test"
-import React from "react"
+import { describe, expect, test } from "bun:test"
 import { render } from "ink-testing-library"
-import { StatusCommand } from "@commands/status/StatusCommand"
-import type { StatusInfo } from "@/types"
+import React from "react"
+
 import { DEFAULTS } from "@/config"
+import type { StatusInfo } from "@/types"
+import { StatusCommand } from "@commands/status/StatusCommand"
 
 describe("StatusCommand", () => {
   test("displays full status info", () => {

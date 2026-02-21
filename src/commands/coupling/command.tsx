@@ -1,14 +1,15 @@
 import { Command } from "@commander-js/extra-typings"
-import React from "react"
 import { render } from "ink"
+import React from "react"
+
+import { formatOutput } from "@/output"
+import { CouplingCommand } from "@commands/coupling/CouplingCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
-import { formatOutput } from "@/output"
 import { AggregateRepository } from "@db/aggregates"
-import { CouplingCommand } from "@commands/coupling/CouplingCommand"
 import {
-  resolveExcludedCategories,
   filterPairsByTrackedFiles,
+  resolveExcludedCategories,
 } from "@services/file-filter"
 
 const HELP_TEXT = `

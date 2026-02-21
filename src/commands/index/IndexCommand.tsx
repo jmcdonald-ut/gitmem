@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react"
 import { Box, Text, useApp } from "ink"
 import Spinner from "ink-spinner"
+import React, { useEffect, useState } from "react"
+
 import type { IndexProgress } from "@/types"
 import { EnricherService } from "@services/enricher"
 

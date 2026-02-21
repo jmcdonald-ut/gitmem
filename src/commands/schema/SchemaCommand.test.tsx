@@ -1,9 +1,10 @@
-import { describe, test, expect } from "bun:test"
-import React from "react"
+import { describe, expect, test } from "bun:test"
 import { render } from "ink-testing-library"
-import { SchemaCommand } from "@commands/schema/SchemaCommand"
+import React from "react"
+
 import { SCHEMA } from "@/schema"
 import type { SchemaTable } from "@/types"
+import { SchemaCommand } from "@commands/schema/SchemaCommand"
 
 const sampleTables: SchemaTable[] = [
   {

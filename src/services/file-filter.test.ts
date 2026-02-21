@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test"
+
 import {
-  isExcluded,
-  isGenerated,
-  getExclusionPatterns,
-  resolveExcludedCategories,
-  filterByTrackedFiles,
-  filterPairsByTrackedFiles,
   DEFAULT_EXCLUDED,
   type FileCategory,
+  filterByTrackedFiles,
+  filterPairsByTrackedFiles,
+  getExclusionPatterns,
+  isExcluded,
+  isGenerated,
+  resolveExcludedCategories,
 } from "@services/file-filter"
 
 describe("isExcluded", () => {

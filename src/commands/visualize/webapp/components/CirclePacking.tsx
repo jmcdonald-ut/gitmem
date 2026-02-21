@@ -1,20 +1,21 @@
 /// <reference lib="dom" />
 import {
-  useRef,
-  useEffect,
-  useState,
-  useCallback,
-  useMemo,
-  type MouseEvent,
-} from "react"
-import {
+  type HierarchyCircularNode,
   hierarchy as d3hierarchy,
   pack as d3pack,
-  type HierarchyCircularNode,
 } from "d3-hierarchy"
 import { interpolateZoom } from "d3-interpolate"
-import { scoreColor } from "@visualize-app/lib/colors"
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+
 import { Tooltip, type TooltipData } from "@visualize-app/components/Tooltip"
+import { scoreColor } from "@visualize-app/lib/colors"
 import type { HierarchyNode, HierarchyResult } from "@visualize-app/types"
 
 interface CirclePackingProps {

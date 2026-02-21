@@ -1,9 +1,10 @@
 /// <reference lib="dom" />
-import "@visualize-app/test-setup"
-import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test"
-import { render, waitFor, cleanup } from "@testing-library/react"
+import { cleanup, render, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+
 import { App } from "@visualize-app/App"
+import "@visualize-app/test-setup"
 
 const hierarchyResponse = {
   root: {

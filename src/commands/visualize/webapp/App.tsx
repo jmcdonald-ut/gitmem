@@ -1,10 +1,11 @@
 /// <reference lib="dom" />
-import { useState, useCallback } from "react"
-import { useHierarchy } from "@visualize-app/hooks/useHierarchy"
-import { useDetails } from "@visualize-app/hooks/useDetails"
-import { Header } from "@visualize-app/components/Header"
+import { useCallback, useState } from "react"
+
 import { CirclePacking } from "@visualize-app/components/CirclePacking"
 import { DetailsPanel } from "@visualize-app/components/DetailsPanel"
+import { Header } from "@visualize-app/components/Header"
+import { useDetails } from "@visualize-app/hooks/useDetails"
+import { useHierarchy } from "@visualize-app/hooks/useHierarchy"
 
 export function App() {
   const {

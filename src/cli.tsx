@@ -1,17 +1,17 @@
 #!/usr/bin/env bun
-import { initCommand } from "@commands/init/command"
-import { indexCommand } from "@commands/index/command"
-import { statusCommand } from "@commands/status/command"
-import { queryCommand } from "@commands/query/command"
 import { checkCommand } from "@commands/check/command"
-import { hotspotsCommand } from "@commands/hotspots/command"
-import { statsCommand } from "@commands/stats/command"
 import { couplingCommand } from "@commands/coupling/command"
-import { trendsCommand } from "@commands/trends/command"
-import { schemaCommand } from "@commands/schema/command"
-import { visualizeCommand } from "@commands/visualize/command"
 import { generateCommand } from "@commands/generate/command"
 import { gitmemCommand } from "@commands/gitmem"
+import { hotspotsCommand } from "@commands/hotspots/command"
+import { indexCommand } from "@commands/index/command"
+import { initCommand } from "@commands/init/command"
+import { queryCommand } from "@commands/query/command"
+import { schemaCommand } from "@commands/schema/command"
+import { statsCommand } from "@commands/stats/command"
+import { statusCommand } from "@commands/status/command"
+import { trendsCommand } from "@commands/trends/command"
+import { visualizeCommand } from "@commands/visualize/command"
 
 gitmemCommand.addCommand(initCommand)
 gitmemCommand.addCommand(indexCommand)

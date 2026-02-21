@@ -1,13 +1,14 @@
 import { Command } from "@commander-js/extra-typings"
-import React from "react"
+import { existsSync, mkdirSync, writeFileSync } from "fs"
 import { render } from "ink"
 import { join, relative } from "path"
-import { existsSync, mkdirSync, writeFileSync } from "fs"
-import { runCommand } from "@commands/utils/command-context"
+import React from "react"
+
 import { formatOutput } from "@/output"
-import { getSkillContent } from "@commands/generate/skill-content"
 import { GenerateSkillCommand } from "@commands/generate/GenerateSkillCommand"
+import { getSkillContent } from "@commands/generate/skill-content"
 import { GitmemCommandOpts } from "@commands/gitmem"
+import { runCommand } from "@commands/utils/command-context"
 
 export interface GenerateSkillOptions {
   repoRoot: string

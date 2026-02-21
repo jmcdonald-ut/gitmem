@@ -1,9 +1,9 @@
 /// <reference lib="dom" />
-import type { DetailsResponse } from "@visualize-app/types"
-import { fmt, smartTruncate } from "@visualize-app/lib/format"
-import { StatGrid } from "@visualize-app/components/StatGrid"
 import { ClassificationBar } from "@visualize-app/components/ClassificationBar"
+import { StatGrid } from "@visualize-app/components/StatGrid"
 import { TrendIndicator } from "@visualize-app/components/TrendIndicator"
+import { fmt, smartTruncate } from "@visualize-app/lib/format"
+import type { DetailsResponse } from "@visualize-app/types"
 
 interface DetailsPanelProps {
   data: DetailsResponse | null

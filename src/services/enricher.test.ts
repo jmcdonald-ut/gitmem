@@ -1,18 +1,19 @@
-import { describe, test, expect, beforeEach, mock, spyOn } from "bun:test"
-import { createDatabase } from "@db/database"
-import { CommitRepository } from "@db/commits"
-import { AggregateRepository } from "@db/aggregates"
-import { SearchService } from "@db/search"
-import { BatchJobRepository } from "@db/batch-jobs"
-import { EnricherService } from "@services/enricher"
-import type { BatchLLMService } from "@services/batch-llm"
+import { Database } from "bun:sqlite"
+import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+
 import type {
+  CommitInfo,
   IGitService,
   ILLMService,
   IndexProgress,
-  CommitInfo,
 } from "@/types"
-import { Database } from "bun:sqlite"
+import { AggregateRepository } from "@db/aggregates"
+import { BatchJobRepository } from "@db/batch-jobs"
+import { CommitRepository } from "@db/commits"
+import { createDatabase } from "@db/database"
+import { SearchService } from "@db/search"
+import type { BatchLLMService } from "@services/batch-llm"
+import { EnricherService } from "@services/enricher"
 
 describe("EnricherService", () => {
   let db: Database

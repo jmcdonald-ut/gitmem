@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
-import { scaleLinear } from "d3-scale"
 import { interpolateRgb } from "d3-interpolate"
+import { scaleLinear } from "d3-scale"
 
 /** Classification colors referencing CSS custom properties from styles.css. */
 export const COLORS: Record<string, string> = {

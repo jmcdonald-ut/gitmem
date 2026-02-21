@@ -1,10 +1,11 @@
-import { describe, test, expect, mock } from "bun:test"
-import React from "react"
+import { describe, expect, mock, test } from "bun:test"
 import { render } from "ink-testing-library"
+import React from "react"
+
+import type { CheckProgress, EvalResult, EvalSummary } from "@/types"
 import { CheckCommand } from "@commands/check/CheckCommand"
 import { waitForFrame } from "@commands/utils/test-utils"
 import type { CheckerService } from "@services/checker"
-import type { CheckProgress, EvalResult, EvalSummary } from "@/types"
 
 function createMockChecker(
   behavior:

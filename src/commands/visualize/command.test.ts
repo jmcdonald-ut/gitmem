@@ -1,12 +1,13 @@
 import { Database } from "bun:sqlite"
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
+
 import {
-  parsePort,
-  normalizePathPrefix,
   handleDetails,
+  normalizePathPrefix,
+  parsePort,
 } from "@commands/visualize/command"
-import { CommitRepository } from "@db/commits"
 import { AggregateRepository } from "@db/aggregates"
+import { CommitRepository } from "@db/commits"
 import { createDatabase } from "@db/database"
 
 describe("parsePort", () => {

@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk"
-import type { CommitInfo, EnrichmentResult, BatchStatusResult } from "@/types"
+
+import type { BatchStatusResult, CommitInfo, EnrichmentResult } from "@/types"
+import { getBatchStatus as getBatchStatusShared } from "@services/batch-shared"
 import {
-  SYSTEM_PROMPT,
   ENRICHMENT_OUTPUT_CONFIG,
+  SYSTEM_PROMPT,
   buildUserMessage,
   parseEnrichmentResponse,
 } from "@services/llm-shared"
-import { getBatchStatus as getBatchStatusShared } from "@services/batch-shared"
 
 /** A single request item for a batch submission. */
 export interface BatchRequest {

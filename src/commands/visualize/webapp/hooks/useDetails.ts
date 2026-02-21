@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+
 import type { DetailsResponse } from "@visualize-app/types"
 
 export function useDetails(path: string | null) {

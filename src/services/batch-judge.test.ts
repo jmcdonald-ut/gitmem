@@ -1,6 +1,7 @@
-import { describe, test, expect, mock } from "bun:test"
-import { BatchJudgeService } from "@services/batch-judge"
+import { describe, expect, mock, test } from "bun:test"
+
 import type { CommitInfo } from "@/types"
+import { BatchJudgeService } from "@services/batch-judge"
 
 function mockClient(overrides: {
   create?: () => Promise<unknown>

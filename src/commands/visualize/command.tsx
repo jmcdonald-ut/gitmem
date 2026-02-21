@@ -1,21 +1,23 @@
 import { Command } from "@commander-js/extra-typings"
 import { basename } from "path"
+
 import { runCommand } from "@commands/utils/command-context"
-import { CommitRepository } from "@db/commits"
+import { buildHierarchy } from "@commands/visualize/hierarchy"
 import {
   AggregateRepository,
-  computeTrend,
   type WindowKey,
+  computeTrend,
 } from "@db/aggregates"
-import { buildHierarchy } from "@commands/visualize/hierarchy"
-import homepage from "@visualize-app/index.html"
+import { CommitRepository } from "@db/commits"
 import {
-  isExcluded,
-  resolveExcludedCategories,
+  type FileCategory,
   filterByTrackedFiles,
   filterPairsByTrackedFiles,
-  type FileCategory,
+  isExcluded,
+  resolveExcludedCategories,
 } from "@services/file-filter"
+
+import homepage from "@visualize-app/index.html"
 
 export function normalizePathPrefix(input: string): string {
   let p = input

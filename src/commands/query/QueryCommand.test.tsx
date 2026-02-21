@@ -1,8 +1,9 @@
-import { describe, test, expect } from "bun:test"
-import React from "react"
+import { describe, expect, test } from "bun:test"
 import { render } from "ink-testing-library"
-import { QueryCommand } from "@commands/query/QueryCommand"
+import React from "react"
+
 import type { SearchResult } from "@/types"
+import { QueryCommand } from "@commands/query/QueryCommand"
 
 describe("QueryCommand", () => {
   const mockResults: SearchResult[] = [

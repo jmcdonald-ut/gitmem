@@ -1,10 +1,11 @@
 import { Command } from "@commander-js/extra-typings"
-import React from "react"
 import { render } from "ink"
-import { runCommand } from "@commands/utils/command-context"
+import React from "react"
+
 import { formatOutput } from "@/output"
 import { SCHEMA } from "@/schema"
 import { SchemaCommand } from "@commands/schema/SchemaCommand"
+import { runCommand } from "@commands/utils/command-context"
 
 const HELP_TEXT = `
 For writing custom SQL queries against the .gitmem/index.db database.

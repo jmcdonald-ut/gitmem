@@ -1,24 +1,25 @@
+import { Database } from "bun:sqlite"
 import {
-  describe,
-  test,
-  expect,
-  beforeEach,
   afterEach,
+  beforeEach,
+  describe,
+  expect,
   mock,
   spyOn,
+  test,
 } from "bun:test"
-import { Database } from "bun:sqlite"
-import { mkdtemp, rm, realpath } from "fs/promises"
-import { join } from "path"
-import { tmpdir } from "os"
 import { mkdirSync, writeFileSync } from "fs"
+import { mkdtemp, realpath, rm } from "fs/promises"
+import { tmpdir } from "os"
+import { join } from "path"
+
+import { DEFAULTS } from "@/config"
 import {
-  runCommand,
-  getDbPath,
   type CommandContext,
+  getDbPath,
+  runCommand,
 } from "@commands/utils/command-context"
 import { createDatabase } from "@db/database"
-import { DEFAULTS } from "@/config"
 
 function createTestConfig(dir: string, overrides?: Record<string, unknown>) {
   const gitmemDir = join(dir, ".gitmem")

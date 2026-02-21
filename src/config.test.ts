@@ -1,16 +1,17 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { mkdtemp, rm } from "fs/promises"
-import { join } from "path"
 import { tmpdir } from "os"
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
+import { join } from "path"
+
 import {
-  loadConfig,
+  DEFAULTS,
+  type GitmemConfig,
   configExists,
   createConfig,
   getAiCoverage,
   isAiEnabled,
-  DEFAULTS,
-  type GitmemConfig,
+  loadConfig,
 } from "@/config"
 
 describe("loadConfig", () => {

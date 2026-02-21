@@ -1,17 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk"
+
 import type {
+  BatchStatusResult,
   CommitInfo,
   EvalVerdict,
   IBatchJudgeService,
-  BatchStatusResult,
 } from "@/types"
+import { getBatchStatus as getBatchStatusShared } from "@services/batch-shared"
 import {
-  JUDGE_SYSTEM_PROMPT,
   EVAL_OUTPUT_CONFIG,
+  JUDGE_SYSTEM_PROMPT,
   buildJudgeUserMessage,
   parseEvalResponse,
 } from "@services/judge-shared"
-import { getBatchStatus as getBatchStatusShared } from "@services/batch-shared"
 
 /** A single request item for a check batch submission. */
 export interface CheckBatchRequest {

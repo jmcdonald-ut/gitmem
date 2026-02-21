@@ -1,12 +1,13 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
+
+import type { CommitInfo } from "@/types"
 import {
+  EnrichmentSchema,
   SYSTEM_PROMPT,
   buildUserMessage,
-  parseEnrichmentResponse,
   estimateTokens,
-  EnrichmentSchema,
+  parseEnrichmentResponse,
 } from "@services/llm-shared"
-import type { CommitInfo } from "@/types"
 
 const commit: CommitInfo = {
   hash: "abc123",

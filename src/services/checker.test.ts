@@ -1,15 +1,16 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test"
-import { createDatabase } from "@db/database"
-import { CommitRepository } from "@db/commits"
-import { BatchJobRepository } from "@db/batch-jobs"
-import { CheckerService } from "@services/checker"
+import { Database } from "bun:sqlite"
+import { beforeEach, describe, expect, mock, test } from "bun:test"
+
 import type {
+  CheckProgress,
+  IBatchJudgeService,
   IGitService,
   IJudgeService,
-  IBatchJudgeService,
-  CheckProgress,
 } from "@/types"
-import { Database } from "bun:sqlite"
+import { BatchJobRepository } from "@db/batch-jobs"
+import { CommitRepository } from "@db/commits"
+import { createDatabase } from "@db/database"
+import { CheckerService } from "@services/checker"
 
 describe("CheckerService", () => {
   let db: Database

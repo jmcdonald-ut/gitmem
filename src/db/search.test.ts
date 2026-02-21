@@ -1,8 +1,9 @@
-import { describe, test, expect, beforeEach } from "bun:test"
-import { createDatabase } from "@db/database"
-import { CommitRepository } from "@db/commits"
-import { SearchService, InvalidQueryError } from "@db/search"
 import { Database } from "bun:sqlite"
+import { beforeEach, describe, expect, test } from "bun:test"
+
+import { CommitRepository } from "@db/commits"
+import { createDatabase } from "@db/database"
+import { InvalidQueryError, SearchService } from "@db/search"
 
 describe("SearchService", () => {
   let db: Database

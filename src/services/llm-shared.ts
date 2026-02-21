@@ -1,5 +1,6 @@
-import { z } from "zod"
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod"
+import { z } from "zod"
+
 import type { CommitInfo, EnrichmentResult } from "@/types"
 import { CLASSIFICATIONS } from "@/types"
 

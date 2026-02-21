@@ -1,12 +1,12 @@
 import type { IGitService, ILLMService, IndexProgress } from "@/types"
 import type { CommitRow, EnrichmentResult } from "@/types"
-import { CommitRepository } from "@db/commits"
 import { AggregateRepository } from "@db/aggregates"
-import { SearchService } from "@db/search"
 import { BatchJobRepository } from "@db/batch-jobs"
+import { CommitRepository } from "@db/commits"
+import { SearchService } from "@db/search"
 import type { BatchLLMService, BatchRequest } from "@services/batch-llm"
-import type { MeasurerService } from "@services/measurer"
 import { SYSTEM_PROMPT, buildUserMessage } from "@services/llm-shared"
+import type { MeasurerService } from "@services/measurer"
 
 const MAX_BATCH_REQUESTS = 100_000
 const MAX_BATCH_BYTES = 200 * 1024 * 1024 // 200 MB, leaving margin from the 256 MB limit

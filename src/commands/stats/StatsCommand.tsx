@@ -1,13 +1,14 @@
-import React from "react"
 import { Box, Text } from "ink"
-import type { FileStatsRow, FileContributorRow, RecentCommit } from "@/types"
+import React from "react"
+
+import type { AiCoverage } from "@/config"
+import type { FileContributorRow, FileStatsRow, RecentCommit } from "@/types"
 import {
   CLASSIFICATION_COLORS,
   CLASSIFICATION_KEYS,
   type Classification,
 } from "@/types"
 import { AiCoverageDisclaimer } from "@commands/utils/AiCoverageDisclaimer"
-import type { AiCoverage } from "@/config"
 
 /** Props for the StatsCommand component. */
 interface StatsCommandProps {

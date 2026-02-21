@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk"
+
 import type { CommitInfo, EnrichmentResult, ILLMService } from "@/types"
 import {
-  SYSTEM_PROMPT,
   ENRICHMENT_OUTPUT_CONFIG,
+  SYSTEM_PROMPT,
   buildUserMessage,
   parseEnrichmentResponse,
 } from "@services/llm-shared"

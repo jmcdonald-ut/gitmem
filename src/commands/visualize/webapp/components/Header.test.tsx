@@ -1,8 +1,9 @@
 /// <reference lib="dom" />
-import "@visualize-app/test-setup"
-import { describe, test, expect, mock, afterEach } from "bun:test"
-import { render, fireEvent, cleanup } from "@testing-library/react"
+import { cleanup, fireEvent, render } from "@testing-library/react"
+import { afterEach, describe, expect, mock, test } from "bun:test"
+
 import { Header } from "@visualize-app/components/Header"
+import "@visualize-app/test-setup"
 
 afterEach(cleanup)
 

@@ -1,8 +1,9 @@
-import { describe, test, expect } from "bun:test"
-import React from "react"
+import { describe, expect, test } from "bun:test"
 import { render } from "ink-testing-library"
-import { InitCommand } from "@commands/init/InitCommand"
+import React from "react"
+
 import { DEFAULTS, type GitmemConfig } from "@/config"
+import { InitCommand } from "@commands/init/InitCommand"
 
 describe("InitCommand", () => {
   test("displays initialized header", () => {

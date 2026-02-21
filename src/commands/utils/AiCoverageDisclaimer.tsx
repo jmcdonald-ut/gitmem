@@ -1,5 +1,6 @@
-import React from "react"
 import { Text } from "ink"
+import React from "react"
+
 import type { AiCoverage } from "@/config"
 
 interface AiCoverageDisclaimerProps {

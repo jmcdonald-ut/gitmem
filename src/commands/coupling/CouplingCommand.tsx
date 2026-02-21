@@ -1,6 +1,7 @@
-import React from "react"
 import { Box, Text } from "ink"
-import type { CouplingPairRow, CouplingPairGlobalRow } from "@/types"
+import React from "react"
+
+import type { CouplingPairGlobalRow, CouplingPairRow } from "@/types"
 
 /** Props for the CouplingCommand component. */
 interface CouplingCommandProps {

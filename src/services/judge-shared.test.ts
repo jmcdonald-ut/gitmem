@@ -1,12 +1,13 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
+
+import type { CommitInfo } from "@/types"
 import {
+  EvalResponseSchema,
   JUDGE_SYSTEM_PROMPT,
   buildJudgeUserMessage,
   parseEvalResponse,
-  EvalResponseSchema,
   reconcileClassificationVerdict,
 } from "@services/judge-shared"
-import type { CommitInfo } from "@/types"
 
 const commit: CommitInfo = {
   hash: "abc123",

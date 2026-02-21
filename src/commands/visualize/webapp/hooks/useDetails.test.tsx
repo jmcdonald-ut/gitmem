@@ -1,8 +1,9 @@
 /// <reference lib="dom" />
-import "@visualize-app/test-setup"
-import { describe, test, expect, mock, afterEach } from "bun:test"
-import { render, waitFor, cleanup } from "@testing-library/react"
+import { cleanup, render, waitFor } from "@testing-library/react"
+import { afterEach, describe, expect, mock, test } from "bun:test"
+
 import { useDetails } from "@visualize-app/hooks/useDetails"
+import "@visualize-app/test-setup"
 
 const originalFetch = globalThis.fetch
 

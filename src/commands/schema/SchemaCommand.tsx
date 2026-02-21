@@ -1,5 +1,6 @@
-import React from "react"
 import { Box, Text } from "ink"
+import React from "react"
+
 import type { SchemaTable } from "@/types"
 
 /** Props for the SchemaCommand component. */

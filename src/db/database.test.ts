@@ -1,8 +1,9 @@
-import { describe, test, expect } from "bun:test"
 import { Database } from "bun:sqlite"
+import { describe, expect, test } from "bun:test"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
-import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import { createDatabase } from "@db/database"
 
 describe("createDatabase", () => {

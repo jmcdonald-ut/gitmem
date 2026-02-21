@@ -1,9 +1,10 @@
-import { describe, test, expect, beforeEach } from "bun:test"
-import { createDatabase } from "@db/database"
-import { CommitRepository } from "@db/commits"
-import { AggregateRepository, computeTrend } from "@db/aggregates"
-import type { CommitInfo, TrendPeriod } from "@/types"
 import { Database } from "bun:sqlite"
+import { beforeEach, describe, expect, test } from "bun:test"
+
+import type { CommitInfo, TrendPeriod } from "@/types"
+import { AggregateRepository, computeTrend } from "@db/aggregates"
+import { CommitRepository } from "@db/commits"
+import { createDatabase } from "@db/database"
 
 describe("AggregateRepository", () => {
   let db: Database

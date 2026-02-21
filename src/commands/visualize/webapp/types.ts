@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
-import type { HierarchyResult } from "@commands/visualize/hierarchy"
 import type { TrendSummary } from "@/types"
+import type { HierarchyResult } from "@commands/visualize/hierarchy"
 
 export type {
   HierarchyResult,

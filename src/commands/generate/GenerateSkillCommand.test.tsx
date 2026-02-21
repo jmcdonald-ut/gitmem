@@ -1,6 +1,7 @@
-import { describe, test, expect } from "bun:test"
-import React from "react"
+import { describe, expect, test } from "bun:test"
 import { render } from "ink-testing-library"
+import React from "react"
+
 import { GenerateSkillCommand } from "@commands/generate/GenerateSkillCommand"
 
 describe("GenerateSkillCommand", () => {

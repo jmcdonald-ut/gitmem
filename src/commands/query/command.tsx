@@ -1,13 +1,14 @@
 import { Command } from "@commander-js/extra-typings"
-import React from "react"
 import { render } from "ink"
+import React from "react"
+
+import { isAiEnabled } from "@/config"
+import { formatOutput } from "@/output"
+import { QueryCommand } from "@commands/query/QueryCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
-import { formatOutput } from "@/output"
-import { isAiEnabled } from "@/config"
 import { CommitRepository } from "@db/commits"
-import { SearchService, InvalidQueryError } from "@db/search"
-import { QueryCommand } from "@commands/query/QueryCommand"
+import { InvalidQueryError, SearchService } from "@db/search"
 
 const HELP_TEXT = `
 Uses SQLite FTS5 full-text search — no API calls at query time.

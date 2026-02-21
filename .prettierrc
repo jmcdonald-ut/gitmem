@@ -1,3 +1,10 @@
 {
-  "semi": false
+  "plugins": ["@trivago/prettier-plugin-sort-imports"],
+  "semi": false,
+  "importOrder": [
+    "^((@(commands|db|services)\/)|(@\/))(.*)$",
+    "^@visualize-app\/(.*)$"
+  ],
+  "importOrderSeparation": true,
+  "importOrderSortSpecifiers": true
 }

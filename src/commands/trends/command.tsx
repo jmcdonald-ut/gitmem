@@ -1,14 +1,15 @@
 import { Command } from "@commander-js/extra-typings"
-import React from "react"
 import { render } from "ink"
+import React from "react"
+
+import { getAiCoverage } from "@/config"
+import { formatOutput } from "@/output"
+import { TrendsCommand } from "@commands/trends/TrendsCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
-import { formatOutput } from "@/output"
-import { getAiCoverage } from "@/config"
-import { CommitRepository } from "@db/commits"
 import type { WindowKey } from "@db/aggregates"
 import { AggregateRepository, computeTrend } from "@db/aggregates"
-import { TrendsCommand } from "@commands/trends/TrendsCommand"
+import { CommitRepository } from "@db/commits"
 
 const VALID_WINDOWS = ["weekly", "monthly", "quarterly"]
 

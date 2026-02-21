@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk"
+
 import type { CommitInfo, EvalVerdict, IJudgeService } from "@/types"
 import {
-  JUDGE_SYSTEM_PROMPT,
   EVAL_OUTPUT_CONFIG,
+  JUDGE_SYSTEM_PROMPT,
   buildJudgeUserMessage,
   parseEvalResponse,
 } from "@services/judge-shared"

@@ -1,10 +1,11 @@
-import { describe, test, expect, mock } from "bun:test"
-import React from "react"
+import { describe, expect, mock, test } from "bun:test"
 import { render } from "ink-testing-library"
+import React from "react"
+
+import type { IndexProgress } from "@/types"
 import { IndexCommand, phaseLabel } from "@commands/index/IndexCommand"
 import { waitForFrame } from "@commands/utils/test-utils"
 import type { EnricherService } from "@services/enricher"
-import type { IndexProgress } from "@/types"
 
 function createMockEnricher(
   behavior: "success" | "error" | "empty" = "success",
