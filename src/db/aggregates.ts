@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite"
 
 import { ValidationError } from "@/errors"
+import { type FileCategory, getExclusionPatterns } from "@/file-filter"
 import type {
   CouplingPairGlobalRow,
   CouplingPairRow,
@@ -10,7 +11,6 @@ import type {
   TrendPeriod,
   TrendSummary,
 } from "@db/types"
-import { type FileCategory, getExclusionPatterns } from "@services/file-filter"
 
 /** Valid time window keys for trend queries. */
 export type WindowKey = "weekly" | "monthly" | "quarterly"

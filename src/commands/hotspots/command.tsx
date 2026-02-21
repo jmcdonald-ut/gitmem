@@ -4,16 +4,13 @@ import React from "react"
 
 import { getAiCoverage, isAiEnabled } from "@/config"
 import { AiRequiredError, ValidationError } from "@/errors"
+import { filterByTrackedFiles, resolveExcludedCategories } from "@/file-filter"
 import { formatOutput } from "@/output"
 import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { AggregateRepository } from "@db/aggregates"
 import { CommitRepository } from "@db/commits"
-import {
-  filterByTrackedFiles,
-  resolveExcludedCategories,
-} from "@services/file-filter"
 
 const VALID_SORT_FIELDS = [
   "total",

@@ -1,6 +1,13 @@
 import { Command } from "@commander-js/extra-typings"
 import { basename } from "path"
 
+import {
+  type FileCategory,
+  filterByTrackedFiles,
+  filterPairsByTrackedFiles,
+  isExcluded,
+  resolveExcludedCategories,
+} from "@/file-filter"
 import { runCommand } from "@commands/utils/command-context"
 import { buildHierarchy } from "@commands/visualize/hierarchy"
 import {
@@ -9,13 +16,6 @@ import {
   computeTrend,
 } from "@db/aggregates"
 import { CommitRepository } from "@db/commits"
-import {
-  type FileCategory,
-  filterByTrackedFiles,
-  filterPairsByTrackedFiles,
-  isExcluded,
-  resolveExcludedCategories,
-} from "@services/file-filter"
 
 import homepage from "@visualize-app/index.html"
 

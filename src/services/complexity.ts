@@ -60,4 +60,4 @@ export function isBinary(content: Buffer): boolean {
   return false
 }
 
-export { isGenerated } from "@services/file-filter"
+export { isGenerated } from "@/file-filter"

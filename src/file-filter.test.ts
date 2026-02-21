@@ -9,7 +9,7 @@ import {
   isExcluded,
   isGenerated,
   resolveExcludedCategories,
-} from "@services/file-filter"
+} from "@/file-filter"
 
 describe("isExcluded", () => {
   describe("test category", () => {

@@ -3,15 +3,15 @@ import { render } from "ink"
 import React from "react"
 
 import { NotFoundError } from "@/errors"
+import {
+  filterPairsByTrackedFiles,
+  resolveExcludedCategories,
+} from "@/file-filter"
 import { formatOutput } from "@/output"
 import { CouplingCommand } from "@commands/coupling/CouplingCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { AggregateRepository } from "@db/aggregates"
-import {
-  filterPairsByTrackedFiles,
-  resolveExcludedCategories,
-} from "@services/file-filter"
 
 const HELP_TEXT = `
 Co-change means two files were modified in the same commit. High
