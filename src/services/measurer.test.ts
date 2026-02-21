@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { beforeEach, describe, expect, mock, test } from "bun:test"
 
-import type { CommitInfo } from "@/types"
+import type { CommitInfo, GitChangeType } from "@/types"
 import { CommitRepository } from "@db/commits"
 import { createDatabase } from "@db/database"
 import { MeasurerService } from "@services/measurer"
@@ -35,7 +35,7 @@ describe("MeasurerService", () => {
     hash: string,
     files: Array<{
       filePath: string
-      changeType: string
+      changeType: GitChangeType
       additions?: number
       deletions?: number
     }>,
@@ -64,7 +64,7 @@ describe("MeasurerService", () => {
   })
 
   test("measures complexity for source files", async () => {
-    insertCommit("aaa", [{ filePath: "src/main.ts", changeType: "A" }])
+    insertCommit("aaa", [{ filePath: "src/main.ts", changeType: "A" as const }])
 
     const fileContent = Buffer.from("function foo() {\n    return 1\n}\n")
     mockGit.getFileContentsBatch = mock(() => {
@@ -98,7 +98,9 @@ describe("MeasurerService", () => {
   })
 
   test("sets 0,0,0 for deleted files without fetching", async () => {
-    insertCommit("aaa", [{ filePath: "src/removed.ts", changeType: "D" }])
+    insertCommit("aaa", [
+      { filePath: "src/removed.ts", changeType: "D" as const },
+    ])
 
     const measurer = new MeasurerService(mockGit, commits)
     const count = await measurer.measure(() => {})
@@ -124,7 +126,9 @@ describe("MeasurerService", () => {
   })
 
   test("sets 0,0,0 for generated files without fetching", async () => {
-    insertCommit("aaa", [{ filePath: "package-lock.json", changeType: "M" }])
+    insertCommit("aaa", [
+      { filePath: "package-lock.json", changeType: "M" as const },
+    ])
 
     const measurer = new MeasurerService(mockGit, commits)
     const count = await measurer.measure(() => {})
@@ -134,7 +138,7 @@ describe("MeasurerService", () => {
   })
 
   test("sets 0,0,0 for binary files", async () => {
-    insertCommit("aaa", [{ filePath: "image.png", changeType: "A" }])
+    insertCommit("aaa", [{ filePath: "image.png", changeType: "A" as const }])
 
     const binaryContent = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00])
     mockGit.getFileContentsBatch = mock(() => {
@@ -157,7 +161,7 @@ describe("MeasurerService", () => {
   })
 
   test("sets 0,0,0 for missing files in git", async () => {
-    insertCommit("aaa", [{ filePath: "gone.ts", changeType: "A" }])
+    insertCommit("aaa", [{ filePath: "gone.ts", changeType: "A" as const }])
 
     // Return empty map (file not found)
     mockGit.getFileContentsBatch = mock(() =>
@@ -179,8 +183,8 @@ describe("MeasurerService", () => {
 
   test("reports progress via callback", async () => {
     insertCommit("aaa", [
-      { filePath: "src/a.ts", changeType: "A" },
-      { filePath: "src/b.ts", changeType: "A" },
+      { filePath: "src/a.ts", changeType: "A" as const },
+      { filePath: "src/b.ts", changeType: "A" as const },
     ])
 
     mockGit.getFileContentsBatch = mock(() => {
@@ -204,9 +208,9 @@ describe("MeasurerService", () => {
 
   test("handles mixed file types in a single batch", async () => {
     insertCommit("aaa", [
-      { filePath: "src/code.ts", changeType: "M" },
-      { filePath: "old.ts", changeType: "D" },
-      { filePath: "yarn.lock", changeType: "M" },
+      { filePath: "src/code.ts", changeType: "M" as const },
+      { filePath: "old.ts", changeType: "D" as const },
+      { filePath: "yarn.lock", changeType: "M" as const },
     ])
 
     mockGit.getFileContentsBatch = mock(() => {
@@ -241,7 +245,7 @@ describe("MeasurerService", () => {
   })
 
   test("does not re-measure already measured files", async () => {
-    insertCommit("aaa", [{ filePath: "src/main.ts", changeType: "A" }])
+    insertCommit("aaa", [{ filePath: "src/main.ts", changeType: "A" as const }])
 
     // Pre-measure
     commits.updateComplexity("aaa", "src/main.ts", 10, 5, 3)

@@ -16,8 +16,18 @@ const commit: CommitInfo = {
   committedAt: "2024-01-01",
   message: "fix auth bug",
   files: [
-    { filePath: "src/auth.ts", changeType: "M", additions: 5, deletions: 2 },
-    { filePath: "src/utils.ts", changeType: "M", additions: 1, deletions: 0 },
+    {
+      filePath: "src/auth.ts",
+      changeType: "M" as const,
+      additions: 5,
+      deletions: 2,
+    },
+    {
+      filePath: "src/utils.ts",
+      changeType: "M" as const,
+      additions: 1,
+      deletions: 0,
+    },
   ],
 }
 
@@ -94,7 +104,7 @@ describe("buildUserMessage", () => {
       files: [
         {
           filePath: "src/a.ts",
-          changeType: "M",
+          changeType: "M" as const,
           additions: 1,
           deletions: 0,
         },
@@ -111,7 +121,7 @@ describe("buildUserMessage", () => {
     // Create commit with thousands of files
     const manyFiles = Array.from({ length: 20_000 }, (_, i) => ({
       filePath: `src/very/deeply/nested/directory/structure/file-${String(i).padStart(5, "0")}.ts`,
-      changeType: "M",
+      changeType: "M" as const,
       additions: 100,
       deletions: 50,
     }))

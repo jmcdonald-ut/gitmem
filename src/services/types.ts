@@ -70,12 +70,22 @@ export interface EvalVerdict {
   suggestedClassification?: Classification
 }
 
+/** The three evaluation verdicts returned by a judge for a single commit. */
+export interface EvaluationVerdicts {
+  /** Verdict on classification correctness. */
+  classificationVerdict: EvalVerdict
+  /** Verdict on summary accuracy. */
+  accuracyVerdict: EvalVerdict
+  /** Verdict on summary completeness. */
+  completenessVerdict: EvalVerdict
+}
+
 /** Full evaluation result for a single commit. */
 export interface EvalResult {
   /** The commit hash that was evaluated. */
   hash: string
   /** The original classification assigned during enrichment. */
-  classification: string
+  classification: Classification
   /** The original summary assigned during enrichment. */
   summary: string
   /** Verdict on classification correctness. */
@@ -116,7 +126,7 @@ export interface CheckProgress {
 
 /** Status result from polling a batch job via the Anthropic API. */
 export interface BatchStatusResult {
-  processingStatus: string
+  processingStatus: "in_progress" | "canceling" | "ended"
   requestCounts: {
     succeeded: number
     errored: number
@@ -149,19 +159,24 @@ export type CheckBatchResult =
       batchStatus: string
     }
 
+/** A single request item for a check batch submission. */
+export interface CheckBatchRequest {
+  hash: string
+  commit: CommitInfo
+  diff: string
+  classification: Classification
+  summary: string
+}
+
 /** Interface for LLM-based commit evaluation (judge). */
 export interface IJudgeService {
   /** Evaluates a commit's enrichment quality using a stronger model. */
   evaluateCommit(
     commit: CommitInfo,
     diff: string,
-    classification: string,
+    classification: Classification,
     summary: string,
-  ): Promise<{
-    classificationVerdict: EvalVerdict
-    accuracyVerdict: EvalVerdict
-    completenessVerdict: EvalVerdict
-  }>
+  ): Promise<EvaluationVerdicts>
 }
 
 /** Interface for batch LLM-based commit evaluation (judge). */
@@ -170,13 +185,7 @@ export interface IBatchJudgeService {
   readonly model: string
   /** Submits a batch of evaluation requests. */
   submitBatch(
-    requests: Array<{
-      hash: string
-      commit: CommitInfo
-      diff: string
-      classification: string
-      summary: string
-    }>,
+    requests: CheckBatchRequest[],
   ): Promise<{ batchId: string; requestCount: number }>
   /** Retrieves the current status of a batch. */
   getBatchStatus(batchId: string): Promise<BatchStatusResult>
@@ -184,11 +193,7 @@ export interface IBatchJudgeService {
   getBatchResults(batchId: string): Promise<
     Array<{
       hash: string
-      result?: {
-        classificationVerdict: EvalVerdict
-        accuracyVerdict: EvalVerdict
-        completenessVerdict: EvalVerdict
-      }
+      result?: EvaluationVerdicts
       error?: string
     }>
   >

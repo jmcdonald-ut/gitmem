@@ -1,9 +1,9 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod"
 import { z } from "zod"
 
-import type { CommitInfo } from "@/types"
+import type { Classification, CommitInfo } from "@/types"
 import { CLASSIFICATIONS } from "@/types"
-import type { EvalVerdict } from "@services/types"
+import type { EvalVerdict, EvaluationVerdicts } from "@services/types"
 
 const VerdictSchema = z.object({
   pass: z.boolean(),
@@ -85,7 +85,7 @@ Completeness evaluation guidelines:
 export function buildJudgeUserMessage(
   commit: CommitInfo,
   diff: string,
-  classification: string,
+  classification: Classification,
   summary: string,
 ): string {
   const fileList = commit.files
@@ -113,11 +113,7 @@ Summary: ${summary}`
  * @param text - Raw text response from the judge.
  * @returns The three evaluation verdicts.
  */
-export function parseEvalResponse(text: string): {
-  classificationVerdict: EvalVerdict
-  accuracyVerdict: EvalVerdict
-  completenessVerdict: EvalVerdict
-} {
+export function parseEvalResponse(text: string): EvaluationVerdicts {
   const parsed = EvalResponseSchema.parse(JSON.parse(text))
 
   return {
@@ -133,7 +129,7 @@ export function parseEvalResponse(text: string): {
  * was originally assigned.
  */
 export function reconcileClassificationVerdict(
-  originalClassification: string,
+  originalClassification: Classification,
   verdict: EvalVerdict,
 ): EvalVerdict {
   if (

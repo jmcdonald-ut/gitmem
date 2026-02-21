@@ -1,9 +1,9 @@
 import type { BatchJobRepository } from "@db/batch-jobs"
 import type { CommitRepository } from "@db/commits"
 import type { CommitRow } from "@db/types"
-import type { CheckBatchRequest } from "@services/batch-judge"
 import { reconcileClassificationVerdict } from "@services/judge-shared"
 import type {
+  CheckBatchRequest,
   CheckBatchResult,
   CheckProgress,
   EvalResult,

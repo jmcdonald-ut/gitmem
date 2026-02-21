@@ -39,7 +39,7 @@ describe("EnricherService", () => {
           files: [
             {
               filePath: "src/main.ts",
-              changeType: "M",
+              changeType: "M" as const,
               additions: 10,
               deletions: 5,
             },
@@ -57,7 +57,7 @@ describe("EnricherService", () => {
             files: [
               {
                 filePath: "src/main.ts",
-                changeType: "M",
+                changeType: "M" as const,
                 additions: 10,
                 deletions: 5,
               },
@@ -196,7 +196,7 @@ describe("EnricherService", () => {
             files: [
               {
                 filePath: "src/main.ts",
-                changeType: "M",
+                changeType: "M" as const,
                 additions: 10,
                 deletions: 5,
               },
@@ -392,7 +392,7 @@ describe("EnricherService", () => {
             files: [
               {
                 filePath: "src/main.ts",
-                changeType: "M",
+                changeType: "M" as const,
                 additions: 10,
                 deletions: 5,
               },
@@ -462,7 +462,7 @@ describe("EnricherService", () => {
             files: [
               {
                 filePath: "src/main.ts",
-                changeType: "M",
+                changeType: "M" as const,
                 additions: 10,
                 deletions: 5,
               },
@@ -521,7 +521,7 @@ describe("EnricherService", () => {
             files: [
               {
                 filePath: "src/main.ts",
-                changeType: "M",
+                changeType: "M" as const,
                 additions: 10,
                 deletions: 5,
               },
@@ -855,7 +855,7 @@ describe("EnricherService", () => {
             files: [
               {
                 filePath: "src/main.ts",
-                changeType: "M",
+                changeType: "M" as const,
                 additions: 10,
                 deletions: 5,
               },
@@ -1177,7 +1177,7 @@ describe("EnricherService", () => {
             files: [
               {
                 filePath: "src/main.ts",
-                changeType: "M",
+                changeType: "M" as const,
                 additions: 10,
                 deletions: 5,
               },

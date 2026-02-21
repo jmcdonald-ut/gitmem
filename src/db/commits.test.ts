@@ -26,7 +26,7 @@ describe("CommitRepository", () => {
     files: [
       {
         filePath: "src/main.ts",
-        changeType: "M",
+        changeType: "M" as const,
         additions: 10,
         deletions: 5,
       },
@@ -222,13 +222,13 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 10,
             deletions: 5,
           },
           {
             filePath: "src/utils.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 20,
             deletions: 0,
           },
@@ -238,7 +238,7 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "README.md",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 3,
             deletions: 1,
           },
@@ -272,7 +272,7 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 10,
             deletions: 0,
           },
@@ -283,7 +283,7 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 5,
             deletions: 2,
           },
@@ -307,7 +307,7 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 10,
             deletions: 0,
           },
@@ -317,7 +317,7 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 5,
             deletions: 2,
           },
@@ -358,7 +358,7 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/services/git.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 10,
             deletions: 0,
           },
@@ -369,7 +369,7 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/services/llm.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 20,
             deletions: 0,
           },
@@ -380,7 +380,7 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/db/commits.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 5,
             deletions: 0,
           },
@@ -404,13 +404,13 @@ describe("CommitRepository", () => {
         files: [
           {
             filePath: "src/services/git.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 5,
             deletions: 1,
           },
           {
             filePath: "src/services/llm.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 3,
             deletions: 1,
           },
@@ -429,19 +429,34 @@ describe("CommitRepository", () => {
       makeCommit("aaa", {
         committedAt: "2024-01-01T00:00:00Z",
         files: [
-          { filePath: "src/a.ts", changeType: "A", additions: 1, deletions: 0 },
+          {
+            filePath: "src/a.ts",
+            changeType: "A" as const,
+            additions: 1,
+            deletions: 0,
+          },
         ],
       }),
       makeCommit("bbb", {
         committedAt: "2024-02-01T00:00:00Z",
         files: [
-          { filePath: "src/b.ts", changeType: "A", additions: 1, deletions: 0 },
+          {
+            filePath: "src/b.ts",
+            changeType: "A" as const,
+            additions: 1,
+            deletions: 0,
+          },
         ],
       }),
       makeCommit("ccc", {
         committedAt: "2024-03-01T00:00:00Z",
         files: [
-          { filePath: "src/c.ts", changeType: "A", additions: 1, deletions: 0 },
+          {
+            filePath: "src/c.ts",
+            changeType: "A" as const,
+            additions: 1,
+            deletions: 0,
+          },
         ],
       }),
     ])

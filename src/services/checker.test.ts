@@ -36,7 +36,7 @@ describe("CheckerService", () => {
           files: [
             {
               filePath: "src/main.ts",
-              changeType: "M",
+              changeType: "M" as const,
               additions: 10,
               deletions: 5,
             },
@@ -603,7 +603,7 @@ describe("CheckerService", () => {
           files: [
             {
               filePath: "src/main.ts",
-              changeType: "M",
+              changeType: "M" as const,
               additions: 10,
               deletions: 5,
             },
@@ -728,7 +728,9 @@ describe("CheckerService", () => {
         })),
         getBatchStatus: mock(async () => ({
           processingStatus:
-            behavior === "status-in-progress" ? "in_progress" : "ended",
+            behavior === "status-in-progress"
+              ? ("in_progress" as const)
+              : ("ended" as const),
           requestCounts: {
             succeeded: 2,
             errored: 0,
@@ -1084,7 +1086,7 @@ describe("CheckerService", () => {
       const batchJudge: IBatchJudgeService = {
         model: "claude-sonnet-4-5-20250929",
         getBatchStatus: mock(async () => ({
-          processingStatus: "ended",
+          processingStatus: "ended" as const,
           requestCounts: {
             succeeded: 1,
             errored: 0,

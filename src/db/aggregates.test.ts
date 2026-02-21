@@ -29,13 +29,13 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 100,
             deletions: 0,
           },
           {
             filePath: "src/utils.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 50,
             deletions: 0,
           },
@@ -50,13 +50,13 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 5,
             deletions: 3,
           },
           {
             filePath: "src/utils.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 2,
             deletions: 1,
           },
@@ -71,13 +71,13 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 20,
             deletions: 5,
           },
           {
             filePath: "src/new.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 80,
             deletions: 0,
           },
@@ -121,7 +121,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/foo.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 10,
             deletions: 0,
           },
@@ -195,8 +195,18 @@ describe("AggregateRepository", () => {
         committedAt: "2024-01-01T00:00:00Z",
         message: "one",
         files: [
-          { filePath: "a.ts", changeType: "A", additions: 1, deletions: 0 },
-          { filePath: "b.ts", changeType: "A", additions: 1, deletions: 0 },
+          {
+            filePath: "a.ts",
+            changeType: "A" as const,
+            additions: 1,
+            deletions: 0,
+          },
+          {
+            filePath: "b.ts",
+            changeType: "A" as const,
+            additions: 1,
+            deletions: 0,
+          },
         ],
       },
     ])
@@ -222,13 +232,13 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "fileA.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 1,
             deletions: 0,
           },
           {
             filePath: "fileB.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 1,
             deletions: 0,
           },
@@ -243,13 +253,13 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "fileA.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 1,
             deletions: 0,
           },
           {
             filePath: "fileB.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 1,
             deletions: 0,
           },
@@ -615,13 +625,13 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/services/git.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 10,
             deletions: 5,
           },
           {
             filePath: "src/db/commits.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 5,
             deletions: 2,
           },
@@ -636,13 +646,13 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/services/git.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 8,
             deletions: 3,
           },
           {
             filePath: "src/db/commits.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 4,
             deletions: 1,
           },
@@ -716,7 +726,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/foo.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 10,
             deletions: 0,
           },
@@ -801,7 +811,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 10,
             deletions: 2,
           },
@@ -853,7 +863,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 5,
             deletions: 1,
           },
@@ -904,13 +914,13 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/main.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 5,
             deletions: 1,
           },
           {
             filePath: "src/new.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 3,
             deletions: 0,
           },
@@ -952,7 +962,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/app.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 50,
             deletions: 0,
           },
@@ -967,7 +977,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/app.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 10,
             deletions: 5,
           },
@@ -1003,7 +1013,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/app.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 50,
             deletions: 0,
           },
@@ -1018,7 +1028,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/app.ts",
-            changeType: "M",
+            changeType: "M" as const,
             additions: 10,
             deletions: 5,
           },
@@ -1086,7 +1096,7 @@ describe("AggregateRepository", () => {
         files: [
           {
             filePath: "src/__tests__/foo.test.ts",
-            changeType: "A",
+            changeType: "A" as const,
             additions: 10,
             deletions: 0,
           },

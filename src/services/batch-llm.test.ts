@@ -76,7 +76,12 @@ const commit: CommitInfo = {
   committedAt: "2024-01-01",
   message: "fix auth bug",
   files: [
-    { filePath: "src/auth.ts", changeType: "M", additions: 5, deletions: 2 },
+    {
+      filePath: "src/auth.ts",
+      changeType: "M" as const,
+      additions: 5,
+      deletions: 2,
+    },
   ],
 }
 

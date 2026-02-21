@@ -1,13 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk"
 
-import type { CommitInfo } from "@/types"
+import type { Classification, CommitInfo } from "@/types"
 import {
   EVAL_OUTPUT_CONFIG,
   JUDGE_SYSTEM_PROMPT,
   buildJudgeUserMessage,
   parseEvalResponse,
 } from "@services/judge-shared"
-import type { EvalVerdict, IJudgeService } from "@services/types"
+import type { EvaluationVerdicts, IJudgeService } from "@services/types"
 
 /** Evaluates commit enrichment quality using the Anthropic API. */
 export class JudgeService implements IJudgeService {
@@ -34,13 +34,9 @@ export class JudgeService implements IJudgeService {
   async evaluateCommit(
     commit: CommitInfo,
     diff: string,
-    classification: string,
+    classification: Classification,
     summary: string,
-  ): Promise<{
-    classificationVerdict: EvalVerdict
-    accuracyVerdict: EvalVerdict
-    completenessVerdict: EvalVerdict
-  }> {
+  ): Promise<EvaluationVerdicts> {
     const userMessage = buildJudgeUserMessage(
       commit,
       diff,

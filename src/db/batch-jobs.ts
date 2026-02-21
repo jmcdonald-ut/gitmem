@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite"
 
+import type { Classification } from "@/types"
 import type { BatchJobStatus, BatchJobType } from "@db/types"
 
 /** Database row representation of a batch job. */
@@ -19,7 +20,7 @@ export interface BatchJobRow {
 export interface CheckBatchItemRow {
   batch_id: string
   hash: string
-  classification: string
+  classification: Classification
   summary: string
 }
 
@@ -113,7 +114,7 @@ export class BatchJobRepository {
     items: Array<{
       batchId: string
       hash: string
-      classification: string
+      classification: Classification
       summary: string
     }>,
   ): void {

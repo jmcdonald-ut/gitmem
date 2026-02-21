@@ -1,4 +1,4 @@
-import type { CommitFile, CommitInfo } from "@/types"
+import type { CommitFile, CommitInfo, GitChangeType } from "@/types"
 import type { IGitService } from "@services/types"
 
 /**
@@ -239,7 +239,7 @@ export class GitService implements IGitService {
 
         return {
           filePath,
-          changeType: changeTypes.get(filePath) ?? "M",
+          changeType: (changeTypes.get(filePath) ?? "M") as GitChangeType,
           additions,
           deletions,
         }
@@ -326,7 +326,8 @@ export class GitService implements IGitService {
         if (commit) {
           commit.files.push({
             filePath,
-            changeType: changeTypeMap.get(currentHash)?.get(filePath) ?? "M",
+            changeType: (changeTypeMap.get(currentHash)?.get(filePath) ??
+              "M") as GitChangeType,
             additions,
             deletions,
           })

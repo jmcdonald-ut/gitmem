@@ -1,3 +1,5 @@
+import type { Classification, GitChangeType } from "@/types"
+
 /** Database row representation of a commit record. */
 export interface CommitRow {
   /** Full SHA-1 commit hash (primary key). */
@@ -11,7 +13,7 @@ export interface CommitRow {
   /** Full commit message. */
   message: string
   /** LLM-assigned classification, or null if not yet enriched. */
-  classification: string | null
+  classification: Classification | null
   /** LLM-generated summary, or null if not yet enriched. */
   summary: string | null
   /** ISO 8601 timestamp of when enrichment was performed. */
@@ -26,8 +28,8 @@ export interface CommitFileRow {
   commit_hash: string
   /** Repository-relative file path. */
   file_path: string
-  /** Git change type (e.g. "M", "A", "D"). */
-  change_type: string
+  /** Git change type code. */
+  change_type: GitChangeType
   /** Number of lines added. */
   additions: number
   /** Number of lines deleted. */
@@ -119,7 +121,7 @@ export interface CouplingPairGlobalRow {
 /** A recent commit associated with a file or directory. */
 export interface RecentCommit {
   hash: string
-  classification: string
+  classification: Classification | ""
   summary: string
   committed_at: string
 }
@@ -178,8 +180,8 @@ export interface SearchResult {
   hash: string
   /** Commit message. */
   message: string
-  /** LLM-assigned classification. */
-  classification: string
+  /** LLM-assigned classification, or empty string if not yet enriched. */
+  classification: Classification | ""
   /** LLM-generated summary. */
   summary: string
   /** FTS5 relevance rank (lower is more relevant). */

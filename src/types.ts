@@ -16,16 +16,14 @@ export const CLASSIFICATIONS = [
 /** A commit classification label assigned during LLM enrichment. */
 export type Classification = (typeof CLASSIFICATIONS)[number]
 
-/** The key holding a count of commits with a specific classification. */
+/** Maps hyphenated classification names to underscored form (e.g. "bug-fix" → "bug_fix"). */
+type HyphenToUnderscore<S extends string> = S extends `${infer A}-${infer B}`
+  ? `${A}_${B}`
+  : S
+
+/** The key holding a count of commits with a specific classification. Derived from Classification to stay in sync automatically. */
 export type ClassificationCountKey =
-  | "bug_fix_count"
-  | "feature_count"
-  | "refactor_count"
-  | "docs_count"
-  | "chore_count"
-  | "perf_count"
-  | "test_count"
-  | "style_count"
+  `${HyphenToUnderscore<Classification>}_count`
 
 /** Colors associated with each commit classification. */
 export const CLASSIFICATION_COLORS: { [key in Classification]: string } = {
@@ -72,12 +70,15 @@ export interface CommitInfo {
   files: CommitFile[]
 }
 
+/** Git change type codes produced by diff-tree. */
+export type GitChangeType = "M" | "A" | "D" | "R" | "C" | "T"
+
 /** A single file changed within a commit. */
 export interface CommitFile {
   /** Repository-relative file path. */
   filePath: string
-  /** Git change type (e.g. "M" for modified, "A" for added). */
-  changeType: string
+  /** Git change type code. */
+  changeType: GitChangeType
   /** Number of lines added. */
   additions: number
   /** Number of lines deleted. */
