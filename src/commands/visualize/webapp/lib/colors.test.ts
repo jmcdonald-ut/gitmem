@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { describe, test, expect } from "bun:test"
-import { COLORS, scoreColor } from "./colors"
+import { COLORS, scoreColor } from "@visualize-app/lib/colors"
 
 describe("COLORS", () => {
   test("has all classification colors as CSS custom property references", () => {

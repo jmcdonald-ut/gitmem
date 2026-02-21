@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { useState, useEffect, useRef } from "react"
-import type { DetailsResponse } from "../types"
+import type { DetailsResponse } from "@visualize-app/types"
 
 export function useDetails(path: string | null) {
   const [data, setData] = useState<DetailsResponse | null>(null)

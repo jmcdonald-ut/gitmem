@@ -15,6 +15,7 @@
     "types": ["bun"],
     "baseUrl": ".",
     "paths": {
+      "@visualize-app/*": ["src/commands/visualize/webapp/*"],
       "@commands/*": ["src/commands/*"],
       "@db/*": ["src/db/*"],
       "@services/*": ["src/services/*"],

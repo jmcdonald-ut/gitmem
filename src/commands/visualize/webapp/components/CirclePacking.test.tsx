@@ -1,11 +1,14 @@
 /// <reference lib="dom" />
-import "../test-setup"
+import "@visualize-app/test-setup"
 import { describe, test, expect, mock, afterEach } from "bun:test"
 import { render, fireEvent, cleanup } from "@testing-library/react"
-import { CirclePacking, resolveOverlaps } from "./CirclePacking"
-import type { HierarchyResult } from "../types"
+import {
+  CirclePacking,
+  resolveOverlaps,
+} from "@visualize-app/components/CirclePacking"
+import type { HierarchyResult } from "@visualize-app/types"
 import { hierarchy as d3hierarchy, pack as d3pack } from "d3-hierarchy"
-import type { HierarchyNode } from "../types"
+import type { HierarchyNode } from "@visualize-app/types"
 
 afterEach(cleanup)
 

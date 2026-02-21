@@ -8,7 +8,7 @@ import {
   type WindowKey,
 } from "@db/aggregates"
 import { buildHierarchy } from "@commands/visualize/hierarchy"
-import homepage from "@commands/visualize/webapp/index.html"
+import homepage from "@visualize-app/index.html"
 import {
   isExcluded,
   resolveExcludedCategories,

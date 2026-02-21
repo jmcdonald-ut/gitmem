@@ -1,8 +1,8 @@
 /// <reference lib="dom" />
-import "../test-setup"
+import "@visualize-app/test-setup"
 import { describe, test, expect, afterEach } from "bun:test"
 import { render, cleanup } from "@testing-library/react"
-import { TrendIndicator } from "./TrendIndicator"
+import { TrendIndicator } from "@visualize-app/components/TrendIndicator"
 import type { TrendSummary } from "@/types"
 
 afterEach(cleanup)
