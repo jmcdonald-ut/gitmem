@@ -314,12 +314,12 @@ describe("AggregateRepository", () => {
     )
   })
 
-  test("getHotspots filters by path prefix", () => {
+  test("getHotspots filters by scope include", () => {
     seedData()
     aggregates.rebuildFileStats()
 
     const hotspots = aggregates.getHotspots({
-      pathPrefix: "src/",
+      scope: { include: ["src/"], exclude: [] },
       limit: 10,
     })
     expect(hotspots.length).toBe(3)
@@ -328,25 +328,25 @@ describe("AggregateRepository", () => {
     }
   })
 
-  test("getHotspots filters by path prefix narrowly", () => {
+  test("getHotspots filters by scope include narrowly", () => {
     seedData()
     aggregates.rebuildFileStats()
 
     const hotspots = aggregates.getHotspots({
-      pathPrefix: "src/new",
+      scope: { include: ["src/new"], exclude: [] },
       limit: 10,
     })
     expect(hotspots).toHaveLength(1)
     expect(hotspots[0].file_path).toBe("src/new.ts")
   })
 
-  test("getHotspots combines sort and path prefix", () => {
+  test("getHotspots combines sort and scope", () => {
     seedData()
     aggregates.rebuildFileStats()
 
     const hotspots = aggregates.getHotspots({
       sort: "feature",
-      pathPrefix: "src/",
+      scope: { include: ["src/"], exclude: [] },
       limit: 2,
     })
     expect(hotspots.length).toBeLessThanOrEqual(2)
@@ -414,7 +414,7 @@ describe("AggregateRepository", () => {
     )
   })
 
-  test("getHotspots combined with path prefix", () => {
+  test("getHotspots combined with scope", () => {
     seedData()
     db.run(
       "UPDATE commit_files SET lines_of_code = 100, indent_complexity = 50, max_indent = 5 WHERE file_path = 'src/main.ts'",
@@ -423,7 +423,7 @@ describe("AggregateRepository", () => {
 
     const hotspots = aggregates.getHotspots({
       sort: "combined",
-      pathPrefix: "src/main",
+      scope: { include: ["src/main"], exclude: [] },
       limit: 10,
     })
     expect(hotspots.length).toBe(1)
@@ -1084,7 +1084,7 @@ describe("AggregateRepository", () => {
     expect(paths).toEqual(["src/main.ts", "src/new.ts", "src/utils.ts"])
   })
 
-  test("getAllFileStats filters by exclusion categories", () => {
+  test("getAllFileStats filters by scope", () => {
     // Seed with a test file path that matches test patterns
     commits.insertRawCommits([
       {
@@ -1106,13 +1106,90 @@ describe("AggregateRepository", () => {
     commits.updateEnrichment("tst", "test", "Added test", "haiku-4.5")
     aggregates.rebuildFileStats()
 
-    // Without exclusion: should include test file
+    // Without scope: should include test file
     const all = aggregates.getAllFileStats()
     expect(all.some((s) => s.file_path.includes("test"))).toBe(true)
 
-    // With test exclusion
-    const filtered = aggregates.getAllFileStats(["test"])
+    // With test exclusion via scope
+    const filtered = aggregates.getAllFileStats({
+      include: [],
+      exclude: ["*.test.*", "*__tests__*"],
+    })
     expect(filtered.every((s) => !s.file_path.includes("test"))).toBe(true)
+  })
+
+  test("getTrendsForFile filters by scope exclude", () => {
+    seedData()
+    // src/main.ts exists in all 3 months, but excluding it should return empty
+    const periods = aggregates.getTrendsForFile("src/main.ts", "monthly", 12, {
+      include: [],
+      exclude: ["src/main*"],
+    })
+    expect(periods).toHaveLength(0)
+  })
+
+  test("getTrendsForFile passes through with matching scope include", () => {
+    seedData()
+    const periods = aggregates.getTrendsForFile("src/main.ts", "monthly", 12, {
+      include: ["src/"],
+      exclude: [],
+    })
+    expect(periods).toHaveLength(3)
+  })
+
+  test("getTrendsForDirectory filters by scope exclude", () => {
+    // Seed data with a test file alongside regular files
+    commits.insertRawCommits([
+      {
+        hash: "t1",
+        authorName: "Alice",
+        authorEmail: "alice@example.com",
+        committedAt: "2024-01-01T00:00:00Z",
+        message: "add code and test",
+        files: [
+          {
+            filePath: "src/app.ts",
+            changeType: "A" as const,
+            additions: 50,
+            deletions: 0,
+          },
+          {
+            filePath: "src/app.test.ts",
+            changeType: "A" as const,
+            additions: 30,
+            deletions: 0,
+          },
+        ],
+      },
+    ])
+    commits.updateEnrichment("t1", "feature", "add app", "haiku-4.5")
+
+    // Without scope: both files contribute
+    const allPeriods = aggregates.getTrendsForDirectory("src/", "monthly", 12)
+    expect(allPeriods).toHaveLength(1)
+    expect(allPeriods[0].additions).toBe(80)
+
+    // Exclude test files: only src/app.ts contributes
+    const filtered = aggregates.getTrendsForDirectory("src/", "monthly", 12, {
+      include: [],
+      exclude: ["*.test.*"],
+    })
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0].additions).toBe(50)
+  })
+
+  test("getTrendsForDirectory filters by scope include", () => {
+    seedData()
+    // Include only src/main — should only show src/main.ts data
+    const periods = aggregates.getTrendsForDirectory("src/", "monthly", 12, {
+      include: ["src/main"],
+      exclude: [],
+    })
+    expect(periods).toHaveLength(3)
+    // Each period should have 1 commit touching only main.ts
+    for (const p of periods) {
+      expect(p.total_changes).toBe(1)
+    }
   })
 
   test("getTrendsForFile includes additions and deletions", () => {

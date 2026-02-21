@@ -3,6 +3,7 @@ import { join } from "path"
 import { z } from "zod"
 
 import { ConfigError, NotInitializedError } from "@/errors"
+import type { ScopeConfig } from "@/scope"
 
 /** Controls whether AI enrichment is used and for which commits. */
 export type AiConfigValue = boolean | string
@@ -17,6 +18,8 @@ export interface GitmemConfig {
   indexModel: string
   /** Default model for `gitmem check`. */
   checkModel: string
+  /** Default include/exclude patterns for file scoping. */
+  scope: ScopeConfig
 }
 
 /** AI coverage status for UI disclaimers. */
@@ -36,6 +39,18 @@ export const DEFAULTS: GitmemConfig = {
   indexStartDate: null,
   indexModel: "claude-haiku-4-5-20251001",
   checkModel: "claude-sonnet-4-5-20250929",
+  scope: {
+    exclude: [
+      "*__test__*",
+      "*.test.*",
+      "test/*",
+      "*__spec__*",
+      "*.spec.*",
+      "spec/*",
+      "*.lock",
+      "*.md",
+    ],
+  },
 }
 
 const isoDate = z.iso.date()
@@ -121,6 +136,34 @@ export function createConfig(
         )
       }
       config.checkModel = overrides.checkModel
+    }
+
+    if (overrides.scope !== undefined) {
+      const s = overrides.scope
+      if (typeof s !== "object" || s === null || Array.isArray(s)) {
+        throw new ConfigError(
+          `Invalid config: "scope" must be an object with optional "include" and "exclude" string arrays`,
+        )
+      }
+      if (
+        s.include !== undefined &&
+        (!Array.isArray(s.include) ||
+          !s.include.every((v) => typeof v === "string"))
+      ) {
+        throw new ConfigError(
+          `Invalid config: "scope.include" must be an array of strings`,
+        )
+      }
+      if (
+        s.exclude !== undefined &&
+        (!Array.isArray(s.exclude) ||
+          !s.exclude.every((v) => typeof v === "string"))
+      ) {
+        throw new ConfigError(
+          `Invalid config: "scope.exclude" must be an array of strings`,
+        )
+      }
+      config.scope = s
     }
   }
 
@@ -217,6 +260,41 @@ export function loadConfig(gitmemDir: string): GitmemConfig {
       )
     }
     config.checkModel = obj.checkModel
+  }
+
+  // scope
+  if ("scope" in obj) {
+    const s = obj.scope
+    if (typeof s !== "object" || s === null || Array.isArray(s)) {
+      throw new ConfigError(
+        `Invalid config: "scope" must be an object with optional "include" and "exclude" string arrays`,
+      )
+    }
+    const sObj = s as Record<string, unknown>
+    const parsed: ScopeConfig = {}
+    if ("include" in sObj) {
+      if (
+        !Array.isArray(sObj.include) ||
+        !sObj.include.every((v: unknown) => typeof v === "string")
+      ) {
+        throw new ConfigError(
+          `Invalid config: "scope.include" must be an array of strings`,
+        )
+      }
+      parsed.include = sObj.include
+    }
+    if ("exclude" in sObj) {
+      if (
+        !Array.isArray(sObj.exclude) ||
+        !sObj.exclude.every((v: unknown) => typeof v === "string")
+      ) {
+        throw new ConfigError(
+          `Invalid config: "scope.exclude" must be an array of strings`,
+        )
+      }
+      parsed.exclude = sObj.exclude
+    }
+    config.scope = parsed
   }
 
   return config

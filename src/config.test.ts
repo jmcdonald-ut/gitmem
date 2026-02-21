@@ -224,6 +224,60 @@ describe("loadConfig", () => {
     expect(config.checkModel).toBe("custom-judge-model")
   })
 
+  test("backfills scope from defaults when missing", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(join(gitmemDir, "config.json"), JSON.stringify({ ai: true }))
+
+    const config = loadConfig(gitmemDir)
+    expect(config.scope).toEqual(DEFAULTS.scope)
+  })
+
+  test("reads scope from config file", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(
+      join(gitmemDir, "config.json"),
+      JSON.stringify({ scope: { include: ["src/"], exclude: ["*.lock"] } }),
+    )
+
+    const config = loadConfig(gitmemDir)
+    expect(config.scope).toEqual({ include: ["src/"], exclude: ["*.lock"] })
+  })
+
+  test("throws on invalid scope type", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(
+      join(gitmemDir, "config.json"),
+      JSON.stringify({ scope: "bad" }),
+    )
+
+    expect(() => loadConfig(gitmemDir)).toThrow("scope")
+  })
+
+  test("throws on invalid scope.include type", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(
+      join(gitmemDir, "config.json"),
+      JSON.stringify({ scope: { include: "bad" } }),
+    )
+
+    expect(() => loadConfig(gitmemDir)).toThrow("scope.include")
+  })
+
+  test("throws on invalid scope.exclude type", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(
+      join(gitmemDir, "config.json"),
+      JSON.stringify({ scope: { exclude: [123] } }),
+    )
+
+    expect(() => loadConfig(gitmemDir)).toThrow("scope.exclude")
+  })
+
   test("throws on invalid JSON", () => {
     const gitmemDir = join(tempDir, ".gitmem")
     mkdirSync(gitmemDir, { recursive: true })
@@ -391,6 +445,39 @@ describe("createConfig", () => {
     const gitmemDir = join(tempDir, ".gitmem")
     const config = createConfig(gitmemDir, { checkModel: "custom-judge" })
     expect(config.checkModel).toBe("custom-judge")
+  })
+
+  test("applies scope override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    const config = createConfig(gitmemDir, {
+      scope: { include: ["src/"], exclude: ["*.lock"] },
+    })
+    expect(config.scope).toEqual({ include: ["src/"], exclude: ["*.lock"] })
+  })
+
+  test("throws on non-object scope override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() =>
+      createConfig(gitmemDir, { scope: "bad" as unknown as object }),
+    ).toThrow("scope")
+  })
+
+  test("throws on invalid scope.include override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() =>
+      createConfig(gitmemDir, {
+        scope: { include: [42] } as unknown as object,
+      }),
+    ).toThrow("scope.include")
+  })
+
+  test("throws on invalid scope.exclude override", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    expect(() =>
+      createConfig(gitmemDir, {
+        scope: { exclude: [true] } as unknown as object,
+      }),
+    ).toThrow("scope.exclude")
   })
 })
 

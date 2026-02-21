@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 
 import { ValidationError } from "@/errors"
-import { type FileCategory, getExclusionPatterns } from "@/file-filter"
+import { type ScopeSpec, buildScopeClauses } from "@/scope"
 import type {
   CouplingPairGlobalRow,
   CouplingPairRow,
@@ -92,10 +92,8 @@ export interface HotspotsOptions {
   limit?: number
   /** Sort field — "total" or a classification name (default "total"). */
   sort?: string
-  /** Only include files under this directory prefix. */
-  pathPrefix?: string
-  /** File categories to exclude from results. */
-  exclude?: FileCategory[]
+  /** File scope filter (include/exclude patterns). */
+  scope?: ScopeSpec
 }
 
 const SORT_COLUMNS: Record<string, string> = {
@@ -118,25 +116,6 @@ export class AggregateRepository {
   /** @param db - The SQLite database instance. */
   constructor(db: Database) {
     this.db = db
-  }
-
-  /**
-   * Builds SQL NOT LIKE conditions and params for excluding file categories.
-   * @param column - The SQL column name to filter (e.g. "file_path").
-   * @param categories - File categories to exclude.
-   * @returns Object with conditions array and params array.
-   */
-  private buildExclusionClauses(
-    column: string,
-    categories?: FileCategory[],
-  ): { conditions: string[]; params: string[] } {
-    if (!categories || categories.length === 0)
-      return { conditions: [], params: [] }
-    const patterns = getExclusionPatterns(categories)
-    return {
-      conditions: patterns.map(() => `${column} NOT LIKE ? ESCAPE '\\'`),
-      params: patterns,
-    }
   }
 
   /**
@@ -428,10 +407,10 @@ export class AggregateRepository {
   getHotspots(
     options: HotspotsOptions = {},
   ): Array<FileStatsRow & { combined_score?: number }> {
-    const { limit = 10, sort = "total", pathPrefix, exclude } = options
+    const { limit = 10, sort = "total", scope } = options
 
     if (sort === "combined") {
-      return this.getHotspotsCombined(limit, pathPrefix, exclude)
+      return this.getHotspotsCombined(limit, scope)
     }
 
     const column = SORT_COLUMNS[sort]
@@ -444,14 +423,9 @@ export class AggregateRepository {
     const conditions: string[] = []
     const params: (string | number)[] = []
 
-    if (pathPrefix) {
-      conditions.push("file_path LIKE ? || '%'")
-      params.push(pathPrefix)
-    }
-
-    const excl = this.buildExclusionClauses("file_path", exclude)
-    conditions.push(...excl.conditions)
-    params.push(...excl.params)
+    const sc = buildScopeClauses("file_path", scope)
+    conditions.push(...sc.conditions)
+    params.push(...sc.params)
 
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
@@ -471,8 +445,7 @@ export class AggregateRepository {
    */
   private getHotspotsCombined(
     limit: number,
-    pathPrefix?: string,
-    exclude?: FileCategory[],
+    scope?: ScopeSpec,
   ): Array<FileStatsRow & { combined_score: number }> {
     // Build two separate WHERE clauses: bare for the CTE, qualified for the main query
     const cteConditions: string[] = []
@@ -480,20 +453,13 @@ export class AggregateRepository {
     const mainConditions: string[] = []
     const mainParams: (string | number)[] = []
 
-    if (pathPrefix) {
-      cteConditions.push("file_path LIKE ? || '%'")
-      cteParams.push(pathPrefix)
-      mainConditions.push("fs.file_path LIKE ? || '%'")
-      mainParams.push(pathPrefix)
-    }
+    const bareSc = buildScopeClauses("file_path", scope)
+    cteConditions.push(...bareSc.conditions)
+    cteParams.push(...bareSc.params)
 
-    const bareExcl = this.buildExclusionClauses("file_path", exclude)
-    cteConditions.push(...bareExcl.conditions)
-    cteParams.push(...bareExcl.params)
-
-    const qualExcl = this.buildExclusionClauses("fs.file_path", exclude)
-    mainConditions.push(...qualExcl.conditions)
-    mainParams.push(...qualExcl.params)
+    const qualSc = buildScopeClauses("fs.file_path", scope)
+    mainConditions.push(...qualSc.conditions)
+    mainParams.push(...qualSc.params)
 
     const cteWhere =
       cteConditions.length > 0 ? `WHERE ${cteConditions.join(" AND ")}` : ""
@@ -533,13 +499,13 @@ export class AggregateRepository {
    * @param exclude - File categories to exclude from results.
    * @returns All file stats rows matching the filter.
    */
-  getAllFileStats(exclude?: FileCategory[]): FileStatsRow[] {
-    const excl = this.buildExclusionClauses("file_path", exclude)
+  getAllFileStats(scope?: ScopeSpec): FileStatsRow[] {
+    const sc = buildScopeClauses("file_path", scope)
     const where =
-      excl.conditions.length > 0 ? `WHERE ${excl.conditions.join(" AND ")}` : ""
+      sc.conditions.length > 0 ? `WHERE ${sc.conditions.join(" AND ")}` : ""
     return this.db
       .query<FileStatsRow, string[]>(`SELECT * FROM file_stats ${where}`)
-      .all(...excl.params)
+      .all(...sc.params)
   }
 
   /**
@@ -674,15 +640,15 @@ export class AggregateRepository {
    */
   getTopCoupledPairs(
     limit: number = 10,
-    exclude?: FileCategory[],
+    scope?: ScopeSpec,
   ): CouplingPairGlobalRow[] {
     const conditions: string[] = []
     const params: (string | number)[] = []
 
-    const exclA = this.buildExclusionClauses("file_a", exclude)
-    const exclB = this.buildExclusionClauses("file_b", exclude)
-    conditions.push(...exclA.conditions, ...exclB.conditions)
-    params.push(...exclA.params, ...exclB.params)
+    const scA = buildScopeClauses("file_a", scope)
+    const scB = buildScopeClauses("file_b", scope)
+    conditions.push(...scA.conditions, ...scB.conditions)
+    params.push(...scA.params, ...scB.params)
 
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
@@ -708,12 +674,12 @@ export class AggregateRepository {
   getCoupledFilesWithRatio(
     filePath: string,
     limit: number = 10,
-    exclude?: FileCategory[],
+    scope?: ScopeSpec,
   ): CouplingPairRow[] {
-    const excl = this.buildExclusionClauses("coupled.file", exclude)
+    const sc = buildScopeClauses("coupled.file", scope)
 
-    if (excl.conditions.length > 0) {
-      const exclWhere = excl.conditions.join(" AND ")
+    if (sc.conditions.length > 0) {
+      const scWhere = sc.conditions.join(" AND ")
 
       return this.db
         .query<CouplingPairRow, (string | number)[]>(
@@ -728,11 +694,11 @@ export class AggregateRepository {
            )
            SELECT file, co_change_count, coupling_ratio
            FROM coupled
-           WHERE ${exclWhere}
+           WHERE ${scWhere}
            ORDER BY co_change_count DESC
            LIMIT ?`,
         )
-        .all(filePath, filePath, filePath, filePath, ...excl.params, limit)
+        .all(filePath, filePath, filePath, filePath, ...sc.params, limit)
     }
 
     return this.db
@@ -761,6 +727,7 @@ export class AggregateRepository {
     filePath: string,
     window: WindowKey,
     limit: number,
+    scope?: ScopeSpec,
   ): TrendPeriod[] {
     const windowSql = WINDOW_FORMATS[window]
     if (!windowSql) {
@@ -768,8 +735,19 @@ export class AggregateRepository {
         `Invalid window "${window}". Valid values: ${Object.keys(WINDOW_FORMATS).join(", ")}`,
       )
     }
+
+    const conditions: string[] = ["cf.file_path = ?"]
+    const params: (string | number)[] = [filePath]
+
+    const sc = buildScopeClauses("cf.file_path", scope)
+    conditions.push(...sc.conditions)
+    params.push(...sc.params)
+
+    const where = `WHERE ${conditions.join(" AND ")}`
+    params.push(limit)
+
     return this.db
-      .query<TrendPeriod, [string, number]>(
+      .query<TrendPeriod, (string | number)[]>(
         `SELECT
            ${windowSql} as period,
            COUNT(DISTINCT cf.commit_hash) as total_changes,
@@ -788,12 +766,12 @@ export class AggregateRepository {
            AVG(CASE WHEN cf.lines_of_code > 0 THEN cf.lines_of_code END) as avg_loc
          FROM commit_files cf
          JOIN commits c ON c.hash = cf.commit_hash
-         WHERE cf.file_path = ?
+         ${where}
          GROUP BY period
          ORDER BY period DESC
          LIMIT ?`,
       )
-      .all(filePath, limit)
+      .all(...params)
   }
 
   /**
@@ -807,6 +785,7 @@ export class AggregateRepository {
     prefix: string,
     window: WindowKey,
     limit: number,
+    scope?: ScopeSpec,
   ): TrendPeriod[] {
     const windowSql = WINDOW_FORMATS[window]
     if (!windowSql) {
@@ -814,8 +793,19 @@ export class AggregateRepository {
         `Invalid window "${window}". Valid values: ${Object.keys(WINDOW_FORMATS).join(", ")}`,
       )
     }
+
+    const conditions: string[] = ["cf.file_path LIKE ? || '%'"]
+    const params: (string | number)[] = [prefix]
+
+    const sc = buildScopeClauses("cf.file_path", scope)
+    conditions.push(...sc.conditions)
+    params.push(...sc.params)
+
+    const where = `WHERE ${conditions.join(" AND ")}`
+    params.push(limit)
+
     return this.db
-      .query<TrendPeriod, [string, number]>(
+      .query<TrendPeriod, (string | number)[]>(
         `SELECT
            ${windowSql} as period,
            COUNT(DISTINCT cf.commit_hash) as total_changes,
@@ -834,12 +824,12 @@ export class AggregateRepository {
            AVG(CASE WHEN cf.lines_of_code > 0 THEN cf.lines_of_code END) as avg_loc
          FROM commit_files cf
          JOIN commits c ON c.hash = cf.commit_hash
-         WHERE cf.file_path LIKE ? || '%'
+         ${where}
          GROUP BY period
          ORDER BY period DESC
          LIMIT ?`,
       )
-      .all(prefix, limit)
+      .all(...params)
   }
 
   /**
@@ -851,13 +841,14 @@ export class AggregateRepository {
   getCoupledFilesForDirectory(
     prefix: string,
     limit: number = 10,
-    exclude?: FileCategory[],
+    scope?: ScopeSpec,
   ): CouplingPairRow[] {
-    if (exclude && exclude.length > 0) {
-      const excl = this.buildExclusionClauses("coupled.file", exclude)
-      const exclWhere = excl.conditions.join(" AND ")
+    const sc = buildScopeClauses("coupled.file", scope)
+
+    if (sc.conditions.length > 0) {
+      const scWhere = sc.conditions.join(" AND ")
       const innerParams = [prefix, prefix, prefix, prefix, prefix, prefix]
-      const outerParams = [...excl.params, limit]
+      const outerParams = [...sc.params, limit]
 
       return this.db
         .query<CouplingPairRow, (string | number)[]>(
@@ -880,7 +871,7 @@ export class AggregateRepository {
            )
            SELECT file, co_change_count, coupling_ratio
            FROM coupled
-           WHERE ${exclWhere}
+           WHERE ${scWhere}
            ORDER BY co_change_count DESC
            LIMIT ?`,
         )
