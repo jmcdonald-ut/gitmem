@@ -555,4 +555,72 @@ describe("handleDetails", () => {
       }),
     )
   })
+
+  test("pathPrefix filters directory coupling to only files within scope", async () => {
+    const { db, commits, aggregates } = setup()
+
+    db.run(`
+      INSERT INTO file_stats (file_path, total_changes, bug_fix_count, feature_count, refactor_count, docs_count, chore_count, perf_count, test_count, style_count, first_seen, last_changed, total_additions, total_deletions)
+      VALUES
+        ('src/commands/foo.ts', 5, 2, 1, 1, 0, 1, 0, 0, 0, '2025-01-01', '2025-06-01', 100, 20),
+        ('src/commands/bar.ts', 3, 1, 1, 0, 0, 1, 0, 0, 0, '2025-01-01', '2025-06-01', 50, 10),
+        ('src/db/database.ts', 4, 0, 2, 1, 0, 1, 0, 0, 0, '2025-01-01', '2025-06-01', 80, 15)
+    `)
+    // foo.ts couples with bar.ts (within scope) and database.ts (outside scope)
+    db.run(`
+      INSERT INTO file_coupling (file_a, file_b, co_change_count)
+      VALUES
+        ('src/commands/bar.ts', 'src/commands/foo.ts', 4),
+        ('src/db/database.ts', 'src/commands/foo.ts', 3)
+    `)
+
+    // Scoped to src/commands/ — database.ts coupling should be filtered out
+    const res = handleDetails(
+      makeUrl("foo.ts"),
+      commits,
+      aggregates,
+      [],
+      undefined,
+      "src/commands/",
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("file")
+    expect(data.coupled.length).toBe(1)
+    expect(data.coupled[0].file).toBe("bar.ts")
+  })
+
+  test("pathPrefix filters directory-level coupling to only files within scope", async () => {
+    const { db, commits, aggregates } = setup()
+
+    db.run(`
+      INSERT INTO file_stats (file_path, total_changes, bug_fix_count, feature_count, refactor_count, docs_count, chore_count, perf_count, test_count, style_count, first_seen, last_changed, total_additions, total_deletions)
+      VALUES
+        ('src/commands/viz/render.ts', 3, 1, 1, 0, 0, 1, 0, 0, 0, '2025-01-01', '2025-06-01', 50, 10),
+        ('src/commands/utils.ts', 2, 0, 1, 0, 0, 1, 0, 0, 0, '2025-01-01', '2025-06-01', 30, 5),
+        ('src/db/schema.ts', 4, 0, 2, 1, 0, 1, 0, 0, 0, '2025-01-01', '2025-06-01', 80, 15)
+    `)
+    // viz/ couples with utils.ts (within src/commands/) and schema.ts (outside)
+    db.run(`
+      INSERT INTO file_coupling (file_a, file_b, co_change_count)
+      VALUES
+        ('src/commands/utils.ts', 'src/commands/viz/render.ts', 3),
+        ('src/db/schema.ts', 'src/commands/viz/render.ts', 5)
+    `)
+
+    // Scoped to src/commands/ — schema.ts coupling should be filtered out
+    const res = handleDetails(
+      makeUrl("viz/"),
+      commits,
+      aggregates,
+      [],
+      undefined,
+      "src/commands/",
+    )
+    const data = await res.json()
+
+    expect(data.type).toBe("directory")
+    expect(data.coupled.length).toBe(1)
+    expect(data.coupled[0].file).toBe("utils.ts")
+  })
 })

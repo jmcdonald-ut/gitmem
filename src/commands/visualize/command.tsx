@@ -61,9 +61,12 @@ function buildDirectoryResponse(
     fetchLimit,
     exclude,
   )
-  const coupled = trackedFiles
-    ? rawCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
+  const scopedCoupled = pathPrefix
+    ? rawCoupled.filter((c) => c.file.startsWith(pathPrefix))
     : rawCoupled
+  const coupled = trackedFiles
+    ? scopedCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
+    : scopedCoupled
   const rawHotspots = aggregates.getHotspots({
     pathPrefix: dirPath,
     sort: "combined",
@@ -197,9 +200,12 @@ export function handleDetails(
       fetchLimit,
       exclude,
     )
-    const coupled = trackedFiles
-      ? rawCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
+    const scopedCoupled = pathPrefix
+      ? rawCoupled.filter((c) => c.file.startsWith(pathPrefix))
       : rawCoupled
+    const coupled = trackedFiles
+      ? scopedCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
+      : scopedCoupled
     const trends = aggregates.getTrendsForFile(filePath, window, trendLimit)
     const trendSummary = computeTrend(trends)
 
