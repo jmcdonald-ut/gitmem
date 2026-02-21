@@ -88,13 +88,13 @@ describe("EnricherService", () => {
   })
 
   test("run processes all new commits", async () => {
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const progress: IndexProgress[] = []
     const result = await enricher.run((p) => progress.push(p))
@@ -120,13 +120,13 @@ describe("EnricherService", () => {
     ])
     commits.updateEnrichment("aaa", "feature", "Already enriched", "haiku-4.5")
 
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
     const result = await enricher.run(() => {})
 
     // Should only enrich bbb and ccc
@@ -140,13 +140,13 @@ describe("EnricherService", () => {
       enrichCommit: mock(() => Promise.reject(new Error("API error"))),
     }
 
-    const enricher = new EnricherService(
-      mockGit,
-      failingLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: failingLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     // Suppress console.error for this test
     const consoleSpy = spyOn(console, "error").mockImplementation(() => {})
@@ -160,13 +160,13 @@ describe("EnricherService", () => {
   })
 
   test("run reports progress phases", async () => {
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const phases: string[] = []
     await enricher.run((p) => phases.push(p.phase))
@@ -223,16 +223,14 @@ describe("EnricherService", () => {
       }),
     }
 
-    const enricher = new EnricherService(
-      sixHashGit,
-      trackingLLM,
+    const enricher = new EnricherService({
+      git: sixHashGit,
+      llm: trackingLLM,
       commits,
       aggregates,
       search,
-      null,
-      "claude-haiku-4-5-20251001",
-      2, // concurrency = 2
-    )
+      concurrency: 2,
+    })
     const result = await enricher.run(() => {}, controller.signal)
 
     // First window of 2 processed, then abort stops further windows
@@ -248,13 +246,13 @@ describe("EnricherService", () => {
     const incrCouplingSpy = spyOn(aggregates, "rebuildFileCouplingIncremental")
     const incrSearchSpy = spyOn(search, "indexNewCommits")
 
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
     await enricher.run(() => {})
 
     expect(incrStatsSpy).toHaveBeenCalledTimes(1)
@@ -272,13 +270,13 @@ describe("EnricherService", () => {
     const incrStatsSpy = spyOn(aggregates, "rebuildFileStatsIncremental")
     const incrSearchSpy = spyOn(search, "indexNewCommits")
 
-    const enricher = new EnricherService(
-      emptyGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: emptyGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
     const result = await enricher.run(() => {})
 
     expect(result.discoveredThisRun).toBe(0)
@@ -289,13 +287,13 @@ describe("EnricherService", () => {
   })
 
   test("run uses getDiffBatch for pre-fetching diffs", async () => {
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
     await enricher.run(() => {})
 
     // getDiffBatch should have been called once with all unenriched hashes
@@ -318,16 +316,13 @@ describe("EnricherService", () => {
     }
 
     // With concurrency 8 and 3 commits, all should be in one window
-    const enricher = new EnricherService(
-      mockGit,
-      concurrentLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: concurrentLLM,
       commits,
       aggregates,
       search,
-      null,
-      "claude-haiku-4-5-20251001",
-      8,
-    )
+    })
     const result = await enricher.run(() => {})
 
     expect(result.enrichedThisRun).toBe(3)
@@ -358,13 +353,13 @@ describe("EnricherService", () => {
       }),
     }
 
-    const enricher = new EnricherService(
-      mockGit,
-      partialFailLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: partialFailLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const consoleSpy = spyOn(console, "error").mockImplementation(() => {})
     const result = await enricher.run(() => {})
@@ -424,16 +419,14 @@ describe("EnricherService", () => {
     }
 
     // Set concurrency to 2
-    const enricher = new EnricherService(
-      fiveHashGit,
-      trackingLLM,
+    const enricher = new EnricherService({
+      git: fiveHashGit,
+      llm: trackingLLM,
       commits,
       aggregates,
       search,
-      null,
-      "claude-haiku-4-5-20251001",
-      2,
-    )
+      concurrency: 2,
+    })
     const result = await enricher.run(() => {})
 
     expect(result.enrichedThisRun).toBe(5)
@@ -481,13 +474,13 @@ describe("EnricherService", () => {
       getTotalCommitCount: mock(() => Promise.resolve(3)),
     }
 
-    const enricher = new EnricherService(
-      mergeGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mergeGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
     const result = await enricher.run(() => {})
 
     expect(result.enrichedThisRun).toBe(3)
@@ -537,13 +530,13 @@ describe("EnricherService", () => {
       getTotalCommitCount: mock(() => Promise.resolve(1)),
     }
 
-    const enricher = new EnricherService(
-      mergeWithDiffGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mergeWithDiffGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
     const result = await enricher.run(() => {})
 
     // Merge commit with a diff should still go to LLM
@@ -563,13 +556,13 @@ describe("EnricherService", () => {
       getBatchResults: mock(() => Promise.resolve([])),
     } as unknown as BatchLLMService
 
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const progress: IndexProgress[] = []
     const result = await enricher.runBatch(
@@ -607,13 +600,13 @@ describe("EnricherService", () => {
       getBatchResults: mock(() => Promise.resolve([])),
     } as unknown as BatchLLMService
 
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const result = await enricher.runBatch(
       batchLLM(mockBatchLLM),
@@ -668,13 +661,13 @@ describe("EnricherService", () => {
       getCommitHashes: mock(() => Promise.resolve(["aaa"])),
     }
 
-    const enricher = new EnricherService(
-      emptyGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: emptyGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const result = await enricher.runBatch(
       batchLLM(mockBatchLLM),
@@ -744,13 +737,13 @@ describe("EnricherService", () => {
       getTotalCommitCount: mock(() => Promise.resolve(1)),
     }
 
-    const enricher = new EnricherService(
-      singleGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: singleGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const result = await enricher.runBatch(
       batchLLM(mockBatchLLM),
@@ -815,13 +808,13 @@ describe("EnricherService", () => {
       getTotalCommitCount: mock(() => Promise.resolve(2)),
     }
 
-    const enricher = new EnricherService(
-      twoGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: twoGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const result = await enricher.runBatch(
       batchLLM(mockBatchLLM),
@@ -881,13 +874,13 @@ describe("EnricherService", () => {
       getBatchResults: mock(() => Promise.resolve([])),
     } as unknown as BatchLLMService
 
-    const enricher = new EnricherService(
-      mergeGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mergeGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     await enricher.runBatch(batchLLM(mockBatchLLM), batchJobs, () => {})
 
@@ -936,13 +929,13 @@ describe("EnricherService", () => {
       getBatchResults: mock(() => Promise.resolve([])),
     } as unknown as BatchLLMService
 
-    const enricher = new EnricherService(
-      allMergeGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: allMergeGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const phases: string[] = []
     const result = await enricher.runBatch(
@@ -986,13 +979,13 @@ describe("EnricherService", () => {
       getBatchResults: mock(() => Promise.resolve([])),
     } as unknown as BatchLLMService
 
-    const enricher = new EnricherService(
-      singleGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: singleGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const phases: string[] = []
     const result = await enricher.runBatch(
@@ -1010,13 +1003,13 @@ describe("EnricherService", () => {
   // --- chunkBatchRequests tests ---
 
   test("chunkBatchRequests splits by request count", () => {
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const requests = Array.from({ length: 5 }, (_, i) => ({
       hash: `hash${i}`,
@@ -1038,13 +1031,13 @@ describe("EnricherService", () => {
   })
 
   test("chunkBatchRequests splits by byte size", () => {
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     // MAX_BATCH_BYTES is 200MB. Use many requests at ~500k each to exceed the limit.
     // buildUserMessage truncates individual diffs, but the total across all
@@ -1072,13 +1065,13 @@ describe("EnricherService", () => {
   })
 
   test("chunkBatchRequests handles empty input", () => {
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const chunks = enricher.chunkBatchRequests([])
     expect(chunks).toHaveLength(0)
@@ -1087,13 +1080,13 @@ describe("EnricherService", () => {
   // --- null LLM tests ---
 
   test("run with null LLM skips enrichment but still discovers and aggregates", async () => {
-    const enricher = new EnricherService(
-      mockGit,
-      null,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: null,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const phases: string[] = []
     const result = await enricher.run((p) => phases.push(p.phase))
@@ -1111,13 +1104,13 @@ describe("EnricherService", () => {
   })
 
   test("run with null LLM makes unenriched commits searchable by message", async () => {
-    const enricher = new EnricherService(
-      mockGit,
-      null,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: null,
       commits,
       aggregates,
       search,
-    )
+    })
 
     await enricher.run(() => {})
 
@@ -1136,13 +1129,13 @@ describe("EnricherService", () => {
       getBatchResults: mock(() => Promise.resolve([])),
     } as unknown as BatchLLMService
 
-    const enricher = new EnricherService(
-      mockGit,
-      null,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: null,
       commits,
       aggregates,
       search,
-    )
+    })
 
     const phases: string[] = []
     const result = await enricher.runBatch(
@@ -1193,18 +1186,14 @@ describe("EnricherService", () => {
       getTotalCommitCount: mock(() => Promise.resolve(3)),
     }
 
-    const enricher = new EnricherService(
-      datedGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: datedGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-      null,
-      "claude-haiku-4-5-20251001",
-      8,
-      undefined,
-      "2024-01-01",
-    )
+      aiStartDate: "2024-01-01",
+    })
 
     const result = await enricher.run(() => {})
 
@@ -1220,17 +1209,14 @@ describe("EnricherService", () => {
   })
 
   test("run with indexStartDate passes it to git.getCommitHashes", async () => {
-    const enricher = new EnricherService(
-      mockGit,
-      mockLLM,
+    const enricher = new EnricherService({
+      git: mockGit,
+      llm: mockLLM,
       commits,
       aggregates,
       search,
-      null,
-      "claude-haiku-4-5-20251001",
-      8,
-      "2024-01-01",
-    )
+      indexStartDate: "2024-01-01",
+    })
 
     await enricher.run(() => {})
 

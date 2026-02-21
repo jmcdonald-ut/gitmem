@@ -12,6 +12,19 @@ import type { IGitService, ILLMService, IndexProgress } from "@services/types"
 const MAX_BATCH_REQUESTS = 100_000
 const MAX_BATCH_BYTES = 200 * 1024 * 1024 // 200 MB, leaving margin from the 256 MB limit
 
+export interface EnricherServiceOptions {
+  git: IGitService
+  llm: ILLMService | null
+  commits: CommitRepository
+  aggregates: AggregateRepository
+  search: SearchService
+  measurer?: MeasurerService | null
+  model?: string
+  concurrency?: number
+  indexStartDate?: string
+  aiStartDate?: string
+}
+
 /**
  * Orchestrates the full indexing pipeline: discovers new commits, enriches them
  * via LLM, rebuilds aggregates, and rebuilds the FTS search index.
@@ -28,40 +41,17 @@ export class EnricherService {
   private indexStartDate?: string
   private aiStartDate?: string
 
-  /**
-   * @param git - Git repository service.
-   * @param llm - LLM enrichment service (null to skip enrichment).
-   * @param commits - Commit database repository.
-   * @param aggregates - Aggregate statistics repository.
-   * @param search - Full-text search service.
-   * @param measurer - Complexity measurement service.
-   * @param model - Model identifier stored with enrichment results.
-   * @param concurrency - Number of parallel LLM requests per window.
-   * @param indexStartDate - Only discover commits on or after this date.
-   * @param aiStartDate - Only enrich commits on or after this date.
-   */
-  constructor(
-    git: IGitService,
-    llm: ILLMService | null,
-    commits: CommitRepository,
-    aggregates: AggregateRepository,
-    search: SearchService,
-    measurer: MeasurerService | null = null,
-    model: string = "claude-haiku-4-5-20251001",
-    concurrency: number = 8,
-    indexStartDate?: string,
-    aiStartDate?: string,
-  ) {
-    this.git = git
-    this.llm = llm
-    this.commits = commits
-    this.aggregates = aggregates
-    this.search = search
-    this.measurer = measurer
-    this.model = model
-    this.concurrency = concurrency
-    this.indexStartDate = indexStartDate
-    this.aiStartDate = aiStartDate
+  constructor(options: EnricherServiceOptions) {
+    this.git = options.git
+    this.llm = options.llm
+    this.commits = options.commits
+    this.aggregates = options.aggregates
+    this.search = options.search
+    this.measurer = options.measurer ?? null
+    this.model = options.model ?? "claude-haiku-4-5-20251001"
+    this.concurrency = options.concurrency ?? 8
+    this.indexStartDate = options.indexStartDate
+    this.aiStartDate = options.aiStartDate
   }
 
   /**

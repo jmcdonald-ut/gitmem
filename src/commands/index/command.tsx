@@ -62,7 +62,7 @@ export const indexCommand = new Command("index")
         const measurer = new MeasurerService(git, commits)
         const aiStartDate =
           typeof config.ai === "string" ? config.ai : undefined
-        const enricher = new EnricherService(
+        const enricher = new EnricherService({
           git,
           llm,
           commits,
@@ -70,10 +70,10 @@ export const indexCommand = new Command("index")
           search,
           measurer,
           model,
-          opts.concurrency,
-          config.indexStartDate ?? undefined,
+          concurrency: opts.concurrency,
+          indexStartDate: config.indexStartDate ?? undefined,
           aiStartDate,
-        )
+        })
 
         if (aiEnabled) {
           db.prepare(
