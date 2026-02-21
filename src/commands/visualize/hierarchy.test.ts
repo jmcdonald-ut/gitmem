@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
-import type { FileStatsRow } from "@/types"
 import { buildHierarchy } from "@commands/visualize/hierarchy"
+import type { FileStatsRow } from "@db/types"
 
 function makeStats(
   filePath: string,

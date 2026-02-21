@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { render } from "ink-testing-library"
 import React from "react"
 
-import type { CouplingPairGlobalRow, CouplingPairRow } from "@/types"
 import { CouplingCommand } from "@commands/coupling/CouplingCommand"
+import type { CouplingPairGlobalRow, CouplingPairRow } from "@db/types"
 
 describe("CouplingCommand", () => {
   test("renders global mode with file_a and file_b", () => {

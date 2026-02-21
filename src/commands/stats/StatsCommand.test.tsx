@@ -3,8 +3,8 @@ import { render } from "ink-testing-library"
 import React from "react"
 
 import type { AiCoverage } from "@/config"
-import type { FileContributorRow, FileStatsRow, RecentCommit } from "@/types"
 import { StatsCommand } from "@commands/stats/StatsCommand"
+import type { FileContributorRow, FileStatsRow, RecentCommit } from "@db/types"
 
 const makeStats = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({
   file_path: "src/main.ts",

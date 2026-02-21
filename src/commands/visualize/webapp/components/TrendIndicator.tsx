@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import type { TrendSummary } from "@/types"
+import type { TrendSummary } from "@db/types"
 
 function trendClass(dir: string): string {
   if (dir === "increasing") return "trend-up"

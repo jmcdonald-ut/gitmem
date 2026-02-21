@@ -9,7 +9,7 @@ import type {
   FileStatsRow,
   TrendPeriod,
   TrendSummary,
-} from "@/types"
+} from "@db/types"
 import { type FileCategory, getExclusionPatterns } from "@services/file-filter"
 
 /** Valid time window keys for trend queries. */

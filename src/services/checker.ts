@@ -1,7 +1,6 @@
 import type {
   CheckBatchResult,
   CheckProgress,
-  CommitRow,
   EvalResult,
   EvalSummary,
   IBatchJudgeService,
@@ -10,6 +9,7 @@ import type {
 } from "@/types"
 import type { BatchJobRepository } from "@db/batch-jobs"
 import type { CommitRepository } from "@db/commits"
+import type { CommitRow } from "@db/types"
 import type { CheckBatchRequest } from "@services/batch-judge"
 import { reconcileClassificationVerdict } from "@services/judge-shared"
 

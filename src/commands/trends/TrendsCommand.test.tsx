@@ -3,8 +3,8 @@ import { render } from "ink-testing-library"
 import React from "react"
 
 import type { AiCoverage } from "@/config"
-import type { TrendPeriod, TrendSummary } from "@/types"
 import { TrendsCommand } from "@commands/trends/TrendsCommand"
+import type { TrendPeriod, TrendSummary } from "@db/types"
 
 const makePeriod = (overrides: Partial<TrendPeriod> = {}): TrendPeriod => ({
   period: "2025-03",

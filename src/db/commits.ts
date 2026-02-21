@@ -1,12 +1,7 @@
 import type { Database } from "bun:sqlite"
 
-import type {
-  CommitFile,
-  CommitFileRow,
-  CommitInfo,
-  CommitRow,
-  RecentCommit,
-} from "@/types"
+import type { CommitFile, CommitInfo } from "@/types"
+import type { CommitFileRow, CommitRow, RecentCommit } from "@db/types"
 
 /** Repository for reading and writing commit records in the SQLite database. */
 export class CommitRepository {

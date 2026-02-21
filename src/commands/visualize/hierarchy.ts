@@ -1,4 +1,4 @@
-import type { FileStatsRow } from "@/types"
+import type { FileStatsRow } from "@db/types"
 
 export interface HierarchyNode {
   name: string

@@ -3,8 +3,8 @@ import { render } from "ink-testing-library"
 import React from "react"
 
 import type { AiCoverage } from "@/config"
-import type { FileStatsRow } from "@/types"
 import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
+import type { FileStatsRow } from "@db/types"
 
 const makeRow = (overrides: Partial<FileStatsRow> = {}): FileStatsRow => ({
   file_path: "src/main.ts",

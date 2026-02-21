@@ -2,7 +2,7 @@
 import { cleanup, render } from "@testing-library/react"
 import { afterEach, describe, expect, test } from "bun:test"
 
-import type { TrendSummary } from "@/types"
+import type { TrendSummary } from "@db/types"
 
 import { TrendIndicator } from "@visualize-app/components/TrendIndicator"
 import "@visualize-app/test-setup"

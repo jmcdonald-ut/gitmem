@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite"
 
-import type { BatchJobStatus, BatchJobType } from "@/types"
+import type { BatchJobStatus, BatchJobType } from "@db/types"
 
 /** Database row representation of a batch job. */
 export interface BatchJobRow {

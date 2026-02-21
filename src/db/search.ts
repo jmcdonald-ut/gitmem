@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 
 import { InvalidQueryError } from "@/errors"
-import type { SearchResult } from "@/types"
+import type { SearchResult } from "@db/types"
 
 export { InvalidQueryError }
 

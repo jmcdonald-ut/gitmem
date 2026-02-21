@@ -1,9 +1,14 @@
-import type { IGitService, ILLMService, IndexProgress } from "@/types"
-import type { CommitRow, EnrichmentResult } from "@/types"
+import type {
+  EnrichmentResult,
+  IGitService,
+  ILLMService,
+  IndexProgress,
+} from "@/types"
 import type { AggregateRepository } from "@db/aggregates"
 import type { BatchJobRepository } from "@db/batch-jobs"
 import type { CommitRepository } from "@db/commits"
 import type { SearchService } from "@db/search"
+import type { CommitRow } from "@db/types"
 import type { BatchLLMService, BatchRequest } from "@services/batch-llm"
 import { SYSTEM_PROMPT, buildUserMessage } from "@services/llm-shared"
 import type { MeasurerService } from "@services/measurer"

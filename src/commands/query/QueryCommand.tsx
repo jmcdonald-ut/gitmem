@@ -1,7 +1,7 @@
 import { Box, Text } from "ink"
 import React from "react"
 
-import type { SearchResult } from "@/types"
+import type { SearchResult } from "@db/types"
 
 /** Props for the QueryCommand component. */
 interface QueryCommandProps {
