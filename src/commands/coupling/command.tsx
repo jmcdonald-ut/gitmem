@@ -3,11 +3,9 @@ import { render } from "ink"
 import React from "react"
 
 import { NotFoundError } from "@/errors"
-import {
-  filterPairsByTrackedFiles,
-  resolveExcludedCategories,
-} from "@/file-filter"
+import { filterPairsByTrackedFiles } from "@/file-filter"
 import { formatOutput } from "@/output"
+import { addScopeOptions, resolveScope } from "@/scope"
 import { CouplingCommand } from "@commands/coupling/CouplingCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
@@ -25,27 +23,31 @@ Three modes:
 Examples:
   gitmem coupling
   gitmem coupling src/db/commits.ts
-  gitmem coupling src/services/`
+  gitmem coupling src/services/
+  gitmem coupling -I src/ -X "*.test.*"`
 
-export const couplingCommand = new Command("coupling")
-  .alias("c")
-  .argument("[path]", "File or directory path")
-  .description("Show files that frequently change together")
-  .addHelpText("after", HELP_TEXT)
-  .option("-l, --limit <number>", "Max results", parsePositiveInt, 10)
-  .option("--include-tests", "Include test files (excluded by default)")
-  .option("--include-docs", "Include documentation files (excluded by default)")
-  .option(
-    "--include-generated",
-    "Include generated/vendored files (excluded by default)",
-  )
-  .option("--all", "Include all files (no exclusions)")
-  .option("--include-deleted", "Include files no longer in the working tree")
-  .action(async (path, opts, cmd) => {
-    await runCommand(cmd.parent!.opts(), {}, async ({ format, db, git }) => {
+export const couplingCommand = addScopeOptions(
+  new Command("coupling")
+    .alias("c")
+    .argument("[path]", "File or directory path")
+    .description("Show files that frequently change together")
+    .addHelpText("after", HELP_TEXT)
+    .option("-l, --limit <number>", "Max results", parsePositiveInt, 10)
+    .option("--include-deleted", "Include files no longer in the working tree"),
+).action(async (path, opts, cmd) => {
+  await runCommand(
+    cmd.parent!.opts(),
+    {},
+    async ({ format, db, git, config }) => {
       const aggregates = new AggregateRepository(db)
       const limit = opts.limit
-      const exclude = resolveExcludedCategories(opts)
+
+      const flags = {
+        include: opts.include,
+        exclude: opts.exclude,
+        all: opts.all,
+      }
+      const scope = resolveScope(flags, config.scope)
 
       const trackedFiles = opts.includeDeleted
         ? undefined
@@ -53,7 +55,7 @@ export const couplingCommand = new Command("coupling")
       const fetchLimit = trackedFiles ? 10000 : limit
 
       if (!path) {
-        const raw = aggregates.getTopCoupledPairs(fetchLimit, exclude)
+        const raw = aggregates.getTopCoupledPairs(fetchLimit, scope)
         const pairs = trackedFiles
           ? filterPairsByTrackedFiles(raw, trackedFiles, limit)
           : raw
@@ -67,7 +69,7 @@ export const couplingCommand = new Command("coupling")
           const raw = aggregates.getCoupledFilesWithRatio(
             path,
             fetchLimit,
-            exclude,
+            scope,
           )
           const pairs = trackedFiles
             ? raw.filter((r) => trackedFiles.has(r.file)).slice(0, limit)
@@ -87,7 +89,7 @@ export const couplingCommand = new Command("coupling")
           const raw = aggregates.getCoupledFilesForDirectory(
             prefix,
             fetchLimit,
-            exclude,
+            scope,
           )
           const pairs = trackedFiles
             ? raw.filter((r) => trackedFiles.has(r.file)).slice(0, limit)
@@ -98,5 +100,6 @@ export const couplingCommand = new Command("coupling")
           render(<CouplingCommand path={prefix} pairs={pairs} />).unmount()
         }
       }
-    })
-  })
+    },
+  )
+})

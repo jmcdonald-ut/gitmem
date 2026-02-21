@@ -1,13 +1,13 @@
 import { Command } from "@commander-js/extra-typings"
 import { basename } from "path"
 
+import { filterByTrackedFiles, filterPairsByTrackedFiles } from "@/file-filter"
 import {
-  type FileCategory,
-  filterByTrackedFiles,
-  filterPairsByTrackedFiles,
-  isExcluded,
-  resolveExcludedCategories,
-} from "@/file-filter"
+  type ScopeSpec,
+  addScopeOptions,
+  matchesScope,
+  resolveScope,
+} from "@/scope"
 import { runCommand } from "@commands/utils/command-context"
 import { buildHierarchy } from "@commands/visualize/hierarchy"
 import {
@@ -46,7 +46,7 @@ function buildDirectoryResponse(
   dirPath: string,
   displayPath: string,
   aggregates: AggregateRepository,
-  exclude: FileCategory[],
+  scope: ScopeSpec,
   trackedFiles: Set<string> | undefined,
   pathPrefix: string,
   fetchLimit: number,
@@ -59,7 +59,7 @@ function buildDirectoryResponse(
   const rawCoupled = aggregates.getCoupledFilesForDirectory(
     dirPath,
     fetchLimit,
-    exclude,
+    scope,
   )
   const scopedCoupled = pathPrefix
     ? rawCoupled.filter((c) => c.file.startsWith(pathPrefix))
@@ -68,10 +68,12 @@ function buildDirectoryResponse(
     ? scopedCoupled.filter((c) => trackedFiles.has(c.file)).slice(0, 5)
     : scopedCoupled
   const rawHotspots = aggregates.getHotspots({
-    pathPrefix: dirPath,
+    scope: {
+      include: [dirPath],
+      exclude: scope.exclude,
+    },
     sort: "combined",
     limit: fetchLimit,
-    exclude,
   })
   const hotspots = trackedFiles
     ? filterByTrackedFiles(rawHotspots, trackedFiles, 5)
@@ -106,7 +108,7 @@ export function handleDetails(
   url: URL,
   commits: CommitRepository,
   aggregates: AggregateRepository,
-  exclude: FileCategory[],
+  scope: ScopeSpec,
   trackedFiles?: Set<string>,
   pathPrefix = "",
 ): Response {
@@ -123,7 +125,7 @@ export function handleDetails(
           pathPrefix,
           pathPrefix,
           aggregates,
-          exclude,
+          scope,
           trackedFiles,
           pathPrefix,
           fetchLimit,
@@ -140,12 +142,12 @@ export function handleDetails(
       const rawHotspots = aggregates.getHotspots({
         sort: "combined",
         limit: fetchLimit,
-        exclude,
+        scope,
       })
       const hotspots = trackedFiles
         ? filterByTrackedFiles(rawHotspots, trackedFiles, 5)
         : rawHotspots
-      const rawPairs = aggregates.getTopCoupledPairs(fetchLimit, exclude)
+      const rawPairs = aggregates.getTopCoupledPairs(fetchLimit, scope)
       const coupledPairs = trackedFiles
         ? filterPairsByTrackedFiles(rawPairs, trackedFiles, 5)
         : rawPairs
@@ -182,7 +184,7 @@ export function handleDetails(
           filePath,
           stripPrefix(filePath, pathPrefix),
           aggregates,
-          exclude,
+          scope,
           trackedFiles,
           pathPrefix,
           fetchLimit,
@@ -198,7 +200,7 @@ export function handleDetails(
     const rawCoupled = aggregates.getCoupledFilesWithRatio(
       filePath,
       fetchLimit,
-      exclude,
+      scope,
     )
     const scopedCoupled = pathPrefix
       ? rawCoupled.filter((c) => c.file.startsWith(pathPrefix))
@@ -241,165 +243,159 @@ The server runs until you press Ctrl+C.
 Examples:
   gitmem visualize
   gitmem visualize src/commands/
-  gitmem viz src/services/ --include-tests
-  gitmem viz --port 3000`
+  gitmem viz src/services/ -I "*.ts"
+  gitmem viz --port 3000 --all`
 
-export const visualizeCommand = new Command("visualize")
-  .alias("viz")
-  .description("Open an interactive visualization of the repository")
-  .argument("[path]", "Scope visualization to a subdirectory")
-  .addHelpText("after", HELP_TEXT)
-  .option("-p, --port <number>", "Server port (0 for auto)", parsePort, 0)
-  .option("--include-tests", "Include test files (excluded by default)")
-  .option("--include-docs", "Include documentation files (excluded by default)")
-  .option(
-    "--include-generated",
-    "Include generated/vendored files (excluded by default)",
-  )
-  .option("--all", "Include all files (no exclusions)")
-  .option("--include-deleted", "Include files no longer in the working tree")
-  .action(async (path, opts, cmd) => {
-    await runCommand(
-      cmd.parent!.opts(),
-      { needsApiKey: false },
-      async ({ db, git, cwd }) => {
-        const pathPrefix = path ? normalizePathPrefix(path) : ""
-        const exclude = resolveExcludedCategories(opts)
-        const allTrackedFiles = await git.getTrackedFiles()
-        const trackedFiles =
-          exclude.length > 0
-            ? allTrackedFiles.filter((f) => !isExcluded(f, exclude))
-            : allTrackedFiles
+export const visualizeCommand = addScopeOptions(
+  new Command("visualize")
+    .alias("viz")
+    .description("Open an interactive visualization of the repository")
+    .argument("[path]", "Scope visualization to a subdirectory")
+    .addHelpText("after", HELP_TEXT)
+    .option("-p, --port <number>", "Server port (0 for auto)", parsePort, 0)
+    .option("--include-deleted", "Include files no longer in the working tree"),
+).action(async (path, opts, cmd) => {
+  await runCommand(
+    cmd.parent!.opts(),
+    { needsApiKey: false },
+    async ({ db, git, cwd, config }) => {
+      const pathPrefix = path ? normalizePathPrefix(path) : ""
 
-        // Filter to files under the path prefix
-        const scopedTrackedFiles = pathPrefix
-          ? trackedFiles.filter((f) => f.startsWith(pathPrefix))
-          : trackedFiles
+      const flags = {
+        include: opts.include,
+        exclude: opts.exclude,
+        all: opts.all,
+      }
+      const scope = resolveScope(flags, config.scope)
+      const allTrackedFiles = await git.getTrackedFiles()
+      const trackedFiles = allTrackedFiles.filter((f) => matchesScope(f, scope))
 
-        if (pathPrefix && scopedTrackedFiles.length === 0) {
-          console.error(
-            `No tracked files found under "${pathPrefix}". Check the path and try again.`,
-          )
-          return
-        }
+      // Filter to files under the path prefix
+      const scopedTrackedFiles = pathPrefix
+        ? trackedFiles.filter((f) => f.startsWith(pathPrefix))
+        : trackedFiles
 
-        const commits = new CommitRepository(db)
-        const aggregates = new AggregateRepository(db)
-        const allStats = aggregates.getAllFileStats(exclude)
-        const scopedStats = pathPrefix
-          ? allStats.filter((s) => s.file_path.startsWith(pathPrefix))
-          : allStats
-        const strippedStatsMap = new Map(
-          scopedStats.map((s) => [stripPrefix(s.file_path, pathPrefix), s]),
+      if (pathPrefix && scopedTrackedFiles.length === 0) {
+        console.error(
+          `No tracked files found under "${pathPrefix}". Check the path and try again.`,
         )
+        return
+      }
 
-        const strippedTrackedFiles = scopedTrackedFiles.map((f) =>
-          stripPrefix(f, pathPrefix),
-        )
-        const filesForHierarchy = opts.includeDeleted
-          ? [
-              ...new Set([
-                ...strippedTrackedFiles,
-                ...scopedStats.map((s) => stripPrefix(s.file_path, pathPrefix)),
-              ]),
-            ]
-          : strippedTrackedFiles
-        const hierarchyData = buildHierarchy(
-          filesForHierarchy,
-          strippedStatsMap,
-        )
-        const repoName = basename(cwd)
-        const detailsTrackedFiles = opts.includeDeleted
-          ? undefined
-          : new Set(allTrackedFiles)
+      const commits = new CommitRepository(db)
+      const aggregates = new AggregateRepository(db)
+      const allStats = aggregates.getAllFileStats(scope)
+      const scopedStats = pathPrefix
+        ? allStats.filter((s) => s.file_path.startsWith(pathPrefix))
+        : allStats
+      const strippedStatsMap = new Map(
+        scopedStats.map((s) => [stripPrefix(s.file_path, pathPrefix), s]),
+      )
 
-        const securityHeaders = {
-          "X-Content-Type-Options": "nosniff",
-          "X-Frame-Options": "DENY",
-          "Content-Security-Policy":
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
-        }
+      const strippedTrackedFiles = scopedTrackedFiles.map((f) =>
+        stripPrefix(f, pathPrefix),
+      )
+      const filesForHierarchy = opts.includeDeleted
+        ? [
+            ...new Set([
+              ...strippedTrackedFiles,
+              ...scopedStats.map((s) => stripPrefix(s.file_path, pathPrefix)),
+            ]),
+          ]
+        : strippedTrackedFiles
+      const hierarchyData = buildHierarchy(filesForHierarchy, strippedStatsMap)
+      const repoName = basename(cwd)
+      const detailsTrackedFiles = opts.includeDeleted
+        ? undefined
+        : new Set(allTrackedFiles)
 
-        // Pre-compress hierarchy JSON (static payload, potentially large)
-        const hierarchyJson = JSON.stringify({
-          ...hierarchyData,
-          repoName,
-          pathPrefix,
-        })
-        const hierarchyGzip = Bun.gzipSync(Buffer.from(hierarchyJson))
+      const securityHeaders = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy":
+          "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
+      }
 
-        // Cache details responses (DB is read-only during visualization)
-        const detailsCache = new Map<string, Response>()
+      // Pre-compress hierarchy JSON (static payload, potentially large)
+      const hierarchyJson = JSON.stringify({
+        ...hierarchyData,
+        repoName,
+        pathPrefix,
+      })
+      const hierarchyGzip = Bun.gzipSync(Buffer.from(hierarchyJson))
 
-        const server = Bun.serve({
-          hostname: "127.0.0.1",
-          port: opts.port,
-          routes: {
-            "/": homepage,
-          },
-          fetch(req) {
-            const url = new URL(req.url)
-            if (url.pathname === "/api/hierarchy") {
-              const acceptGzip =
-                req.headers.get("accept-encoding")?.includes("gzip") ?? false
-              if (acceptGzip) {
-                return new Response(hierarchyGzip, {
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Content-Encoding": "gzip",
-                    ...securityHeaders,
-                  },
-                })
-              }
-              return new Response(hierarchyJson, {
+      // Cache details responses (DB is read-only during visualization)
+      const detailsCache = new Map<string, Response>()
+
+      const server = Bun.serve({
+        hostname: "127.0.0.1",
+        port: opts.port,
+        routes: {
+          "/": homepage,
+        },
+        fetch(req) {
+          const url = new URL(req.url)
+          if (url.pathname === "/api/hierarchy") {
+            const acceptGzip =
+              req.headers.get("accept-encoding")?.includes("gzip") ?? false
+            if (acceptGzip) {
+              return new Response(hierarchyGzip, {
                 headers: {
                   "Content-Type": "application/json",
+                  "Content-Encoding": "gzip",
                   ...securityHeaders,
                 },
               })
             }
-            if (url.pathname === "/api/details") {
-              const cacheKey = url.searchParams.get("path") ?? ""
-              const cached = detailsCache.get(cacheKey)
-              if (cached) return cached.clone()
-
-              const res = handleDetails(
-                url,
-                commits,
-                aggregates,
-                exclude,
-                detailsTrackedFiles,
-                pathPrefix,
-              )
-              for (const [k, v] of Object.entries(securityHeaders)) {
-                res.headers.set(k, v)
-              }
-              detailsCache.set(cacheKey, res.clone())
-              return res
-            }
-            return new Response("Not found", {
-              status: 404,
-              headers: securityHeaders,
+            return new Response(hierarchyJson, {
+              headers: {
+                "Content-Type": "application/json",
+                ...securityHeaders,
+              },
             })
-          },
-        })
-
-        const scopeLabel = pathPrefix ? ` (${pathPrefix})` : ""
-        console.log(`Visualize${scopeLabel}: http://localhost:${server.port}`)
-        if (hierarchyData.unindexedCount > 0) {
-          console.log(
-            `${hierarchyData.unindexedCount} files not yet indexed. Run \`gitmem index\` for full data.`,
-          )
-        }
-
-        await new Promise<void>((resolve) => {
-          const shutdown = () => {
-            void server.stop()
-            resolve()
           }
-          process.once("SIGINT", shutdown)
-          process.once("SIGTERM", shutdown)
-        })
-      },
-    )
-  })
+          if (url.pathname === "/api/details") {
+            const cacheKey = url.searchParams.get("path") ?? ""
+            const cached = detailsCache.get(cacheKey)
+            if (cached) return cached.clone()
+
+            const res = handleDetails(
+              url,
+              commits,
+              aggregates,
+              scope,
+              detailsTrackedFiles,
+              pathPrefix,
+            )
+            for (const [k, v] of Object.entries(securityHeaders)) {
+              res.headers.set(k, v)
+            }
+            detailsCache.set(cacheKey, res.clone())
+            return res
+          }
+          return new Response("Not found", {
+            status: 404,
+            headers: securityHeaders,
+          })
+        },
+      })
+
+      const scopeLabel = pathPrefix ? ` (${pathPrefix})` : ""
+      console.log(`Visualize${scopeLabel}: http://localhost:${server.port}`)
+      if (hierarchyData.unindexedCount > 0) {
+        console.log(
+          `${hierarchyData.unindexedCount} files not yet indexed. Run \`gitmem index\` for full data.`,
+        )
+      }
+
+      await new Promise<void>((resolve) => {
+        const shutdown = () => {
+          void server.stop()
+          resolve()
+        }
+        process.once("SIGINT", shutdown)
+        process.once("SIGTERM", shutdown)
+      })
+    },
+  )
+})
