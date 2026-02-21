@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
 import { z } from "zod"
 
+import { ConfigError, NotInitializedError } from "@/errors"
+
 /** Controls whether AI enrichment is used and for which commits. */
 export type AiConfigValue = boolean | string
 
@@ -53,7 +55,7 @@ export function createConfig(
   overrides?: Partial<GitmemConfig>,
 ): GitmemConfig {
   if (configExists(gitmemDir)) {
-    throw new Error(
+    throw new ConfigError(
       "Already initialized. Edit .gitmem/config.json to change settings.",
     )
   }
@@ -67,13 +69,13 @@ export function createConfig(
         config.ai = ai
       } else if (typeof ai === "string") {
         if (!isoDate.safeParse(ai).success) {
-          throw new Error(
+          throw new ConfigError(
             `Invalid config: "ai" must be true, false, or a valid "YYYY-MM-DD" date string, got "${ai}"`,
           )
         }
         config.ai = ai
       } else {
-        throw new Error(
+        throw new ConfigError(
           `Invalid config: "ai" must be true, false, or a valid "YYYY-MM-DD" date string`,
         )
       }
@@ -85,13 +87,13 @@ export function createConfig(
         config.indexStartDate = null
       } else if (typeof isd === "string") {
         if (!isoDate.safeParse(isd).success) {
-          throw new Error(
+          throw new ConfigError(
             `Invalid config: "indexStartDate" must be null or a valid "YYYY-MM-DD" date string, got "${isd}"`,
           )
         }
         config.indexStartDate = isd
       } else {
-        throw new Error(
+        throw new ConfigError(
           `Invalid config: "indexStartDate" must be null or a valid "YYYY-MM-DD" date string`,
         )
       }
@@ -102,7 +104,7 @@ export function createConfig(
         typeof overrides.indexModel !== "string" ||
         overrides.indexModel === ""
       ) {
-        throw new Error(
+        throw new ConfigError(
           `Invalid config: "indexModel" must be a non-empty string`,
         )
       }
@@ -114,7 +116,7 @@ export function createConfig(
         typeof overrides.checkModel !== "string" ||
         overrides.checkModel === ""
       ) {
-        throw new Error(
+        throw new ConfigError(
           `Invalid config: "checkModel" must be a non-empty string`,
         )
       }
@@ -142,18 +144,18 @@ export function loadConfig(gitmemDir: string): GitmemConfig {
   const configPath = join(gitmemDir, "config.json")
 
   if (!existsSync(configPath)) {
-    throw new Error("gitmem is not initialized. Run `gitmem init` first.")
+    throw new NotInitializedError()
   }
 
   let raw: unknown
   try {
     raw = JSON.parse(readFileSync(configPath, "utf-8"))
   } catch {
-    throw new Error(`Invalid config: ${configPath} is not valid JSON`)
+    throw new ConfigError(`Invalid config: ${configPath} is not valid JSON`)
   }
 
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    throw new Error(`Invalid config: ${configPath} must be a JSON object`)
+    throw new ConfigError(`Invalid config: ${configPath} must be a JSON object`)
   }
 
   const obj = raw as Record<string, unknown>
@@ -166,13 +168,13 @@ export function loadConfig(gitmemDir: string): GitmemConfig {
       config.ai = ai
     } else if (typeof ai === "string") {
       if (!isoDate.safeParse(ai).success) {
-        throw new Error(
+        throw new ConfigError(
           `Invalid config: "ai" must be true, false, or a valid "YYYY-MM-DD" date string, got "${ai}"`,
         )
       }
       config.ai = ai
     } else {
-      throw new Error(
+      throw new ConfigError(
         `Invalid config: "ai" must be true, false, or a valid "YYYY-MM-DD" date string`,
       )
     }
@@ -185,13 +187,13 @@ export function loadConfig(gitmemDir: string): GitmemConfig {
       config.indexStartDate = null
     } else if (typeof isd === "string") {
       if (!isoDate.safeParse(isd).success) {
-        throw new Error(
+        throw new ConfigError(
           `Invalid config: "indexStartDate" must be null or a valid "YYYY-MM-DD" date string, got "${isd}"`,
         )
       }
       config.indexStartDate = isd
     } else {
-      throw new Error(
+      throw new ConfigError(
         `Invalid config: "indexStartDate" must be null or a valid "YYYY-MM-DD" date string`,
       )
     }
@@ -200,7 +202,9 @@ export function loadConfig(gitmemDir: string): GitmemConfig {
   // indexModel
   if ("indexModel" in obj) {
     if (typeof obj.indexModel !== "string" || obj.indexModel === "") {
-      throw new Error(`Invalid config: "indexModel" must be a non-empty string`)
+      throw new ConfigError(
+        `Invalid config: "indexModel" must be a non-empty string`,
+      )
     }
     config.indexModel = obj.indexModel
   }
@@ -208,7 +212,9 @@ export function loadConfig(gitmemDir: string): GitmemConfig {
   // checkModel
   if ("checkModel" in obj) {
     if (typeof obj.checkModel !== "string" || obj.checkModel === "") {
-      throw new Error(`Invalid config: "checkModel" must be a non-empty string`)
+      throw new ConfigError(
+        `Invalid config: "checkModel" must be a non-empty string`,
+      )
     }
     config.checkModel = obj.checkModel
   }

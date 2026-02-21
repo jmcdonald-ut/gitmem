@@ -1,18 +1,9 @@
 import type { Database } from "bun:sqlite"
 
+import { InvalidQueryError } from "@/errors"
 import type { SearchResult } from "@/types"
 
-/** Error thrown when a user-provided FTS5 query has invalid syntax. */
-export class InvalidQueryError extends Error {
-  constructor(query: string, cause: unknown) {
-    const message =
-      cause instanceof Error && cause.message.includes("fts5")
-        ? cause.message.replace(/^.*fts5: /, "")
-        : "invalid query syntax"
-    super(`Invalid search query "${query}": ${message}`)
-    this.name = "InvalidQueryError"
-  }
-}
+export { InvalidQueryError }
 
 /** Manages the FTS5 full-text search index over enriched commits. */
 export class SearchService {

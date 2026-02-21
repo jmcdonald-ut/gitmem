@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite"
 
+import { ValidationError } from "@/errors"
 import type {
   CouplingPairGlobalRow,
   CouplingPairRow,
@@ -435,7 +436,7 @@ export class AggregateRepository {
 
     const column = SORT_COLUMNS[sort]
     if (!column) {
-      throw new Error(
+      throw new ValidationError(
         `Invalid sort field "${sort}". Valid values: ${[...Object.keys(SORT_COLUMNS), "combined"].join(", ")}`,
       )
     }
@@ -763,7 +764,7 @@ export class AggregateRepository {
   ): TrendPeriod[] {
     const windowSql = WINDOW_FORMATS[window]
     if (!windowSql) {
-      throw new Error(
+      throw new ValidationError(
         `Invalid window "${window}". Valid values: ${Object.keys(WINDOW_FORMATS).join(", ")}`,
       )
     }
@@ -809,7 +810,7 @@ export class AggregateRepository {
   ): TrendPeriod[] {
     const windowSql = WINDOW_FORMATS[window]
     if (!windowSql) {
-      throw new Error(
+      throw new ValidationError(
         `Invalid window "${window}". Valid values: ${Object.keys(WINDOW_FORMATS).join(", ")}`,
       )
     }

@@ -13,6 +13,7 @@ import {
   isAiEnabled,
   loadConfig,
 } from "@/config"
+import { ConfigError, NotInitializedError } from "@/errors"
 
 describe("loadConfig", () => {
   let tempDir: string
@@ -32,6 +33,7 @@ describe("loadConfig", () => {
     expect(() => loadConfig(gitmemDir)).toThrow(
       "gitmem is not initialized. Run `gitmem init` first.",
     )
+    expect(() => loadConfig(gitmemDir)).toThrow(NotInitializedError)
   })
 
   test("throws when directory does not exist", () => {
@@ -40,6 +42,7 @@ describe("loadConfig", () => {
     expect(() => loadConfig(gitmemDir)).toThrow(
       "gitmem is not initialized. Run `gitmem init` first.",
     )
+    expect(() => loadConfig(gitmemDir)).toThrow(NotInitializedError)
   })
 
   test("reads existing config", () => {
@@ -227,6 +230,7 @@ describe("loadConfig", () => {
     writeFileSync(join(gitmemDir, "config.json"), "{invalid")
 
     expect(() => loadConfig(gitmemDir)).toThrow("not valid JSON")
+    expect(() => loadConfig(gitmemDir)).toThrow(ConfigError)
   })
 
   test("throws on non-object JSON", () => {
@@ -235,6 +239,15 @@ describe("loadConfig", () => {
     writeFileSync(join(gitmemDir, "config.json"), '"just a string"')
 
     expect(() => loadConfig(gitmemDir)).toThrow("must be a JSON object")
+    expect(() => loadConfig(gitmemDir)).toThrow(ConfigError)
+  })
+
+  test("throws ConfigError on invalid ai value", () => {
+    const gitmemDir = join(tempDir, ".gitmem")
+    mkdirSync(gitmemDir, { recursive: true })
+    writeFileSync(join(gitmemDir, "config.json"), JSON.stringify({ ai: 42 }))
+
+    expect(() => loadConfig(gitmemDir)).toThrow(ConfigError)
   })
 })
 
@@ -321,6 +334,7 @@ describe("createConfig", () => {
     expect(() => createConfig(gitmemDir)).toThrow(
       "Already initialized. Edit .gitmem/config.json to change settings.",
     )
+    expect(() => createConfig(gitmemDir)).toThrow(ConfigError)
   })
 
   test("throws on invalid ai date", () => {
