@@ -2,6 +2,7 @@ import { Command } from "@commander-js/extra-typings"
 import { render } from "ink"
 import React from "react"
 
+import { NotFoundError } from "@/errors"
 import { formatOutput } from "@/output"
 import { CouplingCommand } from "@commands/coupling/CouplingCommand"
 import { runCommand } from "@commands/utils/command-context"
@@ -80,8 +81,7 @@ export const couplingCommand = new Command("coupling")
           const fileCount = aggregates.getDirectoryFileCount(prefix)
 
           if (fileCount === 0) {
-            console.error(`Error: no indexed data found for "${path}"`)
-            process.exit(1)
+            throw new NotFoundError(`no indexed data found for "${path}"`)
           }
 
           const raw = aggregates.getCoupledFilesForDirectory(

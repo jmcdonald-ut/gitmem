@@ -82,44 +82,34 @@ export const indexCommand = new Command("index")
         }
 
         if (format === "json") {
-          try {
-            let result
-            if (opts.batch && aiEnabled) {
-              const batchLLM = new BatchLLMService(apiKey, model)
-              const batchJobs = new BatchJobRepository(db)
-              result = await enricher.runBatch(batchLLM, batchJobs, () => {})
-            } else {
-              result = await enricher.run(() => {})
-            }
-
-            db.prepare(
-              "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
-            ).run("last_run", new Date().toISOString())
-
-            formatOutput("json", {
-              success: true,
-              discovered: result.discoveredThisRun,
-              enriched: result.enrichedThisRun,
-              already_enriched: result.totalEnriched - result.enrichedThisRun,
-              failed: 0,
-              total_commits: result.totalCommits,
-              enriched_commits: result.totalEnriched,
-              coverage_pct:
-                result.totalCommits > 0
-                  ? Math.round(
-                      (result.totalEnriched / result.totalCommits) * 100,
-                    )
-                  : 0,
-              model: aiEnabled ? model : null,
-              batch_id: "batchId" in result ? (result.batchId ?? null) : null,
-            })
-          } catch (err) {
-            formatOutput("json", {
-              success: false,
-              error: err instanceof Error ? err.message : String(err),
-            })
-            process.exit(1)
+          let result
+          if (opts.batch && aiEnabled) {
+            const batchLLM = new BatchLLMService(apiKey, model)
+            const batchJobs = new BatchJobRepository(db)
+            result = await enricher.runBatch(batchLLM, batchJobs, () => {})
+          } else {
+            result = await enricher.run(() => {})
           }
+
+          db.prepare(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+          ).run("last_run", new Date().toISOString())
+
+          formatOutput("json", {
+            success: true,
+            discovered: result.discoveredThisRun,
+            enriched: result.enrichedThisRun,
+            already_enriched: result.totalEnriched - result.enrichedThisRun,
+            failed: 0,
+            total_commits: result.totalCommits,
+            enriched_commits: result.totalEnriched,
+            coverage_pct:
+              result.totalCommits > 0
+                ? Math.round((result.totalEnriched / result.totalCommits) * 100)
+                : 0,
+            model: aiEnabled ? model : null,
+            batch_id: "batchId" in result ? (result.batchId ?? null) : null,
+          })
         } else {
           if (opts.batch && aiEnabled) {
             const batchLLM = new BatchLLMService(apiKey, model)

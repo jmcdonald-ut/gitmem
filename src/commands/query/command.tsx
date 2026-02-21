@@ -3,12 +3,13 @@ import { render } from "ink"
 import React from "react"
 
 import { isAiEnabled } from "@/config"
+import { AiRequiredError } from "@/errors"
 import { formatOutput } from "@/output"
 import { QueryCommand } from "@commands/query/QueryCommand"
 import { runCommand } from "@commands/utils/command-context"
 import { parsePositiveInt } from "@commands/utils/parse-int"
 import { CommitRepository } from "@db/commits"
-import { InvalidQueryError, SearchService } from "@db/search"
+import { SearchService } from "@db/search"
 
 const HELP_TEXT = `
 Uses SQLite FTS5 full-text search — no API calls at query time.
@@ -39,14 +40,9 @@ export const queryCommand = new Command("query")
       {},
       async ({ format, git, db, config }) => {
         if (opts.classification && !isAiEnabled(config)) {
-          const msg =
-            "Error: --classification filter requires AI enrichment, but AI is disabled in .gitmem/config.json"
-          if (format === "json") {
-            formatOutput("json", { success: false, error: msg })
-          } else {
-            console.error(msg)
-          }
-          process.exit(1)
+          throw new AiRequiredError(
+            "--classification filter requires AI enrichment, but AI is disabled in .gitmem/config.json",
+          )
         }
 
         const commits = new CommitRepository(db)
@@ -60,19 +56,7 @@ export const queryCommand = new Command("query")
             : 0
 
         const classification: string | undefined = opts.classification
-        let results
-        try {
-          results = search.search(query, opts.limit, classification)
-        } catch (error) {
-          if (error instanceof InvalidQueryError) {
-            console.error(`Error: ${error.message}`)
-            console.error(
-              'Hint: use quotes for phrases, e.g. gitmem query "memory leak"',
-            )
-            process.exit(1)
-          }
-          throw error
-        }
+        const results = search.search(query, opts.limit, classification)
 
         if (
           formatOutput(format, {

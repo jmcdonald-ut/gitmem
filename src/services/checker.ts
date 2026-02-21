@@ -151,6 +151,8 @@ export class CheckerService {
         if (outcome.status === "fulfilled") {
           results.push(outcome.value)
           evaluated++
+        } else {
+          console.error(`Failed to evaluate commit: ${outcome.reason}`)
         }
       }
     }

@@ -3,6 +3,7 @@ import { render } from "ink"
 import React from "react"
 
 import { getAiCoverage } from "@/config"
+import { NotFoundError } from "@/errors"
 import { formatOutput } from "@/output"
 import { StatsCommand } from "@commands/stats/StatsCommand"
 import { runCommand } from "@commands/utils/command-context"
@@ -69,8 +70,7 @@ export const statsCommand = new Command("stats")
         const fileCount = aggregates.getDirectoryFileCount(prefix)
 
         if (fileCount === 0) {
-          console.error(`Error: no indexed data found for "${path}"`)
-          process.exit(1)
+          throw new NotFoundError(`no indexed data found for "${path}"`)
         }
 
         const dirStats = aggregates.getDirectoryStats(prefix)!

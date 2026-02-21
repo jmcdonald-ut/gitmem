@@ -84,12 +84,12 @@ describe("runCommand", () => {
     await rm(tempDir, { recursive: true })
   })
 
-  test("exits with 1 when not a git repo", async () => {
+  test("exits with 5 when not a git repo", async () => {
     await expect(runCommand({}, {}, async () => {})).rejects.toThrow(
-      "process.exit(1)",
+      "process.exit(5)",
     )
 
-    expect(exitCode).toBe(1)
+    expect(exitCode).toBe(5)
     expect(errorSpy).toHaveBeenCalledWith("Error: not a git repository")
   })
 
@@ -99,9 +99,9 @@ describe("runCommand", () => {
 
     await expect(
       runCommand({}, { needsDb: false }, async () => {}),
-    ).rejects.toThrow("process.exit(1)")
+    ).rejects.toThrow("process.exit(3)")
 
-    expect(exitCode).toBe(1)
+    expect(exitCode).toBe(3)
     expect(errorSpy).toHaveBeenCalledWith(
       "Error: gitmem is not initialized. Run `gitmem init` first.",
     )
@@ -122,7 +122,7 @@ describe("runCommand", () => {
     expect(calls[0][0].config).toEqual(DEFAULTS)
   })
 
-  test("exits with 1 when API key missing and needsApiKey is true", async () => {
+  test("exits with 5 when API key missing and needsApiKey is true", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
     createTestConfig(tempDir)
@@ -133,9 +133,9 @@ describe("runCommand", () => {
     try {
       await expect(
         runCommand({}, { needsApiKey: true, needsDb: false }, async () => {}),
-      ).rejects.toThrow("process.exit(1)")
+      ).rejects.toThrow("process.exit(5)")
 
-      expect(exitCode).toBe(1)
+      expect(exitCode).toBe(5)
       expect(errorSpy).toHaveBeenCalledWith(
         "Error: ANTHROPIC_API_KEY environment variable is required",
       )
@@ -146,16 +146,16 @@ describe("runCommand", () => {
     }
   })
 
-  test("exits with 1 when db does not exist and dbMustExist is true", async () => {
+  test("exits with 4 when db does not exist and dbMustExist is true", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
     createTestConfig(tempDir)
 
     await expect(
       runCommand({}, { needsApiKey: false }, async () => {}),
-    ).rejects.toThrow("process.exit(1)")
+    ).rejects.toThrow("process.exit(4)")
 
-    expect(exitCode).toBe(1)
+    expect(exitCode).toBe(4)
     expect(errorSpy).toHaveBeenCalledWith(
       "Error: no index found. Run `gitmem index` first.",
     )
@@ -193,7 +193,7 @@ describe("runCommand", () => {
         capturedDb = ctx.db
         throw new Error("handler failed")
       }),
-    ).rejects.toThrow("handler failed")
+    ).rejects.toThrow("process.exit(1)")
 
     // Verify db was closed by trying to run a query — should throw
     expect(() => capturedDb!.query("SELECT 1")).toThrow()
@@ -306,12 +306,12 @@ describe("runCommand", () => {
       runCommand({}, { needsApiKey: false, needsLock: true }, async () => {
         throw new Error("handler failed")
       }),
-    ).rejects.toThrow("handler failed")
+    ).rejects.toThrow("process.exit(1)")
 
     expect(existsSync(lockPath)).toBe(false)
   })
 
-  test("rethrows non-EEXIST errors from lock acquisition", async () => {
+  test("handles non-EEXIST errors from lock acquisition", async () => {
     const { $ } = await import("bun")
     const { chmodSync } = await import("fs")
     await $`git init ${tempDir}`.quiet()
@@ -338,7 +338,7 @@ describe("runCommand", () => {
     }
   })
 
-  test("exits with 1 when lock file already exists", async () => {
+  test("exits with 6 when lock file already exists", async () => {
     const { $ } = await import("bun")
     await $`git init ${tempDir}`.quiet()
     createTestConfig(tempDir)
@@ -353,9 +353,9 @@ describe("runCommand", () => {
 
     await expect(
       runCommand({}, { needsApiKey: false, needsLock: true }, async () => {}),
-    ).rejects.toThrow("process.exit(1)")
+    ).rejects.toThrow("process.exit(6)")
 
-    expect(exitCode).toBe(1)
+    expect(exitCode).toBe(6)
     expect(errorSpy).toHaveBeenCalledWith(
       "Error: another gitmem process is running (lock file exists: .gitmem/index.lock)",
     )
@@ -413,9 +413,9 @@ describe("runCommand", () => {
 
     await expect(
       runCommand({}, { needsDb: false }, async () => {}),
-    ).rejects.toThrow("process.exit(1)")
+    ).rejects.toThrow("process.exit(3)")
 
-    expect(exitCode).toBe(1)
+    expect(exitCode).toBe(3)
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining("not valid JSON"),
     )

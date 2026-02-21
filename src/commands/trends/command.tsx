@@ -3,6 +3,7 @@ import { render } from "ink"
 import React from "react"
 
 import { getAiCoverage } from "@/config"
+import { NotFoundError, ValidationError } from "@/errors"
 import { formatOutput } from "@/output"
 import { TrendsCommand } from "@commands/trends/TrendsCommand"
 import { runCommand } from "@commands/utils/command-context"
@@ -42,14 +43,13 @@ export const trendsCommand = new Command("trends")
     12,
   )
   .action(async (path, opts, cmd) => {
-    if (!VALID_WINDOWS.includes(opts.window)) {
-      console.error(
-        `Error: invalid window "${opts.window}". Valid values: ${VALID_WINDOWS.join(", ")}`,
-      )
-      process.exit(1)
-    }
-
     await runCommand(cmd.parent!.opts(), {}, ({ format, db, config }) => {
+      if (!VALID_WINDOWS.includes(opts.window)) {
+        throw new ValidationError(
+          `invalid window "${opts.window}". Valid values: ${VALID_WINDOWS.join(", ")}`,
+        )
+      }
+
       const commits = new CommitRepository(db)
       const aggregates = new AggregateRepository(db)
       const aiCoverage = getAiCoverage(
@@ -72,8 +72,7 @@ export const trendsCommand = new Command("trends")
         const fileCount = aggregates.getDirectoryFileCount(prefix)
 
         if (fileCount === 0) {
-          console.error(`Error: no indexed data found for "${path}"`)
-          process.exit(1)
+          throw new NotFoundError(`no indexed data found for "${path}"`)
         }
 
         type = "directory"

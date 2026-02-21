@@ -3,6 +3,7 @@ import { render } from "ink"
 import React from "react"
 
 import { getAiCoverage, isAiEnabled } from "@/config"
+import { AiRequiredError, ValidationError } from "@/errors"
 import { formatOutput } from "@/output"
 import { HotspotsCommand } from "@commands/hotspots/HotspotsCommand"
 import { runCommand } from "@commands/utils/command-context"
@@ -63,13 +64,6 @@ export const hotspotsCommand = new Command("hotspots")
   .option("--all", "Include all files (no exclusions)")
   .option("--include-deleted", "Include files no longer in the working tree")
   .action(async (opts, cmd) => {
-    if (!VALID_SORT_FIELDS.includes(opts.sort)) {
-      console.error(
-        `Error: invalid sort field "${opts.sort}". Valid values: ${VALID_SORT_FIELDS.join(", ")}`,
-      )
-      process.exit(1)
-    }
-
     const CLASSIFICATION_SORT_FIELDS = [
       "bug-fix",
       "feature",
@@ -85,17 +79,19 @@ export const hotspotsCommand = new Command("hotspots")
       cmd.parent!.opts(),
       {},
       async ({ format, db, git, config }) => {
+        if (!VALID_SORT_FIELDS.includes(opts.sort)) {
+          throw new ValidationError(
+            `invalid sort field "${opts.sort}". Valid values: ${VALID_SORT_FIELDS.join(", ")}`,
+          )
+        }
+
         if (
           CLASSIFICATION_SORT_FIELDS.includes(opts.sort) &&
           !isAiEnabled(config)
         ) {
-          const msg = `Error: sorting by "${opts.sort}" requires AI enrichment, but AI is disabled in .gitmem/config.json`
-          if (format === "json") {
-            formatOutput("json", { success: false, error: msg })
-          } else {
-            console.error(msg)
-          }
-          process.exit(1)
+          throw new AiRequiredError(
+            `sorting by "${opts.sort}" requires AI enrichment, but AI is disabled in .gitmem/config.json`,
+          )
         }
 
         const commits = new CommitRepository(db)

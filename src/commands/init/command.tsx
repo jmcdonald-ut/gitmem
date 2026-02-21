@@ -55,22 +55,10 @@ export const initCommand = new Command("init")
         if (opts.checkModel !== undefined)
           overrides.checkModel = opts.checkModel
 
-        let config: GitmemConfig
-        try {
-          config = createConfig(
-            gitmemDir,
-            Object.keys(overrides).length > 0 ? overrides : undefined,
-          )
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
-          if (format === "json") {
-            formatOutput("json", { success: false, error: message })
-          } else {
-            console.error(`Error: ${message}`)
-          }
-          process.exit(1)
-          return
-        }
+        const config = createConfig(
+          gitmemDir,
+          Object.keys(overrides).length > 0 ? overrides : undefined,
+        )
 
         const dbPath = resolve(gitmemDir, "index.db")
         const db = createDatabase(dbPath)

@@ -5,6 +5,7 @@ import React from "react"
 import z from "zod"
 
 import { isAiEnabled } from "@/config"
+import { AiRequiredError, NotFoundError, ValidationError } from "@/errors"
 import { formatOutput } from "@/output"
 import { BatchCheckCommand } from "@commands/check/BatchCheckCommand"
 import { CheckCommand } from "@commands/check/CheckCommand"
@@ -73,29 +74,23 @@ export const checkCommand = new Command("check")
     "Use Anthropic Message Batches API (50% cost reduction)",
   )
   .action(async (hash, opts, cmd) => {
-    const parsedInput = inputSchema.safeParse({ ...opts, hash })
-    if (parsedInput.error) {
-      console.error(
-        "Error: provide either a commit hash or use --sample <N> (--batch optional with --sample)",
-      )
-      process.exit(1)
-    }
-
-    const input = parsedInput.data
-
     await runCommand(
       cmd.parent!.opts(),
       { needsApiKey: true, needsLock: true },
       async ({ format, cwd, git, apiKey, db, config }) => {
+        const parsedInput = inputSchema.safeParse({ ...opts, hash })
+        if (parsedInput.error) {
+          throw new ValidationError(
+            "provide either a commit hash or use --sample <N> (--batch optional with --sample)",
+          )
+        }
+
+        const input = parsedInput.data
+
         if (!isAiEnabled(config)) {
-          const msg =
-            "Error: AI is disabled in .gitmem/config.json. The check command requires AI enrichment."
-          if (format === "json") {
-            formatOutput("json", { success: false, error: msg })
-          } else {
-            console.error(msg)
-          }
-          process.exit(1)
+          throw new AiRequiredError(
+            "AI is disabled in .gitmem/config.json. The check command requires AI enrichment.",
+          )
         }
 
         const model = opts.model ?? config.checkModel
@@ -151,10 +146,9 @@ export const checkCommand = new Command("check")
           } else {
             const result = await checker.checkOne(input.hash, () => {})
             if (!result) {
-              console.error(
-                `Error: commit ${input.hash} not found or not yet enriched`,
+              throw new NotFoundError(
+                `commit ${input.hash} not found or not yet enriched`,
               )
-              process.exit(1)
             }
             formatOutput("json", result)
           }
