@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { describe, expect, test } from "bun:test"
 
+import type { ScopeSpec } from "@/scope"
 import {
   handleDetails,
   normalizePathPrefix,
@@ -9,6 +10,8 @@ import {
 import { AggregateRepository } from "@db/aggregates"
 import { CommitRepository } from "@db/commits"
 import { createDatabase } from "@db/database"
+
+const noScope: ScopeSpec = { include: [], exclude: [] }
 
 describe("parsePort", () => {
   test("parses valid port numbers", () => {
@@ -137,7 +140,7 @@ describe("handleDetails", () => {
 
   test("returns root details for empty path", async () => {
     const { commits, aggregates } = setup()
-    const res = handleDetails(makeUrl("/"), commits, aggregates, [])
+    const res = handleDetails(makeUrl("/"), commits, aggregates, noScope)
     const data = await res.json()
 
     expect(data.type).toBe("root")
@@ -151,7 +154,7 @@ describe("handleDetails", () => {
   test("returns root details when path param is missing", async () => {
     const { commits, aggregates } = setup()
     const url = new URL("http://localhost/api/details")
-    const res = handleDetails(url, commits, aggregates, [])
+    const res = handleDetails(url, commits, aggregates, noScope)
     const data = await res.json()
 
     expect(data.type).toBe("root")
@@ -161,7 +164,7 @@ describe("handleDetails", () => {
     const { db, commits, aggregates } = setup()
     seedData(db)
 
-    const res = handleDetails(makeUrl(""), commits, aggregates, [])
+    const res = handleDetails(makeUrl(""), commits, aggregates, noScope)
     const data = await res.json()
 
     expect(data.type).toBe("root")
@@ -187,7 +190,7 @@ describe("handleDetails", () => {
 
   test("returns directory details for path ending in /", async () => {
     const { commits, aggregates } = setup()
-    const res = handleDetails(makeUrl("src/"), commits, aggregates, [])
+    const res = handleDetails(makeUrl("src/"), commits, aggregates, noScope)
     const data = await res.json()
 
     expect(data.type).toBe("directory")
@@ -198,7 +201,7 @@ describe("handleDetails", () => {
     const { db, commits, aggregates } = setup()
     seedData(db)
 
-    const res = handleDetails(makeUrl("src/"), commits, aggregates, [])
+    const res = handleDetails(makeUrl("src/"), commits, aggregates, noScope)
     const data = await res.json()
 
     expect(data.type).toBe("directory")
@@ -229,7 +232,12 @@ describe("handleDetails", () => {
 
   test("returns file details for file path", async () => {
     const { commits, aggregates } = setup()
-    const res = handleDetails(makeUrl("src/main.ts"), commits, aggregates, [])
+    const res = handleDetails(
+      makeUrl("src/main.ts"),
+      commits,
+      aggregates,
+      noScope,
+    )
     const data = await res.json()
 
     expect(data.type).toBe("file")
@@ -253,7 +261,12 @@ describe("handleDetails", () => {
        VALUES ('src/main.ts', 5, 1, 2, 1, 0, 1, 0, 0, 0, '2025-01-01', '2025-06-01', 200, 50, 150)`,
     )
 
-    const res = handleDetails(makeUrl("src/main.ts"), commits, aggregates, [])
+    const res = handleDetails(
+      makeUrl("src/main.ts"),
+      commits,
+      aggregates,
+      noScope,
+    )
     const data = await res.json()
 
     expect(data.type).toBe("file")
@@ -266,7 +279,12 @@ describe("handleDetails", () => {
     const { db, commits, aggregates } = setup()
     seedData(db)
 
-    const res = handleDetails(makeUrl("src/auth.ts"), commits, aggregates, [])
+    const res = handleDetails(
+      makeUrl("src/auth.ts"),
+      commits,
+      aggregates,
+      noScope,
+    )
     const data = await res.json()
 
     expect(data.type).toBe("file")
@@ -299,7 +317,7 @@ describe("handleDetails", () => {
     const { db, commits, aggregates } = setup()
     db.close()
 
-    const res = handleDetails(makeUrl(""), commits, aggregates, [])
+    const res = handleDetails(makeUrl(""), commits, aggregates, noScope)
 
     expect(res.status).toBe(500)
     const data = await res.json()
@@ -313,7 +331,7 @@ describe("handleDetails", () => {
       throw "something went wrong"
     }
 
-    const res = handleDetails(makeUrl(""), commits, aggregates, [])
+    const res = handleDetails(makeUrl(""), commits, aggregates, noScope)
 
     expect(res.status).toBe(500)
     const data = await res.json()
@@ -335,7 +353,7 @@ describe("handleDetails", () => {
       VALUES ('bbb222', 'Bob', 'bob@test.com', '2025-02-10T00:00:00Z', 'wip')
     `)
 
-    const res = handleDetails(makeUrl(""), commits, aggregates, [])
+    const res = handleDetails(makeUrl(""), commits, aggregates, noScope)
     const data = await res.json()
 
     expect(data.type).toBe("root")
@@ -354,7 +372,7 @@ describe("handleDetails", () => {
       makeUrl(""),
       commits,
       aggregates,
-      [],
+      noScope,
       trackedFiles,
     )
     const data = await res.json()
@@ -377,7 +395,7 @@ describe("handleDetails", () => {
       makeUrl("src/"),
       commits,
       aggregates,
-      [],
+      noScope,
       trackedFiles,
     )
     const data = await res.json()
@@ -397,7 +415,7 @@ describe("handleDetails", () => {
       makeUrl("src/auth.ts"),
       commits,
       aggregates,
-      [],
+      noScope,
       trackedFiles,
     )
     const data = await res.json()
@@ -410,7 +428,7 @@ describe("handleDetails", () => {
     const { db, commits, aggregates } = setup()
     seedData(db)
 
-    const res = handleDetails(makeUrl(""), commits, aggregates, [])
+    const res = handleDetails(makeUrl(""), commits, aggregates, noScope)
     const data = await res.json()
 
     expect(data.hotspots.length).toBe(3)
@@ -425,7 +443,7 @@ describe("handleDetails", () => {
       makeUrl("/"),
       commits,
       aggregates,
-      [],
+      noScope,
       undefined,
       "src/",
     )
@@ -451,7 +469,7 @@ describe("handleDetails", () => {
       makeUrl("services/"),
       commits,
       aggregates,
-      [],
+      noScope,
       undefined,
       "src/",
     )
@@ -471,7 +489,7 @@ describe("handleDetails", () => {
       makeUrl("auth.ts"),
       commits,
       aggregates,
-      [],
+      noScope,
       undefined,
       "src/",
     )
@@ -491,7 +509,7 @@ describe("handleDetails", () => {
       makeUrl("/"),
       commits,
       aggregates,
-      [],
+      noScope,
       undefined,
       "src/",
     )
@@ -507,12 +525,12 @@ describe("handleDetails", () => {
     const { db, commits, aggregates } = setup()
     seedData(db)
 
-    const resDefault = handleDetails(makeUrl(""), commits, aggregates, [])
+    const resDefault = handleDetails(makeUrl(""), commits, aggregates, noScope)
     const resEmpty = handleDetails(
       makeUrl(""),
       commits,
       aggregates,
-      [],
+      noScope,
       undefined,
       "",
     )
@@ -542,7 +560,12 @@ describe("handleDetails", () => {
       VALUES ('lib/helpers.ts', 'src/services/auth.ts', 3)
     `)
 
-    const res = handleDetails(makeUrl("src/services/"), commits, aggregates, [])
+    const res = handleDetails(
+      makeUrl("src/services/"),
+      commits,
+      aggregates,
+      noScope,
+    )
     const data = await res.json()
 
     expect(data.type).toBe("directory")
@@ -579,7 +602,7 @@ describe("handleDetails", () => {
       makeUrl("foo.ts"),
       commits,
       aggregates,
-      [],
+      noScope,
       undefined,
       "src/commands/",
     )
@@ -613,7 +636,7 @@ describe("handleDetails", () => {
       makeUrl("viz/"),
       commits,
       aggregates,
-      [],
+      noScope,
       undefined,
       "src/commands/",
     )
