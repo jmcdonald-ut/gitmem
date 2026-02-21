@@ -144,9 +144,9 @@ describe("buildHierarchy", () => {
     expect(src.indexed).toBe(false)
   })
 
-  test("files with null complexity get score 0", () => {
+  test("score is based on change frequency alone", () => {
     const s1 = makeStats("a.ts", {
-      total_changes: 10,
+      total_changes: 5,
       current_complexity: null,
     })
     const s2 = makeStats("b.ts", {
@@ -163,8 +163,8 @@ describe("buildHierarchy", () => {
 
     const a = result.root.children!.find((c) => c.name === "a.ts")!
     const b = result.root.children!.find((c) => c.name === "b.ts")!
-    expect(a.score).toBe(0)
-    expect(b.score).toBe(1) // max of both changes and complexity
+    expect(a.score).toBe(0.5) // 5/10
+    expect(b.score).toBe(1) // 10/10
   })
 
   test("multiple files in same directory share the directory node", () => {

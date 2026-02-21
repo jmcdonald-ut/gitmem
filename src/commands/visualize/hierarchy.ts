@@ -34,14 +34,8 @@ export function buildHierarchy(
 
   // Compute normalization values across all file stats
   let maxChanges = 0
-  let maxComplexity = 0
   for (const stats of fileStats.values()) {
     if (stats.total_changes > maxChanges) maxChanges = stats.total_changes
-    if (
-      stats.current_complexity != null &&
-      stats.current_complexity > maxComplexity
-    )
-      maxComplexity = stats.current_complexity
   }
 
   let totalIndexed = 0
@@ -76,15 +70,8 @@ export function buildHierarchy(
     if (indexed) totalIndexed++
 
     let score = 0
-    if (
-      indexed &&
-      maxChanges > 0 &&
-      maxComplexity > 0 &&
-      stats.current_complexity != null
-    ) {
-      score =
-        (stats.total_changes / maxChanges) *
-        (stats.current_complexity / maxComplexity)
+    if (indexed && maxChanges > 0) {
+      score = stats.total_changes / maxChanges
     }
 
     const leaf: HierarchyNode = {
