@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
-import { COLORS } from "../lib/colors"
-import type { ClassificationCounts } from "../types"
+import { COLORS } from "@visualize-app/lib/colors"
+import type { ClassificationCounts } from "@visualize-app/types"
 
 const TYPES = [
   { key: "bug_fix_count", label: "bug-fix", color: COLORS["bug-fix"] },

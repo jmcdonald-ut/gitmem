@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { useState, useEffect } from "react"
-import type { HierarchyResponse } from "../types"
+import type { HierarchyResponse } from "@visualize-app/types"
 
 export function useHierarchy() {
   const [data, setData] = useState<HierarchyResponse | null>(null)

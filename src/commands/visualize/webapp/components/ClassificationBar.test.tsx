@@ -1,8 +1,8 @@
 /// <reference lib="dom" />
-import "../test-setup"
+import "@visualize-app/test-setup"
 import { describe, test, expect, afterEach } from "bun:test"
 import { render, cleanup } from "@testing-library/react"
-import { ClassificationBar } from "./ClassificationBar"
+import { ClassificationBar } from "@visualize-app/components/ClassificationBar"
 
 afterEach(cleanup)
 

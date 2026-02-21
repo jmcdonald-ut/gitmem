@@ -1,8 +1,11 @@
 /// <reference lib="dom" />
-import type { HierarchyResult } from "../hierarchy"
+import type { HierarchyResult } from "@commands/visualize/hierarchy"
 import type { TrendSummary } from "@/types"
 
-export type { HierarchyResult, HierarchyNode } from "../hierarchy"
+export type {
+  HierarchyResult,
+  HierarchyNode,
+} from "@commands/visualize/hierarchy"
 
 export interface HierarchyResponse extends HierarchyResult {
   repoName: string

@@ -13,9 +13,9 @@ import {
   type HierarchyCircularNode,
 } from "d3-hierarchy"
 import { interpolateZoom } from "d3-interpolate"
-import { scoreColor } from "../lib/colors"
-import { Tooltip, type TooltipData } from "./Tooltip"
-import type { HierarchyNode, HierarchyResult } from "../types"
+import { scoreColor } from "@visualize-app/lib/colors"
+import { Tooltip, type TooltipData } from "@visualize-app/components/Tooltip"
+import type { HierarchyNode, HierarchyResult } from "@visualize-app/types"
 
 interface CirclePackingProps {
   hierarchy: HierarchyResult

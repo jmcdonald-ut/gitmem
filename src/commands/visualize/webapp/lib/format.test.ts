@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { describe, test, expect } from "bun:test"
-import { fmt, smartTruncate } from "./format"
+import { fmt, smartTruncate } from "@visualize-app/lib/format"
 
 describe("fmt", () => {
   test("formats a number with locale string", () => {
