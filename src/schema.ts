@@ -1,4 +1,28 @@
-import type { SchemaTable } from "@/types"
+/** A column within a database table, used for schema documentation. */
+export interface SchemaColumn {
+  /** Column name. */
+  name: string
+  /** SQLite column type (e.g. "TEXT", "INTEGER"). */
+  type: string
+  /** Whether this column is part of the primary key. */
+  primary_key: boolean
+  /** Whether this column is NOT NULL. */
+  not_null: boolean
+  /** Brief description of the column's purpose. */
+  description: string
+}
+
+/** A database table or virtual table, used for schema documentation. */
+export interface SchemaTable {
+  /** Table name. */
+  name: string
+  /** Brief description of the table's purpose. */
+  description: string
+  /** Whether this is an FTS5 virtual table. */
+  virtual: boolean
+  /** Columns in this table. */
+  columns: SchemaColumn[]
+}
 
 /** Complete schema documentation for the gitmem SQLite database. */
 export const SCHEMA: SchemaTable[] = [

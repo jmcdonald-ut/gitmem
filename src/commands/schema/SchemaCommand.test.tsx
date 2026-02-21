@@ -3,7 +3,7 @@ import { render } from "ink-testing-library"
 import React from "react"
 
 import { SCHEMA } from "@/schema"
-import type { SchemaTable } from "@/types"
+import type { SchemaTable } from "@/schema"
 import { SchemaCommand } from "@commands/schema/SchemaCommand"
 
 const sampleTables: SchemaTable[] = [

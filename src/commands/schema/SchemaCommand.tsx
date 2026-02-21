@@ -1,7 +1,7 @@
 import { Box, Text } from "ink"
 import React from "react"
 
-import type { SchemaTable } from "@/types"
+import type { SchemaTable } from "@/schema"
 
 /** Props for the SchemaCommand component. */
 interface SchemaCommandProps {
