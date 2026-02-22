@@ -107,12 +107,12 @@ Commands:
   query|q [options] <query>       Full-text search over indexed commits (no API
                                   calls)
   check [options] [hash]          Evaluate enrichment quality via LLM-as-judge
-  hotspots|h [options]            Show most-changed files with classification
+  hotspots|h [options] [path]     Show most-changed files with classification
                                   breakdown
-  stats [options] <path>          Show detailed change statistics for a file or
+  stats [options] [path]          Show detailed change statistics for a file or
                                   directory
   coupling|c [options] [path]     Show files that frequently change together
-  trends|t [options] <path>       Show change velocity and classification mix
+  trends|t [options] [path]       Show change velocity and classification mix
                                   over time
   schema                          Display database schema documentation
   visualize|viz [options] [path]  Open an interactive visualization of the
