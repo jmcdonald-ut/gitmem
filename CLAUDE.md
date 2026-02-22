@@ -32,10 +32,12 @@ bun run build         # Compile to standalone binary at build/gitmem
 ```
 src/
   cli.tsx              # Entry point — registers commands via addCommand()
-  config.ts            # Config loading from .gitmem/config.json (AI toggle, model defaults)
+  config.ts            # Config loading from .gitmem/config.json (AI toggle, model defaults, scope)
   types.ts             # All shared types, interfaces, and constants
   schema.ts            # Database schema documentation
   output.ts            # CLI output format resolution
+  scope.ts             # Pattern-based file scope: --include/-I, --exclude/-X, --all flags
+  file-filter.ts       # isGenerated check and tracked-file filter helpers
   commands/            # One directory per CLI command
     <name>/
       command.tsx      # Commander definition, options, help text, action handler
@@ -70,7 +72,6 @@ src/
     enricher.ts        # Orchestrates the 5-phase pipeline (EnricherService)
     measurer.ts        # Orchestrates complexity measurement for commit files
     complexity.ts      # Indentation-based complexity metrics
-    file-filter.ts     # Test/docs/generated file exclusion logic
     checker.ts         # Orchestrates enrichment quality evaluation
     judge.ts           # Anthropic API for commit evaluation (JudgeService)
     judge-shared.ts    # Shared judge prompt, message builder, response parser
@@ -95,7 +96,7 @@ src/
 | `visualize` | `viz` | Interactive circle-packing visualization via local HTTP server |
 | `generate skill` | — | Generate a Claude Code skill file for this repository |
 
-Several commands (`hotspots`, `coupling`, `visualize`) support file-filter flags (`--include-tests`, `--include-docs`, `--include-generated`, `--all`) via `file-filter.ts`. By default, test, docs, and generated files are excluded.
+Most query commands (`hotspots`, `coupling`, `query`, `stats`, `trends`, `visualize`) support scope flags (`--include/-I`, `--exclude/-X`, `--all`) via `scope.ts`. Default exclude patterns are configured in `.gitmem/config.json` under `scope`.
 
 ## Architecture
 
@@ -130,6 +131,7 @@ Settings are stored in `.gitmem/config.json` (created by `gitmem init`):
 | `indexStartDate` | `string \| null` | `null` | Limit discovery to commits on/after this date (`"YYYY-MM-DD"`) |
 | `indexModel` | `string` | `"claude-haiku-4-5-20251001"` | Default model for `gitmem index` |
 | `checkModel` | `string` | `"claude-sonnet-4-5-20250929"` | Default model for `gitmem check` |
+| `scope` | `{ include?: string[], exclude?: string[] }` | `{ exclude: ["*__test__*", "*.test.*", "test/*", ...] }` | Default include/exclude glob patterns for file scoping |
 
 ## Environment
 
